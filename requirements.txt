@@ -15,7 +15,6 @@ Flask-Principal==0.4.0
 Flask-Bcrypt==1.0.1
 Flask-SSLify==0.1.5
 Flask-SeaSurf==1.1.1
-# Flask-Secure-Headers==0.6  # опционально, если нужен
 Werkzeug==2.3.7
 SQLAlchemy==2.0.20
 python-dotenv==1.0.0
@@ -23,3 +22,5 @@ Pillow==10.0.0
 eventlet==0.33.3
 python-socketio==5.9.0
 bcrypt==4.0.1
+psycopg2-binary==2.9.9
+gunicorn==21.2.0
