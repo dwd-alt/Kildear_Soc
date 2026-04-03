@@ -1,0 +1,1081 @@
+{% extends "base.html" %}
+
+{% block title %}{{ group_chat.name }} - Kildear{% endblock %}
+
+{% block content %}
+<div class="group-chat-container">
+    <input type="hidden" id="group-chat-id" value="{{ group_chat.id }}">
+
+    <!-- Header -->
+    <div class="group-chat-header">
+        <div class="group-chat-info-header">
+            <img src="{{ group_chat.avatar }}" alt="{{ group_chat.name }}" class="group-chat-avatar-large">
+            <div class="group-chat-details">
+                <h1>{{ group_chat.name }}</h1>
+                <p class="description">{{ group_chat.description }}</p>
+                <div class="group-stats">
+                    <span><i class="fas fa-user-friends"></i> {{ group_chat.member_count }} участников</span>
+                    <span><i class="fas fa-calendar"></i> Создан {{ group_chat.created_at.strftime('%d.%m.%Y') }}</span>
+                    {% if group_chat.is_private %}
+                    <span class="private"><i class="fas fa-lock"></i> Приватный чат</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="group-actions">
+            {% if is_owner %}
+            <button class="btn btn-secondary" onclick="inviteUser()">
+                <i class="fas fa-user-plus"></i> Пригласить
+            </button>
+            <button class="btn btn-secondary" onclick="editGroup()">
+                <i class="fas fa-edit"></i> Редактировать
+            </button>
+            {% endif %}
+            <button class="btn btn-secondary" onclick="showMembers()">
+                <i class="fas fa-users"></i> Участники
+            </button>
+            <button class="btn btn-danger" onclick="leaveGroup()">
+                <i class="fas fa-sign-out-alt"></i> Покинуть
+            </button>
+        </div>
+    </div>
+
+    <!-- Messages -->
+    <div class="group-chat-messages" id="group-messages">
+        {% for message in messages %}
+        <div class="group-message {{ 'own' if message.sender_id == current_user.id else 'other' }}" id="msg-{{ message.id }}">
+            {% if message.sender_id != current_user.id %}
+            <img src="{{ message.sender.avatar_url }}" class="message-avatar" alt="{{ message.sender.username }}">
+            {% endif %}
+            <div class="message-content-wrapper">
+                {% if message.sender_id != current_user.id %}
+                <div class="message-sender">{{ message.sender.display_name or message.sender.username }}</div>
+                {% endif %}
+                <div class="message-bubble">
+                    {% if message.content %}
+                    <p class="message-text">{{ message.content }}</p>
+                    {% endif %}
+                    {% if message.media_url %}
+                    <img src="{{ message.media_url }}" class="message-image" alt="Image">
+                    {% endif %}
+                    <div class="message-reactions" id="reactions-{{ message.id }}"></div>
+                    <span class="message-time">{{ message.created_at.strftime('%H:%M') }}</span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Input area -->
+    <div class="group-chat-input-area">
+        <div class="message-input-wrapper">
+            <textarea id="group-chat-input" placeholder="Введите сообщение..." rows="1"></textarea>
+            <button class="btn-icon" onclick="sendGroupMessage()">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+.group-chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.group-chat-header {
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border);
+    padding: 20px;
+    flex-shrink: 0;
+}
+
+.group-chat-info-header {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.group-chat-avatar-large {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.group-chat-details {
+    flex: 1;
+}
+
+.group-chat-details h1 {
+    margin: 0 0 5px 0;
+    font-size: 24px;
+    color: var(--text-primary);
+}
+
+.group-chat-details .description {
+    color: var(--text-secondary);
+    margin: 0 0 10px 0;
+}
+
+.group-stats {
+    display: flex;
+    gap: 20px;
+    font-size: 14px;
+    color: var(--text-dim);
+}
+
+.group-stats span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.private {
+    color: var(--warning);
+}
+
+.group-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.group-chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.group-message {
+    display: flex;
+    gap: 10px;
+    animation: fadeIn 0.3s ease;
+}
+
+.group-message.own {
+    justify-content: flex-end;
+}
+
+.group-message.own .message-content-wrapper {
+    align-items: flex-end;
+}
+
+.message-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.message-content-wrapper {
+    display: flex;
+    flex-direction: column;
+    max-width: 70%;
+}
+
+.message-sender {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+    margin-left: 5px;
+}
+
+.message-bubble {
+    background: var(--message-bg);
+    padding: 10px 14px;
+    border-radius: 18px;
+    position: relative;
+}
+
+.group-message.own .message-bubble {
+    background: var(--primary);
+    color: white;
+}
+
+.message-text {
+    margin: 0;
+    word-wrap: break-word;
+}
+
+.message-image {
+    max-width: 200px;
+    max-height: 200px;
+    border-radius: 10px;
+    margin-top: 5px;
+    cursor: pointer;
+}
+
+.message-time {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    display: block;
+    text-align: right;
+}
+
+.group-message.own .message-time {
+    color: rgba(255,255,255,0.7);
+}
+
+.message-reactions {
+    display: flex;
+    gap: 5px;
+    margin-top: 5px;
+    flex-wrap: wrap;
+}
+
+.reaction-btn {
+    background: var(--reaction-bg);
+    border: none;
+    border-radius: 20px;
+    padding: 2px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.reaction-btn:hover {
+    transform: scale(1.05);
+}
+
+.group-chat-input-area {
+    padding: 20px;
+    background: var(--card-bg);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.message-input-wrapper {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+#group-chat-input {
+    flex: 1;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    background: var(--input-bg);
+    color: var(--text-primary);
+    resize: none;
+    font-family: inherit;
+    font-size: 14px;
+    max-height: 100px;
+}
+
+#group-chat-input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.btn-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.btn-icon:hover {
+    transform: scale(1.05);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 768px) {
+    .group-chat-info-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .message-content-wrapper {
+        max-width: 85%;
+    }
+
+    .group-actions {
+        justify-content: center;
+    }
+}
+</style>
+
+<script>
+let currentGroupChatId = {{ group_chat.id }};
+let typingTimeout = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-resize textarea
+    const textarea = document.getElementById('group-chat-input');
+    if (textarea) {
+        textarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+            sendTypingIndicator();
+        });
+
+        textarea.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendGroupMessage();
+            }
+        });
+    }
+
+    // Join group chat room via Socket.IO
+    if (socket) {
+        socket.emit('join_group_chat', { chat_id: currentGroupChatId });
+    }
+
+    // Scroll to bottom
+    const messagesContainer = document.getElementById('group-messages');
+    if (messagesContainer) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+});
+
+function sendTypingIndicator() {
+    if (typingTimeout) clearTimeout(typingTimeout);
+
+    if (socket) {
+        socket.emit('group_typing', {
+            chat_id: currentGroupChatId,
+            is_typing: true
+        });
+    }
+
+    typingTimeout = setTimeout(() => {
+        if (socket) {
+            socket.emit('group_typing', {
+                chat_id: currentGroupChatId,
+                is_typing: false
+            });
+        }
+    }, 2000);
+}
+
+async function sendGroupMessage() {
+    const input = document.getElementById('group-chat-input');
+    const content = input.value.trim();
+
+    if (!content) return;
+
+    const formData = new FormData();
+    formData.append('content', content);
+
+    try {
+        const response = await fetch(`/group-chat/${currentGroupChatId}/send`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRF()
+            },
+            body: formData
+        });
+
+        if (response.ok) {
+            input.value = '';
+            input.style.height = 'auto';
+        } else {
+            toast('Ошибка при отправке сообщения', 'error');
+        }
+    } catch (error) {
+        toast('Ошибка при отправке сообщения', 'error');
+    }
+}
+
+async function inviteUser() {
+    const username = prompt('Введите имя пользователя для приглашения:');
+    if (!username) return;
+
+    try {
+        const response = await fetch(`/group-chat/${currentGroupChatId}/invite`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRF()
+            },
+            body: JSON.stringify({ username: username })
+        });
+
+        if (response.ok) {
+            toast(`Пользователь ${username} приглашен!`, 'success');
+        } else {
+            const error = await response.json();
+            toast(error.error || 'Ошибка при приглашении', 'error');
+        }
+    } catch (error) {
+        toast('Ошибка при приглашении', 'error');
+    }
+}
+
+async function showMembers() {
+    try {
+        const response = await fetch(`/group-chat/${currentGroupChatId}/members`);
+        const data = await response.json();
+
+        const modalHtml = `
+            <div class="modal open" id="membersModal">
+                <div class="modal-content">
+                    <h3><i class="fas fa-users"></i> Участники чата</h3>
+                    <div class="members-list">
+                        ${data.members.map(member => `
+                            <div class="member-item">
+                                <img src="${member.avatar}" class="avatar avatar-sm">
+                                <div class="member-info">
+                                    <strong>${escapeHtml(member.display_name || member.username)}</strong>
+                                    <span class="username">@${member.username}</span>
+                                </div>
+                                <span class="online-dot ${member.is_online ? 'online' : 'offline'}"></span>
+                                ${member.id == {{ group_chat.owner_id }} ? '<span class="owner-badge"><i class="fas fa-crown"></i> Владелец</span>' : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button class="btn btn-secondary" onclick="closeModal('membersModal')">Закрыть</button>
+                </div>
+            </div>
+        `;
+
+        const modalContainer = document.createElement('div');
+        modalContainer.innerHTML = modalHtml;
+        document.body.appendChild(modalContainer.firstElementChild);
+
+    } catch (error) {
+        toast('Ошибка загрузки участников', 'error');
+    }
+}
+
+function leaveGroup() {
+    if (confirm('Вы уверены, что хотите покинуть этот чат?')) {
+        fetch(`/group-chat/${currentGroupChatId}/leave`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRF()
+            }
+        }).then(() => {
+            window.location.href = '/group-chats';
+        }).catch(error => {
+            toast('Ошибка при выходе из чата', 'error');
+        });
+    }
+}
+
+function editGroup() {
+    // Implement edit functionality
+    toast('Редактирование группы будет доступно в следующей версии', 'info');
+}
+
+// Socket.IO event listeners
+if (socket) {
+    socket.on('group_message', (data) => {
+        appendGroupMessage(data);
+    });
+
+    socket.on('group_typing', (data) => {
+        showTypingIndicator(data.username);
+    });
+}
+
+function appendGroupMessage(data) {
+    const messagesContainer = document.getElementById('group-messages');
+    const isOwn = data.sender_id == {{ current_user.id }};
+
+    const messageHtml = `
+        <div class="group-message ${isOwn ? 'own' : 'other'}" id="msg-${data.id}">
+            ${!isOwn ? `<img src="${data.sender_avatar}" class="message-avatar" alt="${data.sender_username}">` : ''}
+            <div class="message-content-wrapper">
+                ${!isOwn ? `<div class="message-sender">${escapeHtml(data.sender_username)}</div>` : ''}
+                <div class="message-bubble">
+                    ${data.content ? `<p class="message-text">${escapeHtml(data.content)}</p>` : ''}
+                    ${data.media_url ? `<img src="${data.media_url}" class="message-image" alt="Image">` : ''}
+                    <span class="message-time">${data.created_at}</span>
+                </div>
+            </div>
+        </div>
+    `;
+
+    messagesContainer.insertAdjacentHTML('beforeend', messageHtml);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+let typingIndicatorTimeout = null;
+
+function showTypingIndicator(username) {
+    let indicator = document.getElementById('typing-indicator');
+    if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'typing-indicator';
+        indicator.className = 'typing-indicator';
+        document.querySelector('.group-chat-messages').appendChild(indicator);
+    }
+
+    indicator.innerHTML = `<i class="fas fa-ellipsis-h"></i> ${escapeHtml(username)} печатает...`;
+    indicator.style.display = 'block';
+
+    if (typingIndicatorTimeout) clearTimeout(typingIndicatorTimeout);
+    typingIndicatorTimeout = setTimeout(() => {
+        if (indicator) indicator.style.display = 'none';
+    }, 3000);
+}
+</script>
+{% endblock %}{% extends "base.html" %}
+
+{% block title %}{{ group_chat.name }} - Kildear{% endblock %}
+
+{% block content %}
+<div class="group-chat-container">
+    <input type="hidden" id="group-chat-id" value="{{ group_chat.id }}">
+
+    <!-- Header -->
+    <div class="group-chat-header">
+        <div class="group-chat-info-header">
+            <img src="{{ group_chat.avatar }}" alt="{{ group_chat.name }}" class="group-chat-avatar-large">
+            <div class="group-chat-details">
+                <h1>{{ group_chat.name }}</h1>
+                <p class="description">{{ group_chat.description }}</p>
+                <div class="group-stats">
+                    <span><i class="fas fa-user-friends"></i> {{ group_chat.member_count }} участников</span>
+                    <span><i class="fas fa-calendar"></i> Создан {{ group_chat.created_at.strftime('%d.%m.%Y') }}</span>
+                    {% if group_chat.is_private %}
+                    <span class="private"><i class="fas fa-lock"></i> Приватный чат</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="group-actions">
+            {% if is_owner %}
+            <button class="btn btn-secondary" onclick="inviteUser()">
+                <i class="fas fa-user-plus"></i> Пригласить
+            </button>
+            <button class="btn btn-secondary" onclick="editGroup()">
+                <i class="fas fa-edit"></i> Редактировать
+            </button>
+            {% endif %}
+            <button class="btn btn-secondary" onclick="showMembers()">
+                <i class="fas fa-users"></i> Участники
+            </button>
+            <button class="btn btn-danger" onclick="leaveGroup()">
+                <i class="fas fa-sign-out-alt"></i> Покинуть
+            </button>
+        </div>
+    </div>
+
+    <!-- Messages -->
+    <div class="group-chat-messages" id="group-messages">
+        {% for message in messages %}
+        <div class="group-message {{ 'own' if message.sender_id == current_user.id else 'other' }}" id="msg-{{ message.id }}">
+            {% if message.sender_id != current_user.id %}
+            <img src="{{ message.sender.avatar_url }}" class="message-avatar" alt="{{ message.sender.username }}">
+            {% endif %}
+            <div class="message-content-wrapper">
+                {% if message.sender_id != current_user.id %}
+                <div class="message-sender">{{ message.sender.display_name or message.sender.username }}</div>
+                {% endif %}
+                <div class="message-bubble">
+                    {% if message.content %}
+                    <p class="message-text">{{ message.content }}</p>
+                    {% endif %}
+                    {% if message.media_url %}
+                    <img src="{{ message.media_url }}" class="message-image" alt="Image">
+                    {% endif %}
+                    <div class="message-reactions" id="reactions-{{ message.id }}"></div>
+                    <span class="message-time">{{ message.created_at.strftime('%H:%M') }}</span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Input area -->
+    <div class="group-chat-input-area">
+        <div class="message-input-wrapper">
+            <textarea id="group-chat-input" placeholder="Введите сообщение..." rows="1"></textarea>
+            <button class="btn-icon" onclick="sendGroupMessage()">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+.group-chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.group-chat-header {
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border);
+    padding: 20px;
+    flex-shrink: 0;
+}
+
+.group-chat-info-header {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.group-chat-avatar-large {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.group-chat-details {
+    flex: 1;
+}
+
+.group-chat-details h1 {
+    margin: 0 0 5px 0;
+    font-size: 24px;
+    color: var(--text-primary);
+}
+
+.group-chat-details .description {
+    color: var(--text-secondary);
+    margin: 0 0 10px 0;
+}
+
+.group-stats {
+    display: flex;
+    gap: 20px;
+    font-size: 14px;
+    color: var(--text-dim);
+}
+
+.group-stats span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.private {
+    color: var(--warning);
+}
+
+.group-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.group-chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.group-message {
+    display: flex;
+    gap: 10px;
+    animation: fadeIn 0.3s ease;
+}
+
+.group-message.own {
+    justify-content: flex-end;
+}
+
+.group-message.own .message-content-wrapper {
+    align-items: flex-end;
+}
+
+.message-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.message-content-wrapper {
+    display: flex;
+    flex-direction: column;
+    max-width: 70%;
+}
+
+.message-sender {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+    margin-left: 5px;
+}
+
+.message-bubble {
+    background: var(--message-bg);
+    padding: 10px 14px;
+    border-radius: 18px;
+    position: relative;
+}
+
+.group-message.own .message-bubble {
+    background: var(--primary);
+    color: white;
+}
+
+.message-text {
+    margin: 0;
+    word-wrap: break-word;
+}
+
+.message-image {
+    max-width: 200px;
+    max-height: 200px;
+    border-radius: 10px;
+    margin-top: 5px;
+    cursor: pointer;
+}
+
+.message-time {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    display: block;
+    text-align: right;
+}
+
+.group-message.own .message-time {
+    color: rgba(255,255,255,0.7);
+}
+
+.message-reactions {
+    display: flex;
+    gap: 5px;
+    margin-top: 5px;
+    flex-wrap: wrap;
+}
+
+.reaction-btn {
+    background: var(--reaction-bg);
+    border: none;
+    border-radius: 20px;
+    padding: 2px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.reaction-btn:hover {
+    transform: scale(1.05);
+}
+
+.group-chat-input-area {
+    padding: 20px;
+    background: var(--card-bg);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.message-input-wrapper {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+#group-chat-input {
+    flex: 1;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    background: var(--input-bg);
+    color: var(--text-primary);
+    resize: none;
+    font-family: inherit;
+    font-size: 14px;
+    max-height: 100px;
+}
+
+#group-chat-input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.btn-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.btn-icon:hover {
+    transform: scale(1.05);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 768px) {
+    .group-chat-info-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .message-content-wrapper {
+        max-width: 85%;
+    }
+
+    .group-actions {
+        justify-content: center;
+    }
+}
+</style>
+
+<script>
+let currentGroupChatId = {{ group_chat.id }};
+let typingTimeout = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-resize textarea
+    const textarea = document.getElementById('group-chat-input');
+    if (textarea) {
+        textarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+            sendTypingIndicator();
+        });
+
+        textarea.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendGroupMessage();
+            }
+        });
+    }
+
+    // Join group chat room via Socket.IO
+    if (socket) {
+        socket.emit('join_group_chat', { chat_id: currentGroupChatId });
+    }
+
+    // Scroll to bottom
+    const messagesContainer = document.getElementById('group-messages');
+    if (messagesContainer) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+});
+
+function sendTypingIndicator() {
+    if (typingTimeout) clearTimeout(typingTimeout);
+
+    if (socket) {
+        socket.emit('group_typing', {
+            chat_id: currentGroupChatId,
+            is_typing: true
+        });
+    }
+
+    typingTimeout = setTimeout(() => {
+        if (socket) {
+            socket.emit('group_typing', {
+                chat_id: currentGroupChatId,
+                is_typing: false
+            });
+        }
+    }, 2000);
+}
+
+async function sendGroupMessage() {
+    const input = document.getElementById('group-chat-input');
+    const content = input.value.trim();
+
+    if (!content) return;
+
+    const formData = new FormData();
+    formData.append('content', content);
+
+    try {
+        const response = await fetch(`/group-chat/${currentGroupChatId}/send`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRF()
+            },
+            body: formData
+        });
+
+        if (response.ok) {
+            input.value = '';
+            input.style.height = 'auto';
+        } else {
+            toast('Ошибка при отправке сообщения', 'error');
+        }
+    } catch (error) {
+        toast('Ошибка при отправке сообщения', 'error');
+    }
+}
+
+async function inviteUser() {
+    const username = prompt('Введите имя пользователя для приглашения:');
+    if (!username) return;
+
+    try {
+        const response = await fetch(`/group-chat/${currentGroupChatId}/invite`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRF()
+            },
+            body: JSON.stringify({ username: username })
+        });
+
+        if (response.ok) {
+            toast(`Пользователь ${username} приглашен!`, 'success');
+        } else {
+            const error = await response.json();
+            toast(error.error || 'Ошибка при приглашении', 'error');
+        }
+    } catch (error) {
+        toast('Ошибка при приглашении', 'error');
+    }
+}
+
+async function showMembers() {
+    try {
+        const response = await fetch(`/group-chat/${currentGroupChatId}/members`);
+        const data = await response.json();
+
+        const modalHtml = `
+            <div class="modal open" id="membersModal">
+                <div class="modal-content">
+                    <h3><i class="fas fa-users"></i> Участники чата</h3>
+                    <div class="members-list">
+                        ${data.members.map(member => `
+                            <div class="member-item">
+                                <img src="${member.avatar}" class="avatar avatar-sm">
+                                <div class="member-info">
+                                    <strong>${escapeHtml(member.display_name || member.username)}</strong>
+                                    <span class="username">@${member.username}</span>
+                                </div>
+                                <span class="online-dot ${member.is_online ? 'online' : 'offline'}"></span>
+                                ${member.id == {{ group_chat.owner_id }} ? '<span class="owner-badge"><i class="fas fa-crown"></i> Владелец</span>' : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button class="btn btn-secondary" onclick="closeModal('membersModal')">Закрыть</button>
+                </div>
+            </div>
+        `;
+
+        const modalContainer = document.createElement('div');
+        modalContainer.innerHTML = modalHtml;
+        document.body.appendChild(modalContainer.firstElementChild);
+
+    } catch (error) {
+        toast('Ошибка загрузки участников', 'error');
+    }
+}
+
+function leaveGroup() {
+    if (confirm('Вы уверены, что хотите покинуть этот чат?')) {
+        fetch(`/group-chat/${currentGroupChatId}/leave`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRF()
+            }
+        }).then(() => {
+            window.location.href = '/group-chats';
+        }).catch(error => {
+            toast('Ошибка при выходе из чата', 'error');
+        });
+    }
+}
+
+function editGroup() {
+    // Implement edit functionality
+    toast('Редактирование группы будет доступно в следующей версии', 'info');
+}
+
+// Socket.IO event listeners
+if (socket) {
+    socket.on('group_message', (data) => {
+        appendGroupMessage(data);
+    });
+
+    socket.on('group_typing', (data) => {
+        showTypingIndicator(data.username);
+    });
+}
+
+function appendGroupMessage(data) {
+    const messagesContainer = document.getElementById('group-messages');
+    const isOwn = data.sender_id == {{ current_user.id }};
+
+    const messageHtml = `
+        <div class="group-message ${isOwn ? 'own' : 'other'}" id="msg-${data.id}">
+            ${!isOwn ? `<img src="${data.sender_avatar}" class="message-avatar" alt="${data.sender_username}">` : ''}
+            <div class="message-content-wrapper">
+                ${!isOwn ? `<div class="message-sender">${escapeHtml(data.sender_username)}</div>` : ''}
+                <div class="message-bubble">
+                    ${data.content ? `<p class="message-text">${escapeHtml(data.content)}</p>` : ''}
+                    ${data.media_url ? `<img src="${data.media_url}" class="message-image" alt="Image">` : ''}
+                    <span class="message-time">${data.created_at}</span>
+                </div>
+            </div>
+        </div>
+    `;
+
+    messagesContainer.insertAdjacentHTML('beforeend', messageHtml);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+let typingIndicatorTimeout = null;
+
+function showTypingIndicator(username) {
+    let indicator = document.getElementById('typing-indicator');
+    if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'typing-indicator';
+        indicator.className = 'typing-indicator';
+        document.querySelector('.group-chat-messages').appendChild(indicator);
+    }
+
+    indicator.innerHTML = `<i class="fas fa-ellipsis-h"></i> ${escapeHtml(username)} печатает...`;
+    indicator.style.display = 'block';
+
+    if (typingIndicatorTimeout) clearTimeout(typingIndicatorTimeout);
+    typingIndicatorTimeout = setTimeout(() => {
+        if (indicator) indicator.style.display = 'none';
+    }, 3000);
+}
+</script>
+{% endblock %}

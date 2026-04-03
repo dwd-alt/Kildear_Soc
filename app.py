@@ -1,14 +1,12 @@
 """
 Kildear Social Network — Complete Version
 Full-featured backend with admin panel, voice messages, calls, and enhanced security
-Images stored in database as Base64
 """
 
 import os
 import re
 import time
 import uuid
-import html
 import base64
 import logging
 import platform
@@ -27,10 +25,11 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
 from sqlalchemy import or_, func, and_, text
 from PIL import Image
-import bcrypt
+import qrcode
+from io import BytesIO
+import base64
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -61,19 +60,40 @@ if is_render:
 else:
     SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'instance', 'kildear.db')
 
-# Настройки для загрузки файлов
+# Настройки для загрузки файлов (только для видео)
 if is_render:
-    UPLOAD_FOLDER = '/tmp/uploads'  # Только для временных файлов
+    UPLOAD_FOLDER = '/tmp/uploads'
 else:
     UPLOAD_FOLDER = os.path.join('static', 'uploads')
 
-UPLOAD_SUBFOLDERS = ['avatars', 'images', 'videos', 'covers', 'groups',
-                     'channels', 'chat_images', 'group_covers', 'channel_covers',
-                     'voice_messages']
+UPLOAD_SUBFOLDERS = ['images', 'videos', 'chat_images']
 
 ALLOWED_IMAGE = {"png", "jpg", "jpeg", "gif", "webp"}
 ALLOWED_VIDEO = {"mp4", "webm", "mov", "avi", "mkv"}
 ALLOWED_AUDIO = {"mp3", "wav", "ogg", "m4a"}
+
+# Preset avatars (1-10)
+PRESET_AVATARS = {
+    1: '/static/avatars/preset/1av.png',
+    2: '/static/avatars/preset/2av.png',
+    3: '/static/avatars/preset/3av.png',
+    4: '/static/avatars/preset/4av.png',
+    5: '/static/avatars/preset/5av.png',
+    6: '/static/avatars/preset/6av.png',
+    7: '/static/avatars/preset/7av.png',
+    8: '/static/avatars/preset/8av.png',
+    9: '/static/avatars/preset/9av.png',
+    10: '/static/avatars/preset/10av.png',
+}
+
+# Preset covers (1-5)
+PRESET_COVERS = {
+    1: '/static/covers/preset/1cover.jpg',
+    2: '/static/covers/preset/2cover.jpg',
+    3: '/static/covers/preset/3cover.jpg',
+    4: '/static/covers/preset/4cover.jpg',
+    5: '/static/covers/preset/5cover.jpg',
+}
 
 app.config.update(
     SECRET_KEY=os.environ.get("SECRET_KEY", os.urandom(48).hex()),
@@ -82,8 +102,6 @@ app.config.update(
     SQLALCHEMY_ENGINE_OPTIONS={
         "pool_pre_ping": True,
         "pool_recycle": 300,
-        "pool_size": 20,
-        "max_overflow": 40
     } if is_render else {},
     MAX_CONTENT_LENGTH=int(os.environ.get("MAX_CONTENT_LENGTH", 100 * 1024 * 1024)),
     UPLOAD_FOLDER=UPLOAD_FOLDER,
@@ -134,101 +152,6 @@ socketio = SocketIO(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  Image Processing Helper
-# ──────────────────────────────────────────────────────────────────────────────
-def process_image(file, max_size=(800, 800), quality=85):
-    """
-    Обрабатывает изображение: ресайз, оптимизация, конвертация в JPEG
-    Возвращает Base64 строку и MIME тип
-    """
-    if not file or not file.filename:
-        return None, None
-
-    try:
-        # Проверяем расширение
-        ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
-        if ext not in ALLOWED_IMAGE:
-            return None, None
-
-        # Открываем изображение
-        img = Image.open(file)
-
-        # Конвертируем в RGB если нужно (для JPEG)
-        if img.mode in ('RGBA', 'LA', 'P'):
-            bg = Image.new('RGB', img.size, (255, 255, 255))
-            if img.mode == 'RGBA':
-                bg.paste(img, mask=img.split()[3])
-            else:
-                bg.paste(img)
-            img = bg
-        elif img.mode != 'RGB':
-            img = img.convert('RGB')
-
-        # Ресайз
-        img.thumbnail(max_size, Image.Resampling.LANCZOS)
-
-        # Сохраняем в BytesIO
-        output = BytesIO()
-        img.save(output, format='JPEG', quality=quality, optimize=True)
-        output.seek(0)
-
-        # Конвертируем в Base64
-        image_data = output.read()
-        base64_data = base64.b64encode(image_data).decode('utf-8')
-
-        return base64_data, 'image/jpeg'
-
-    except Exception as e:
-        logger.error(f"Image processing error: {e}")
-        return None, None
-
-
-def process_image_from_bytes(image_bytes, max_size=(800, 800), quality=85):
-    """Обрабатывает изображение из байтов"""
-    try:
-        img = Image.open(BytesIO(image_bytes))
-
-        # Конвертируем в RGB если нужно
-        if img.mode in ('RGBA', 'LA', 'P'):
-            bg = Image.new('RGB', img.size, (255, 255, 255))
-            if img.mode == 'RGBA':
-                bg.paste(img, mask=img.split()[3])
-            else:
-                bg.paste(img)
-            img = bg
-        elif img.mode != 'RGB':
-            img = img.convert('RGB')
-
-        # Ресайз
-        img.thumbnail(max_size, Image.Resampling.LANCZOS)
-
-        # Сохраняем
-        output = BytesIO()
-        img.save(output, format='JPEG', quality=quality, optimize=True)
-        output.seek(0)
-
-        return output.read(), 'image/jpeg'
-
-    except Exception as e:
-        logger.error(f"Image processing from bytes error: {e}")
-        return None, None
-
-
-def save_image_to_db(file, max_size=(800, 800), quality=85):
-    """
-    Сохраняет изображение в базу данных (Base64)
-    Возвращает Data URL
-    """
-    if not file or not file.filename:
-        return None
-
-    base64_data, mime_type = process_image(file, max_size, quality)
-    if base64_data:
-        return f"data:{mime_type};base64,{base64_data}"
-    return None
-
-
-# ──────────────────────────────────────────────────────────────────────────────
 #  Template Filters
 # ──────────────────────────────────────────────────────────────────────────────
 @app.template_filter('timeago')
@@ -270,6 +193,7 @@ def admin_required(f):
         if not current_user.is_authenticated or not current_user.is_admin:
             abort(403)
         return f(*args, **kwargs)
+
     return decorated_function
 
 
@@ -316,15 +240,10 @@ class User(UserMixin, db.Model):
     display_name = db.Column(db.String(60), default="")
     bio = db.Column(db.String(500), default="")
 
-    # Хранение изображений в БД как Base64
-    avatar_data = db.Column(db.Text, nullable=True)
-    avatar_mime = db.Column(db.String(50), default="image/png")
-    cover_data = db.Column(db.Text, nullable=True)
-    cover_mime = db.Column(db.String(50), default="image/jpeg")
-
-    # Для обратной совместимости
-    avatar = db.Column(db.String(300), default="/static/default_avatar.png")
-    cover_photo = db.Column(db.String(300), default="")
+    # Preset avatar (1-10, default 1)
+    preset_avatar = db.Column(db.Integer, default=1)
+    # Preset cover (1-5, None = no cover)
+    preset_cover = db.Column(db.Integer, nullable=True)
 
     website = db.Column(db.String(200), default="")
     location = db.Column(db.String(100), default="")
@@ -340,7 +259,7 @@ class User(UserMixin, db.Model):
     two_factor_enabled = db.Column(db.Boolean, default=False)
     two_factor_secret = db.Column(db.String(32), nullable=True)
 
-    # Отношения
+    # Relationships
     posts = db.relationship("Post", backref="author", lazy="dynamic",
                             foreign_keys="Post.user_id")
     sent_msgs = db.relationship("Message", backref="sender", lazy="dynamic",
@@ -372,29 +291,34 @@ class User(UserMixin, db.Model):
 
     @property
     def avatar_url(self):
-        """Получить URL аватара (из БД или по умолчанию)"""
-        if self.avatar_data:
-            return f"data:{self.avatar_mime};base64,{self.avatar_data}"
-        return self.avatar or "/static/default_avatar.png"
+        """Get avatar URL from preset"""
+        if self.preset_avatar and self.preset_avatar in PRESET_AVATARS:
+            return PRESET_AVATARS[self.preset_avatar]
+        return PRESET_AVATARS[1]
 
     @property
     def cover_url(self):
-        """Получить URL обложки (из БД или пусто)"""
-        if self.cover_data:
-            return f"data:{self.cover_mime};base64,{self.cover_data}"
-        return self.cover_photo or ""
+        """Get cover URL from preset"""
+        if self.preset_cover and self.preset_cover in PRESET_COVERS:
+            return PRESET_COVERS[self.preset_cover]
+        return None
 
-    def set_avatar(self, image_data, mime_type="image/png"):
-        """Установить аватар из бинарных данных"""
-        self.avatar_data = base64.b64encode(image_data).decode('utf-8')
-        self.avatar_mime = mime_type
-        self.avatar = ""
+    def set_preset_avatar(self, avatar_num):
+        """Set preset avatar (1-10)"""
+        if 1 <= avatar_num <= 10:
+            self.preset_avatar = avatar_num
+            return True
+        return False
 
-    def set_cover(self, image_data, mime_type="image/jpeg"):
-        """Установить обложку из бинарных данных"""
-        self.cover_data = base64.b64encode(image_data).decode('utf-8')
-        self.cover_mime = mime_type
-        self.cover_photo = ""
+    def set_preset_cover(self, cover_num):
+        """Set preset cover (1-5) or None to remove"""
+        if cover_num is None:
+            self.preset_cover = None
+            return True
+        if 1 <= cover_num <= 5:
+            self.preset_cover = cover_num
+            return True
+        return False
 
     def set_password(self, pw: str):
         self.password_hash = generate_password_hash(pw)
@@ -435,7 +359,7 @@ class User(UserMixin, db.Model):
 
 class LoginHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)  # nullable=True для неудачных попыток
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     ip_address = db.Column(db.String(45), nullable=False)
     user_agent = db.Column(db.String(200))
     location = db.Column(db.String(100))
@@ -447,7 +371,7 @@ class VoiceMessage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     sender_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     receiver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    audio_data = db.Column(db.Text, nullable=False)  # Base64 данные аудио
+    audio_data = db.Column(db.Text, nullable=False)
     audio_mime = db.Column(db.String(50), default="audio/mpeg")
     audio_url = db.Column(db.String(300), default="")
     duration = db.Column(db.Integer, default=0)
@@ -500,11 +424,6 @@ class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     content = db.Column(db.Text, default="")
-
-    # Хранение медиа в БД
-    media_data = db.Column(db.Text, nullable=True)
-    media_mime = db.Column(db.String(50), nullable=True)
-
     media_url = db.Column(db.String(300), default="")
     media_type = db.Column(db.String(20), default="text")
     thumbnail = db.Column(db.String(300), default="")
@@ -513,18 +432,6 @@ class Post(db.Model):
 
     liked_by = db.relationship("User", secondary=post_likes, backref="liked_posts", lazy="dynamic")
     comments = db.relationship("Comment", backref="post", lazy="dynamic", cascade="all,delete")
-
-    @property
-    def media_url_data(self):
-        if self.media_data:
-            return f"data:{self.media_mime};base64,{self.media_data}"
-        return self.media_url
-
-    def set_media(self, media_data, mime_type, media_type="image"):
-        self.media_data = base64.b64encode(media_data).decode('utf-8')
-        self.media_mime = mime_type
-        self.media_type = media_type
-        self.media_url = ""
 
     @property
     def like_count(self):
@@ -551,19 +458,11 @@ class Message(db.Model):
     sender_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     receiver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     content = db.Column(db.Text, default="")
-    media_data = db.Column(db.Text, nullable=True)
-    media_mime = db.Column(db.String(50), nullable=True)
     media_url = db.Column(db.String(300), default="")
     is_read = db.Column(db.Boolean, default=False)
     is_deleted = db.Column(db.Boolean, default=False)
     reply_to_id = db.Column(db.Integer, db.ForeignKey("message.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    @property
-    def media_url_data(self):
-        if self.media_data:
-            return f"data:{self.media_mime};base64,{self.media_data}"
-        return self.media_url
 
     replies = db.relationship("Message", backref=db.backref("reply_to", remote_side=[id]))
 
@@ -573,27 +472,11 @@ class Group(db.Model):
     name = db.Column(db.String(100), nullable=False)
     slug = db.Column(db.String(120), unique=True, nullable=False)
     description = db.Column(db.Text, default="")
-    avatar_data = db.Column(db.Text, nullable=True)
-    avatar_mime = db.Column(db.String(50), default="image/png")
-    cover_data = db.Column(db.Text, nullable=True)
-    cover_mime = db.Column(db.String(50), default="image/jpeg")
     avatar = db.Column(db.String(300), default="/static/default_group.png")
     cover = db.Column(db.String(300), default="")
     owner_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     is_private = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    @property
-    def avatar_url(self):
-        if self.avatar_data:
-            return f"data:{self.avatar_mime};base64,{self.avatar_data}"
-        return self.avatar
-
-    @property
-    def cover_url(self):
-        if self.cover_data:
-            return f"data:{self.cover_mime};base64,{self.cover_data}"
-        return self.cover
 
     members = db.relationship("User", secondary=group_members,
                               backref="groups", lazy="dynamic")
@@ -610,17 +493,9 @@ class GroupPost(db.Model):
     group_id = db.Column(db.Integer, db.ForeignKey("group.id"), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     content = db.Column(db.Text, default="")
-    media_data = db.Column(db.Text, nullable=True)
-    media_mime = db.Column(db.String(50), nullable=True)
     media_url = db.Column(db.String(300), default="")
     media_type = db.Column(db.String(20), default="text")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    @property
-    def media_url_data(self):
-        if self.media_data:
-            return f"data:{self.media_mime};base64,{self.media_data}"
-        return self.media_url
 
     author = db.relationship("User")
 
@@ -630,27 +505,11 @@ class Channel(db.Model):
     name = db.Column(db.String(100), nullable=False)
     slug = db.Column(db.String(120), unique=True, nullable=False)
     description = db.Column(db.Text, default="")
-    avatar_data = db.Column(db.Text, nullable=True)
-    avatar_mime = db.Column(db.String(50), default="image/png")
-    cover_data = db.Column(db.Text, nullable=True)
-    cover_mime = db.Column(db.String(50), default="image/jpeg")
     avatar = db.Column(db.String(300), default="/static/default_channel.png")
     cover = db.Column(db.String(300), default="")
     owner_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     is_nsfw = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    @property
-    def avatar_url(self):
-        if self.avatar_data:
-            return f"data:{self.avatar_mime};base64,{self.avatar_data}"
-        return self.avatar
-
-    @property
-    def cover_url(self):
-        if self.cover_data:
-            return f"data:{self.cover_mime};base64,{self.cover_data}"
-        return self.cover
 
     subscribers = db.relationship("User", secondary=channel_subs,
                                   backref="subscribed_channels", lazy="dynamic")
@@ -666,18 +525,10 @@ class ChannelPost(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     channel_id = db.Column(db.Integer, db.ForeignKey("channel.id"), nullable=False)
     content = db.Column(db.Text, default="")
-    media_data = db.Column(db.Text, nullable=True)
-    media_mime = db.Column(db.String(50), nullable=True)
     media_url = db.Column(db.String(300), default="")
     media_type = db.Column(db.String(20), default="text")
     views = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    @property
-    def media_url_data(self):
-        if self.media_data:
-            return f"data:{self.media_mime};base64,{self.media_data}"
-        return self.media_url
 
 
 class Notification(db.Model):
@@ -752,74 +603,45 @@ def notification_text(notif):
     return "New notification"
 
 
-def allowed_file(filename: str, allowed: set) -> bool:
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed
-
-
 def ensure_upload_folders():
+    """Create necessary folders"""
     for folder in UPLOAD_SUBFOLDERS:
         folder_path = os.path.join(app.config['UPLOAD_FOLDER'], folder)
         try:
             os.makedirs(folder_path, exist_ok=True)
-            logger.info(f"✅ Folder ready: {folder_path}")
         except Exception as e:
-            logger.error(f"❌ Failed to create folder {folder_path}: {e}")
+            logger.error(f"Failed to create folder {folder_path}: {e}")
+
+    # Create preset folders
+    preset_avatar_folder = os.path.join('static', 'avatars', 'preset')
+    preset_cover_folder = os.path.join('static', 'covers', 'preset')
+    try:
+        os.makedirs(preset_avatar_folder, exist_ok=True)
+        os.makedirs(preset_cover_folder, exist_ok=True)
+        logger.info("✅ Preset folders ready")
+    except Exception as e:
+        logger.error(f"Failed to create preset folders: {e}")
 
 
 def save_file(file, subfolder: str):
-    """Сохраняет файл (для видео и аудио)"""
+    """Save video file"""
     if not file or not file.filename:
         return None
     try:
         ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
-        if not ext:
-            return None
-        if ext not in ALLOWED_VIDEO and ext not in ALLOWED_AUDIO:
+        if not ext or ext not in ALLOWED_VIDEO:
             return None
         filename = f"{uuid.uuid4().hex}.{ext}"
         upload_path = os.path.join(app.config['UPLOAD_FOLDER'], subfolder)
         os.makedirs(upload_path, exist_ok=True)
         file_path = os.path.join(upload_path, filename)
         file.save(file_path)
-        if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
-            logger.error(f"❌ File not saved properly: {file_path}")
-            return None
-        logger.info(f"✅ File saved: {file_path}")
         if is_render:
             return f"/uploads/{subfolder}/{filename}"
         else:
             return f"/static/uploads/{subfolder}/{filename}"
     except Exception as e:
-        logger.error(f"❌ Error saving file: {e}")
-        return None
-
-
-def save_image(file, subfolder=None):
-    """Сохраняет изображение в базу данных (Base64)"""
-    if not file or not file.filename:
-        return None
-
-    try:
-        ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
-        if ext not in ALLOWED_IMAGE:
-            return None
-
-        # Проверяем размер
-        file.seek(0, 2)
-        size = file.tell()
-        file.seek(0)
-
-        if size > 5 * 1024 * 1024:  # 5MB max
-            return None
-
-        # Обрабатываем изображение
-        base64_data, mime_type = process_image(file)
-        if base64_data:
-            return f"data:{mime_type};base64,{base64_data}"
-        return None
-
-    except Exception as e:
-        logger.error(f"Error saving image: {e}")
+        logger.error(f"Error saving file: {e}")
         return None
 
 
@@ -838,131 +660,6 @@ def serve_upload(subfolder, filename):
         os.path.join(app.config['UPLOAD_FOLDER'], subfolder),
         filename
     )
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-#  Report Routes
-# ──────────────────────────────────────────────────────────────────────────────
-
-@app.route("/report/user/<int:user_id>", methods=["GET", "POST"])
-@login_required
-def report_user(user_id):
-    reported_user = User.query.get_or_404(user_id)
-
-    if reported_user.id == current_user.id:
-        flash("Нельзя пожаловаться на самого себя", "error")
-        return redirect(url_for("profile", username=reported_user.username))
-
-    if request.method == "POST":
-        reason = request.form.get("reason")
-        description = request.form.get("description", "")
-
-        if not reason:
-            flash("Укажите причину жалобы", "error")
-            return redirect(url_for("report_user", user_id=user_id))
-
-        report = Report(
-            reporter_id=current_user.id,
-            reported_user_id=reported_user.id,
-            reason=reason,
-            description=description,
-            status='pending'
-        )
-        db.session.add(report)
-        db.session.commit()
-
-        flash(f"Жалоба на пользователя {reported_user.username} отправлена", "success")
-        return redirect(url_for("profile", username=reported_user.username))
-
-    reasons = [
-        ("spam", "Спам"),
-        ("harassment", "Домогательство"),
-        ("hate_speech", "Разжигание ненависти"),
-        ("violence", "Насилие"),
-        ("scam", "Мошенничество"),
-        ("fake_account", "Фейковый аккаунт"),
-        ("other", "Другое")
-    ]
-
-    return render_template("report_user.html", user=reported_user, reasons=reasons)
-
-
-@app.route("/report/post/<int:post_id>", methods=["GET", "POST"])
-@login_required
-def report_post(post_id):
-    post = Post.query.get_or_404(post_id)
-
-    if post.user_id == current_user.id:
-        flash("Нельзя пожаловаться на свой пост", "error")
-        return redirect(url_for("view_post", post_id=post_id))
-
-    if request.method == "POST":
-        reason = request.form.get("reason")
-        description = request.form.get("description", "")
-
-        if not reason:
-            flash("Укажите причину жалобы", "error")
-            return redirect(url_for("report_post", post_id=post_id))
-
-        report = Report(
-            reporter_id=current_user.id,
-            reported_user_id=post.user_id,
-            post_id=post.id,
-            reason=reason,
-            description=description,
-            status='pending'
-        )
-        db.session.add(report)
-        db.session.commit()
-
-        flash(f"Жалоба на пост отправлена", "success")
-        return redirect(url_for("view_post", post_id=post_id))
-
-    reasons = [
-        ("spam", "Спам"),
-        ("harassment", "Домогательство"),
-        ("hate_speech", "Разжигание ненависти"),
-        ("violence", "Насилие"),
-        ("nsfw", "Неприемлемый контент"),
-        ("copyright", "Нарушение авторских прав"),
-        ("other", "Другое")
-    ]
-
-    return render_template("report_post.html", post=post, reasons=reasons)
-
-
-@app.route("/report/comment/<int:comment_id>", methods=["GET", "POST"])
-@login_required
-def report_comment(comment_id):
-    comment = Comment.query.get_or_404(comment_id)
-
-    if comment.user_id == current_user.id:
-        flash("Нельзя пожаловаться на свой комментарий", "error")
-        return redirect(url_for("view_post", post_id=comment.post_id))
-
-    if request.method == "POST":
-        reason = request.form.get("reason")
-        description = request.form.get("description", "")
-
-        if not reason:
-            flash("Укажите причину жалобы", "error")
-            return redirect(url_for("report_comment", comment_id=comment_id))
-
-        report = Report(
-            reporter_id=current_user.id,
-            reported_user_id=comment.user_id,
-            comment_id=comment.id,
-            reason=reason,
-            description=description,
-            status='pending'
-        )
-        db.session.add(report)
-        db.session.commit()
-
-        flash(f"Жалоба на комментарий отправлена", "success")
-        return redirect(url_for("view_post", post_id=comment.post_id))
-
-    return render_template("report_comment.html", comment=comment)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1064,7 +761,9 @@ def inject_globals():
         notification_icon=notification_icon,
         notification_text=notification_text,
         now=datetime.utcnow(),
-        is_production=is_production
+        is_production=is_production,
+        preset_avatars=PRESET_AVATARS,
+        preset_covers=PRESET_COVERS
     )
 
 
@@ -1122,8 +821,6 @@ def admin_dashboard():
             User.created_at >= datetime.utcnow().date()
         ).count(),
         "banned_users": User.query.filter_by(is_banned=True).count(),
-        "images_in_db": User.query.filter(User.avatar_data.isnot(None)).count() +
-                         Post.query.filter(Post.media_data.isnot(None)).count()
     }
 
     recent_users = User.query.order_by(User.created_at.desc()).limit(10).all()
@@ -1280,6 +977,110 @@ def admin_verification():
     return render_template("admin/verification.html", users=users)
 
 
+@app.route("/qr/my")
+@login_required
+def my_qr_code():
+    """Generate QR code for current user"""
+    user_data = {
+        'type': 'user',
+        'user_id': current_user.id,
+        'username': current_user.username,
+        'timestamp': datetime.utcnow().isoformat()
+    }
+
+    # Create QR code with user profile URL
+    qr_url = url_for('profile', username=current_user.username, _external=True)
+
+    qr = qrcode.QRCode(
+        version=3,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=8,
+        border=2,
+    )
+    qr.add_data(qr_url)
+    qr.make(fit=True)
+
+    img = qr.make_image(fill_color="#6c63ff", back_color="white")
+
+    # Convert to base64 for inline display
+    buffered = BytesIO()
+    img.save(buffered, format="PNG")
+    img_str = base64.b64encode(buffered.getvalue()).decode()
+
+    return render_template("qr_code.html", qr_image=f"data:image/png;base64,{img_str}")
+
+
+@app.route("/qr/scan", methods=["GET", "POST"])
+@login_required
+def scan_qr():
+    """Page for scanning QR codes"""
+    if request.method == "POST":
+        qr_data = request.form.get("qr_data", "").strip()
+
+        if not qr_data:
+            flash("No QR code data provided", "error")
+            return redirect(url_for("scan_qr"))
+
+        # Extract username from URL or direct data
+        username = None
+
+        # Check if it's a URL
+        if qr_data.startswith(('http://', 'https://')):
+            # Try to extract username from profile URL
+            import re
+            match = re.search(r'/u/([a-zA-Z0-9_]+)', qr_data)
+            if match:
+                username = match.group(1)
+
+        # If not a URL, try direct username
+        if not username and not qr_data.startswith(('http://', 'https://')):
+            username = qr_data
+
+        # Try to parse JSON data
+        if not username:
+            try:
+                import json
+                data = json.loads(qr_data)
+                if data.get('type') == 'user':
+                    username = data.get('username')
+            except:
+                pass
+
+        if username:
+            user = User.query.filter(func.lower(User.username) == username.lower()).first()
+            if user:
+                return redirect(url_for("profile", username=user.username))
+            else:
+                flash(f"User '{username}' not found", "error")
+        else:
+            flash("Invalid QR code data", "error")
+
+        return redirect(url_for("scan_qr"))
+
+    return render_template("scan_qr.html")
+
+
+@app.route("/api/user/qr/<username>")
+@login_required
+def get_user_qr_data(username):
+    """API endpoint to get QR data for a user"""
+    user = User.query.filter(func.lower(User.username) == username.lower()).first_or_404()
+
+    # Check if blocked
+    if current_user.is_blocked(user):
+        return jsonify({"error": "User blocked"}), 403
+
+    qr_data = {
+        'type': 'user',
+        'user_id': user.id,
+        'username': user.username,
+        'display_name': user.display_name,
+        'avatar': user.avatar_url,
+        'profile_url': url_for('profile', username=user.username, _external=True)
+    }
+
+    return jsonify(qr_data)
+
 @app.route("/admin/banned")
 @login_required
 @admin_required
@@ -1329,7 +1130,6 @@ def send_voice_message():
         if ext not in ALLOWED_AUDIO:
             return jsonify({"error": "Audio format not supported"}), 400
 
-        # Сохраняем аудио в БД
         audio_file.seek(0)
         audio_data = audio_file.read()
         base64_data = base64.b64encode(audio_data).decode('utf-8')
@@ -1583,6 +1383,130 @@ def call_history():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+#  Report Routes
+# ──────────────────────────────────────────────────────────────────────────────
+@app.route("/report/user/<int:user_id>", methods=["GET", "POST"])
+@login_required
+def report_user(user_id):
+    reported_user = User.query.get_or_404(user_id)
+
+    if reported_user.id == current_user.id:
+        flash("Нельзя пожаловаться на самого себя", "error")
+        return redirect(url_for("profile", username=reported_user.username))
+
+    if request.method == "POST":
+        reason = request.form.get("reason")
+        description = request.form.get("description", "")
+
+        if not reason:
+            flash("Укажите причину жалобы", "error")
+            return redirect(url_for("report_user", user_id=user_id))
+
+        report = Report(
+            reporter_id=current_user.id,
+            reported_user_id=reported_user.id,
+            reason=reason,
+            description=description,
+            status='pending'
+        )
+        db.session.add(report)
+        db.session.commit()
+
+        flash(f"Жалоба на пользователя {reported_user.username} отправлена", "success")
+        return redirect(url_for("profile", username=reported_user.username))
+
+    reasons = [
+        ("spam", "Спам"),
+        ("harassment", "Домогательство"),
+        ("hate_speech", "Разжигание ненависти"),
+        ("violence", "Насилие"),
+        ("scam", "Мошенничество"),
+        ("fake_account", "Фейковый аккаунт"),
+        ("other", "Другое")
+    ]
+
+    return render_template("report_user.html", user=reported_user, reasons=reasons)
+
+
+@app.route("/report/post/<int:post_id>", methods=["GET", "POST"])
+@login_required
+def report_post(post_id):
+    post = Post.query.get_or_404(post_id)
+
+    if post.user_id == current_user.id:
+        flash("Нельзя пожаловаться на свой пост", "error")
+        return redirect(url_for("view_post", post_id=post_id))
+
+    if request.method == "POST":
+        reason = request.form.get("reason")
+        description = request.form.get("description", "")
+
+        if not reason:
+            flash("Укажите причину жалобы", "error")
+            return redirect(url_for("report_post", post_id=post_id))
+
+        report = Report(
+            reporter_id=current_user.id,
+            reported_user_id=post.user_id,
+            post_id=post.id,
+            reason=reason,
+            description=description,
+            status='pending'
+        )
+        db.session.add(report)
+        db.session.commit()
+
+        flash(f"Жалоба на пост отправлена", "success")
+        return redirect(url_for("view_post", post_id=post_id))
+
+    reasons = [
+        ("spam", "Спам"),
+        ("harassment", "Домогательство"),
+        ("hate_speech", "Разжигание ненависти"),
+        ("violence", "Насилие"),
+        ("nsfw", "Неприемлемый контент"),
+        ("copyright", "Нарушение авторских прав"),
+        ("other", "Другое")
+    ]
+
+    return render_template("report_post.html", post=post, reasons=reasons)
+
+
+@app.route("/report/comment/<int:comment_id>", methods=["GET", "POST"])
+@login_required
+def report_comment(comment_id):
+    comment = Comment.query.get_or_404(comment_id)
+
+    if comment.user_id == current_user.id:
+        flash("Нельзя пожаловаться на свой комментарий", "error")
+        return redirect(url_for("view_post", post_id=comment.post_id))
+
+    if request.method == "POST":
+        reason = request.form.get("reason")
+        description = request.form.get("description", "")
+
+        if not reason:
+            flash("Укажите причину жалобы", "error")
+            return redirect(url_for("report_comment", comment_id=comment_id))
+
+        report = Report(
+            reporter_id=current_user.id,
+            reported_user_id=comment.user_id,
+            comment_id=comment.id,
+            reason=reason,
+            description=description,
+            status='pending'
+        )
+        db.session.add(report)
+        db.session.commit()
+
+        flash(f"Жалоба на комментарий отправлена", "success")
+        return redirect(url_for("view_post", post_id=comment.post_id))
+
+    return render_template("report_comment.html", comment=comment)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 #  Auth Routes
 # ──────────────────────────────────────────────────────────────────────────────
 @app.route("/register", methods=["GET", "POST"])
@@ -1603,7 +1527,8 @@ def register():
                 return render_template("register.html")
 
             if not re.match(r"^[a-zA-Z0-9_]{3,40}$", username):
-                flash("Имя пользователя должно быть 3-40 символов и содержать только буквы, цифры и подчеркивания", "error")
+                flash("Имя пользователя должно быть 3-40 символов и содержать только буквы, цифры и подчеркивания",
+                      "error")
                 return render_template("register.html")
 
             if not re.match(r"^[^@]+@[^@]+\.[^@]+$", email):
@@ -1633,7 +1558,7 @@ def register():
                 username=username,
                 email=email,
                 display_name=username,
-                avatar="/static/default_avatar.png",
+                preset_avatar=1,
                 bio="",
                 accent_color="#6c63ff",
                 is_private=False,
@@ -1692,7 +1617,6 @@ def login():
             track_failure(ip)
             flash("Неверные учетные данные.", "error")
 
-        # Сохраняем историю входа (с user_id=None для неудачных попыток)
         try:
             login_history = LoginHistory(
                 user_id=user.id if user else None,
@@ -1771,14 +1695,8 @@ def create_post():
                 media_url = save_file(media_file, "videos") or ""
                 media_type = "video"
             elif ext in ALLOWED_IMAGE:
-                # Сохраняем изображение в БД
-                image_url = save_image(media_file)
-                if image_url:
-                    media_url = image_url
-                    media_type = "image"
-                else:
-                    media_url = save_file(media_file, "images") or ""
-                    media_type = "image" if media_url else "text"
+                media_url = save_file(media_file, "images") or ""
+                media_type = "image" if media_url else "text"
             else:
                 flash(f"Неподдерживаемый тип файла", "error")
                 return redirect(url_for("index"))
@@ -1953,50 +1871,56 @@ def profile(username):
 def edit_profile():
     if request.method == "POST":
         try:
+            # Basic info
             current_user.display_name = request.form.get("display_name", "")[:60]
             current_user.bio = request.form.get("bio", "")[:500]
             current_user.website = request.form.get("website", "")[:200]
             current_user.location = request.form.get("location", "")[:100]
-            current_user.accent_color = request.form.get("accent_color", "#6c63ff")[:7]
             current_user.is_private = bool(request.form.get("is_private"))
 
-            # Обработка аватара (сохраняем в БД)
-            avatar = request.files.get("avatar")
-            if avatar and avatar.filename:
-                avatar.seek(0, 2)
-                file_size = avatar.tell()
-                avatar.seek(0)
+            # Accent color
+            accent_color = request.form.get("accent_color")
+            if not accent_color:
+                accent_color = request.form.get("accent_color_custom", "#6c63ff")
+            current_user.accent_color = accent_color[:7]
 
-                if file_size > 5 * 1024 * 1024:
-                    flash("Avatar file too large. Maximum size is 5MB.", "error")
-                else:
-                    image_url = save_image(avatar)
-                    if image_url:
-                        current_user.avatar = image_url
-                        # Очищаем старые данные
-                        current_user.avatar_data = None
-                        flash("Avatar updated successfully!", "success")
+            # Handle preset avatar selection
+            preset_avatar = request.form.get("preset_avatar")
+            if preset_avatar:
+                try:
+                    avatar_num = int(preset_avatar)
+                    if 1 <= avatar_num <= 10:
+                        current_user.set_preset_avatar(avatar_num)
+                        flash(f"Avatar {avatar_num} selected!", "success")
+                except (ValueError, TypeError):
+                    pass
+
+            # Handle preset cover selection
+            preset_cover = request.form.get("preset_cover")
+            if preset_cover:
+                try:
+                    cover_num = int(preset_cover)
+                    if 1 <= cover_num <= 5:
+                        current_user.set_preset_cover(cover_num)
+                        flash(f"Cover {cover_num} selected!", "success")
+                except (ValueError, TypeError):
+                    pass
+            elif request.form.get("remove_cover") == "1":
+                current_user.set_preset_cover(None)
+                flash("Cover removed", "info")
+
+            # Handle password change
+            current_password = request.form.get("current_password")
+            new_password = request.form.get("new_password")
+            if current_password and new_password:
+                if current_user.check_password(current_password):
+                    if len(new_password) >= 8:
+                        current_user.set_password(new_password)
+                        flash("Password changed successfully!", "success")
                     else:
-                        flash("Failed to upload avatar. Please try again.", "error")
-
-            # Обработка обложки (сохраняем в БД)
-            cover = request.files.get("cover_photo")
-            if cover and cover.filename:
-                cover.seek(0, 2)
-                file_size = cover.tell()
-                cover.seek(0)
-
-                if file_size > 10 * 1024 * 1024:
-                    flash("Cover photo too large. Maximum size is 10MB.", "error")
+                        flash("New password must be at least 8 characters", "error")
                 else:
-                    image_url = save_image(cover)
-                    if image_url:
-                        current_user.cover_photo = image_url
-                        # Очищаем старые данные
-                        current_user.cover_data = None
-                        flash("Cover photo updated successfully!", "success")
-                    else:
-                        flash("Failed to upload cover photo. Please try again.", "error")
+                    flash("Current password is incorrect", "error")
 
             db.session.commit()
             flash("Profile updated successfully!", "success")
@@ -2306,12 +2230,7 @@ def send_message(username):
         if media_file and media_file.filename:
             ext = media_file.filename.rsplit('.', 1)[1].lower() if '.' in media_file.filename else ''
             if ext in ALLOWED_IMAGE:
-                # Сохраняем изображение в БД
-                image_url = save_image(media_file)
-                if image_url:
-                    media_url = image_url
-                else:
-                    media_url = save_file(media_file, "chat_images") or ""
+                media_url = save_file(media_file, "chat_images") or ""
             else:
                 media_url = save_file(media_file, "chat_images") or ""
 
@@ -2419,20 +2338,6 @@ def create_group():
             is_private=priv
         )
 
-        # Обработка аватара группы
-        avatar = request.files.get("avatar")
-        if avatar and avatar.filename:
-            image_url = save_image(avatar)
-            if image_url:
-                g.avatar = image_url
-
-        # Обработка обложки группы
-        cover = request.files.get("cover")
-        if cover and cover.filename:
-            image_url = save_image(cover)
-            if image_url:
-                g.cover = image_url
-
         db.session.add(g)
         db.session.flush()
         g.members.append(current_user)
@@ -2521,13 +2426,8 @@ def group_post(slug):
             media_url = save_file(media_file, "videos") or ""
             media_type = "video"
         elif ext in ALLOWED_IMAGE:
-            image_url = save_image(media_file)
-            if image_url:
-                media_url = image_url
-                media_type = "image"
-            else:
-                media_url = save_file(media_file, "images") or ""
-                media_type = "image" if media_url else "text"
+            media_url = save_file(media_file, "images") or ""
+            media_type = "image" if media_url else "text"
 
     p = GroupPost(
         group_id=g.id,
@@ -2622,18 +2522,6 @@ def create_channel():
             owner_id=current_user.id
         )
 
-        avatar = request.files.get("avatar")
-        if avatar and avatar.filename:
-            image_url = save_image(avatar)
-            if image_url:
-                c.avatar = image_url
-
-        cover = request.files.get("cover")
-        if cover and cover.filename:
-            image_url = save_image(cover)
-            if image_url:
-                c.cover = image_url
-
         db.session.add(c)
         db.session.flush()
         c.subscribers.append(current_user)
@@ -2712,13 +2600,8 @@ def channel_publish(slug):
             media_url = save_file(media_file, "videos") or ""
             media_type = "video"
         elif ext in ALLOWED_IMAGE:
-            image_url = save_image(media_file)
-            if image_url:
-                media_url = image_url
-                media_type = "image"
-            else:
-                media_url = save_file(media_file, "images") or ""
-                media_type = "image" if media_url else "text"
+            media_url = save_file(media_file, "images") or ""
+            media_type = "image" if media_url else "text"
 
     p = ChannelPost(
         channel_id=c.id,
@@ -2836,12 +2719,9 @@ def debug_uploads():
                     "exists": False
                 }
 
-    # Добавляем статистику по изображениям в БД
-    result['database_images'] = {
-        'users_with_avatar': User.query.filter(User.avatar != "/static/default_avatar.png").count(),
-        'users_with_cover': User.query.filter(User.cover_photo != "").count(),
-        'posts_with_image': Post.query.filter(Post.media_type == "image").count(),
-        'messages_with_image': Message.query.filter(Message.media_url != "").count()
+    result['preset_stats'] = {
+        'users_with_preset_avatar': User.query.filter(User.preset_avatar.isnot(None)).count(),
+        'users_with_preset_cover': User.query.filter(User.preset_cover.isnot(None)).count()
     }
 
     return jsonify(result)
@@ -3038,7 +2918,8 @@ def create_admin_user():
                 email='admin@kildear.com',
                 display_name='Administrator',
                 is_admin=True,
-                is_verified=True
+                is_verified=True,
+                preset_avatar=1
             )
             admin.set_password(admin_password)
             db.session.add(admin)
@@ -3066,49 +2947,17 @@ def run_migrations():
 
         changes = []
 
-        # Добавляем колонки для хранения изображений в БД
-        image_columns = [
-            ('avatar_data', 'TEXT'),
-            ('avatar_mime', 'VARCHAR(50) DEFAULT "image/png"'),
-            ('cover_data', 'TEXT'),
-            ('cover_mime', 'VARCHAR(50) DEFAULT "image/jpeg"')
-        ]
+        # Добавляем колонку для preset_avatar
+        if 'preset_avatar' not in columns:
+            logger.info("➕ Добавление колонки preset_avatar...")
+            db.session.execute(text('ALTER TABLE "user" ADD COLUMN preset_avatar INTEGER DEFAULT 1'))
+            changes.append('preset_avatar')
 
-        for col_name, col_type in image_columns:
-            if col_name not in columns:
-                logger.info(f"➕ Добавление колонки {col_name}...")
-                db.session.execute(text(f'ALTER TABLE "user" ADD COLUMN {col_name} {col_type}'))
-                changes.append(col_name)
-
-        # Добавляем колонки в post
-        try:
-            post_columns = [col['name'] for col in inspector.get_columns('post')]
-            post_image_columns = [
-                ('media_data', 'TEXT'),
-                ('media_mime', 'VARCHAR(50)')
-            ]
-            for col_name, col_type in post_image_columns:
-                if col_name not in post_columns:
-                    logger.info(f"➕ Добавление колонки {col_name} в post...")
-                    db.session.execute(text(f'ALTER TABLE "post" ADD COLUMN {col_name} {col_type}'))
-                    changes.append(f"post.{col_name}")
-        except Exception as e:
-            logger.warning(f"Could not migrate post table: {e}")
-
-        # Добавляем колонки в message
-        try:
-            msg_columns = [col['name'] for col in inspector.get_columns('message')]
-            msg_image_columns = [
-                ('media_data', 'TEXT'),
-                ('media_mime', 'VARCHAR(50)')
-            ]
-            for col_name, col_type in msg_image_columns:
-                if col_name not in msg_columns:
-                    logger.info(f"➕ Добавление колонки {col_name} в message...")
-                    db.session.execute(text(f'ALTER TABLE "message" ADD COLUMN {col_name} {col_type}'))
-                    changes.append(f"message.{col_name}")
-        except Exception as e:
-            logger.warning(f"Could not migrate message table: {e}")
+        # Добавляем колонку для preset_cover
+        if 'preset_cover' not in columns:
+            logger.info("➕ Добавление колонки preset_cover...")
+            db.session.execute(text('ALTER TABLE "user" ADD COLUMN preset_cover INTEGER'))
+            changes.append('preset_cover')
 
         if changes:
             db.session.commit()
@@ -3151,7 +3000,7 @@ def init_app():
             # Запускаем миграции
             run_migrations()
 
-            # Создаем папки для загрузок (для видео и аудио)
+            # Создаем папки для загрузок (для видео)
             ensure_upload_folders()
 
             # Тест прав на запись
@@ -3179,11 +3028,12 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
 
     print("\n" + "=" * 70)
-    print("🚀 ЗАПУСК KILDEAR SOCIAL NETWORK (DATABASE STORAGE MODE)")
+    print("🚀 ЗАПУСК KILDEAR SOCIAL NETWORK (PRESET AVATARS MODE)")
     print("=" * 70)
     print(f"🌐 Сервер запускается на порту: {port}")
     print(f"📁 Временная папка: {app.config['UPLOAD_FOLDER']}")
-    print(f"💾 Хранение изображений: В Базе Данных (Data URL)")
+    print(f"🎨 Preset аватары: 10 штук (1av.png - 10av.png)")
+    print(f"🖼️  Preset обложки: 5 штук (1cover.jpg - 5cover.jpg)")
     print(f"🐍 Python: {platform.python_version()}")
     print(f"🖥️  Платформа: {platform.system()}")
     print(f"🎯 Режим: {'PRODUCTION' if is_production else 'DEVELOPMENT'}")

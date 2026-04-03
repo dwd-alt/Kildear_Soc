@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}Scan QR Code — Kildear{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 600px; margin: 40px auto;">
+    <div class="card" style="padding: 30px;">
+        <h1 class="h3 mb-3 text-center">
+            <i class="fa-solid fa-camera"></i> Scan QR Code
+        </h1>
+        <p class="text-muted text-center mb-4">
+            Point your camera at a Kildear QR code
+        </p>
+
+        <!-- Camera view -->
+        <div id="cameraContainer" style="position: relative; margin-bottom: 20px;">
+            <video id="camera" autoplay playsinline style="width: 100%; border-radius: 12px; background: #000;"></video>
+            <canvas id="canvas" style="display: none;"></canvas>
+            <div id="scanOverlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; border: 2px solid var(--accent); border-radius: 12px; pointer-events: none;"></div>
+        </div>
+
+        <!-- Or input field -->
+        <div class="mt-3">
+            <div class="divider">or</div>
+            <form method="POST" id="qrForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="input-group">
+                    <input type="text" name="qr_data" id="qrInput" class="form-control"
+                           placeholder="Paste QR code data or profile link">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-magnifying-glass"></i> Find
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="text-center mt-4">
+            <a href="{{ url_for('my_qr_code') }}" class="btn btn-outline">
+                <i class="fa-solid fa-qrcode"></i> Show My QR Code
+            </a>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script>
+let cameraStream = null;
+let scanning = true;
+
+async function startCamera() {
+    try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment" }
+        });
+        const video = document.getElementById('camera');
+        video.srcObject = cameraStream;
+        video.setAttribute('playsinline', true);
+        await video.play();
+        requestAnimationFrame(scanQR);
+    } catch (error) {
+        console.error('Camera error:', error);
+        document.getElementById('cameraContainer').innerHTML = `
+            <div style="background: var(--surface); padding: 40px; text-align: center; border-radius: 12px;">
+                <i class="fa-solid fa-camera-slash" style="font-size: 48px; opacity: 0.5;"></i>
+                <p class="mt-2">Could not access camera.<br>Please use the text input above.</p>
+            </div>
+        `;
+    }
+}
+
+async function scanQR() {
+    if (!scanning) return;
+
+    const video = document.getElementById('camera');
+    const canvas = document.getElementById('canvas');
+    const context = canvas.getContext('2d');
+
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.height = video.videoHeight;
+        canvas.width = video.videoWidth;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+        const code = jsQR(imageData.data, canvas.width, canvas.height, {
+            inversionAttempts: "dontInvert",
+        });
+
+        if (code && code.data) {
+            scanning = false;
+            stopCamera();
+
+            // Found QR code
+            const qrData = code.data;
+            toast('QR code detected!', 'success');
+
+            // Process the QR data
+            processQRData(qrData);
+            return;
+        }
+    }
+    requestAnimationFrame(scanQR);
+}
+
+function stopCamera() {
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+    }
+}
+
+async function processQRData(qrData) {
+    try {
+        // Try to extract username
+        let username = null;
+
+        // Check if it's a URL
+        if (qrData.startsWith(('http://', 'https://'))) {
+            const match = qrData.match(/\/u\/([a-zA-Z0-9_]+)/);
+            if (match) username = match[1];
+        }
+
+        // If not a URL, try direct username
+        if (!username && !qrData.startsWith(('http://', 'https://'))) {
+            username = qrData;
+        }
+
+        // Try to parse JSON
+        if (!username) {
+            try {
+                const data = JSON.parse(qrData);
+                if (data.type === 'user') {
+                    username = data.username;
+                }
+            } catch(e) {}
+        }
+
+        if (username) {
+            // Redirect to profile
+            window.location.href = `/u/${username}`;
+        } else {
+            document.getElementById('qrInput').value = qrData;
+            toast('Could not identify user. Please try again or use text input.', 'error');
+            resetScanner();
+        }
+    } catch (error) {
+        console.error('Error processing QR:', error);
+        toast('Error processing QR code', 'error');
+        resetScanner();
+    }
+}
+
+function resetScanner() {
+    scanning = true;
+    requestAnimationFrame(scanQR);
+}
+
+// Handle form submission
+document.getElementById('qrForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const qrData = document.getElementById('qrInput').value.trim();
+    if (qrData) {
+        processQRData(qrData);
+    }
+});
+
+// Start camera on page load
+startCamera();
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    stopCamera();
+});
+</script>
+
+<style>
+.divider {
+    text-align: center;
+    margin: 20px 0;
+    position: relative;
+}
+.divider::before,
+.divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 45%;
+    height: 1px;
+    background: var(--border);
+}
+.divider::before { left: 0; }
+.divider::after { right: 0; }
+.divider {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+</style>
+{% endblock %}

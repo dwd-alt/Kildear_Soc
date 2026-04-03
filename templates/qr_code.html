@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}My QR Code — Kildear{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 500px; margin: 40px auto; text-align: center;">
+    <div class="card" style="padding: 30px;">
+        <h1 class="h3 mb-3">
+            <i class="fa-solid fa-qrcode"></i> My QR Code
+        </h1>
+        <p class="text-muted mb-4">
+            Scan this code with the Kildear app to quickly find and follow me
+        </p>
+
+        <div style="background: white; padding: 20px; border-radius: 20px; display: inline-block; margin: 20px auto;">
+            <img src="{{ qr_image }}" alt="QR Code" style="width: 250px; height: 250px;">
+        </div>
+
+        <div class="mt-4">
+            <button class="btn btn-primary" onclick="downloadQR()">
+                <i class="fa-solid fa-download"></i> Download QR Code
+            </button>
+            <button class="btn btn-outline" onclick="shareQR()">
+                <i class="fa-solid fa-share"></i> Share
+            </button>
+        </div>
+
+        <div class="mt-4 p-3" style="background: var(--surface); border-radius: 12px;">
+            <p class="mb-1 small text-muted">Or share your profile link:</p>
+            <code style="word-break: break-all;">{{ url_for('profile', username=current_user.username, _external=True) }}</code>
+            <button class="btn btn-sm btn-outline mt-2" onclick="copyLink()">
+                <i class="fa-regular fa-copy"></i> Copy
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+function downloadQR() {
+    const link = document.createElement('a');
+    link.download = 'kildear_qr.png';
+    link.href = '{{ qr_image }}';
+    link.click();
+}
+
+function shareQR() {
+    if (navigator.share) {
+        navigator.share({
+            title: 'My Kildear QR Code',
+            text: 'Scan to follow me on Kildear!',
+            url: '{{ url_for("profile", username=current_user.username, _external=True) }}'
+        });
+    } else {
+        copyLink();
+        toast('Link copied to clipboard!', 'success');
+    }
+}
+
+function copyLink() {
+    const url = '{{ url_for("profile", username=current_user.username, _external=True) }}';
+    navigator.clipboard.writeText(url);
+    toast('Profile link copied!', 'success');
+}
+</script>
+{% endblock %}

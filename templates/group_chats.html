@@ -1,0 +1,385 @@
+{% extends "base.html" %}
+
+{% block title %}Групповые чаты - Kildear{% endblock %}
+
+{% block content %}
+<div class="group-chats-container">
+    <div class="group-chats-header">
+        <h1><i class="fas fa-users"></i> Групповые чаты</h1>
+        <a href="{{ url_for('create_group_chat') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Создать чат
+        </a>
+    </div>
+
+    <div class="group-chats-tabs">
+        <button class="tab-btn active" data-tab="my-chats">
+            <i class="fas fa-comments"></i> Мои чаты
+        </button>
+        <button class="tab-btn" data-tab="explore">
+            <i class="fas fa-search"></i> Исследовать
+        </button>
+    </div>
+
+    <div id="my-chats" class="tab-content active">
+        {% if chats %}
+            <div class="group-chats-list">
+                {% for chat in chats %}
+                <div class="group-chat-item" onclick="window.location.href='{{ url_for('group_chat_detail', chat_id=chat.id) }}'">
+                    <div class="group-chat-avatar">
+                        <img src="{{ chat.avatar }}" alt="{{ chat.name }}">
+                        {% if chat.unread_count > 0 %}
+                        <span class="unread-badge">{{ chat.unread_count }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="group-chat-info">
+                        <h3>{{ chat.name }}</h3>
+                        <p class="group-chat-description">{{ chat.description[:50] }}</p>
+                        <div class="group-chat-meta">
+                            <span><i class="fas fa-user-friends"></i> {{ chat.member_count }} участников</span>
+                            {% if chat.is_private %}
+                            <span class="private-badge"><i class="fas fa-lock"></i> Приватный</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="group-chat-last-message">
+                        {% if chat.last_message %}
+                        <p>{{ chat.last_message.content[:30] }}</p>
+                        <span class="time">{{ chat.last_message.created_at|timeago }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-comments"></i>
+                <h3>Нет групповых чатов</h3>
+                <p>Создайте новый чат или присоединитесь к существующему</p>
+                <a href="{{ url_for('create_group_chat') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Создать чат
+                </a>
+            </div>
+        {% endif %}
+    </div>
+
+    <div id="explore" class="tab-content">
+        <div class="search-group-chats">
+            <input type="text" id="group-search" placeholder="Поиск групповых чатов..." class="search-input">
+        </div>
+        <div id="explore-results" class="group-chats-list">
+            <!-- Результаты поиска будут загружены через JS -->
+        </div>
+    </div>
+</div>
+
+<style>
+.group-chats-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.group-chats-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.group-chats-header h1 {
+    font-size: 28px;
+    color: var(--text-primary);
+}
+
+.group-chats-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--border);
+}
+
+.tab-btn {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.3s;
+}
+
+.tab-btn.active {
+    color: var(--primary);
+    border-bottom: 2px solid var(--primary);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.group-chats-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.group-chat-item {
+    display: flex;
+    gap: 15px;
+    padding: 15px;
+    background: var(--card-bg);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s;
+    border: 1px solid var(--border);
+}
+
+.group-chat-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.group-chat-avatar {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    flex-shrink: 0;
+}
+
+.group-chat-avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.unread-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: var(--danger);
+    color: white;
+    border-radius: 50%;
+    padding: 2px 6px;
+    font-size: 12px;
+    min-width: 20px;
+    text-align: center;
+}
+
+.group-chat-info {
+    flex: 1;
+}
+
+.group-chat-info h3 {
+    margin: 0 0 5px 0;
+    font-size: 18px;
+    color: var(--text-primary);
+}
+
+.group-chat-description {
+    margin: 0 0 8px 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.group-chat-meta {
+    display: flex;
+    gap: 15px;
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+.private-badge {
+    color: var(--warning);
+}
+
+.group-chat-last-message {
+    text-align: right;
+    min-width: 150px;
+}
+
+.group-chat-last-message p {
+    margin: 0 0 5px 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.time {
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    background: var(--card-bg);
+    border-radius: 12px;
+}
+
+.empty-state i {
+    font-size: 64px;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+}
+
+.empty-state h3 {
+    margin: 0 0 10px 0;
+    color: var(--text-primary);
+}
+
+.empty-state p {
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+}
+
+.search-group-chats {
+    margin-bottom: 20px;
+}
+
+.search-input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--input-bg);
+    color: var(--text-primary);
+}
+
+@media (max-width: 768px) {
+    .group-chats-container {
+        padding: 10px;
+    }
+
+    .group-chat-item {
+        flex-direction: column;
+    }
+
+    .group-chat-last-message {
+        text-align: left;
+        min-width: auto;
+    }
+
+    .group-chats-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Tab switching
+    const tabs = document.querySelectorAll('.tab-btn');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            const tabId = this.dataset.tab;
+            tabs.forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(tabId).classList.add('active');
+
+            if (tabId === 'explore') {
+                loadExploreGroups();
+            }
+        });
+    });
+
+    // Search groups
+    const searchInput = document.getElementById('group-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', debounce(loadExploreGroups, 500));
+    }
+});
+
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+async function loadExploreGroups() {
+    const searchQuery = document.getElementById('group-search')?.value || '';
+    const resultsDiv = document.getElementById('explore-results');
+
+    try {
+        const response = await fetch(`/api/groups/explore?q=${encodeURIComponent(searchQuery)}`);
+        const groups = await response.json();
+
+        if (groups.length === 0) {
+            resultsDiv.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-search"></i>
+                    <h3>Группы не найдены</h3>
+                    <p>Попробуйте изменить поисковый запрос</p>
+                </div>
+            `;
+            return;
+        }
+
+        resultsDiv.innerHTML = groups.map(group => `
+            <div class="group-chat-item" onclick="window.location.href='/group-chat/${group.id}'">
+                <div class="group-chat-avatar">
+                    <img src="${group.avatar}" alt="${group.name}">
+                </div>
+                <div class="group-chat-info">
+                    <h3>${escapeHtml(group.name)}</h3>
+                    <p class="group-chat-description">${escapeHtml(group.description || '')}</p>
+                    <div class="group-chat-meta">
+                        <span><i class="fas fa-user-friends"></i> ${group.member_count} участников</span>
+                        ${group.is_private ? '<span class="private-badge"><i class="fas fa-lock"></i> Приватный</span>' : ''}
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="event.stopPropagation(); joinGroup(${group.id})">
+                    <i class="fas fa-plus"></i> Присоединиться
+                </button>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading groups:', error);
+        resultsDiv.innerHTML = '<div class="error">Ошибка загрузки групп</div>';
+    }
+}
+
+async function joinGroup(groupId) {
+    try {
+        const response = await fetch(`/group-chat/${groupId}/join`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRF()
+            }
+        });
+
+        if (response.ok) {
+            toast('Вы присоединились к группе!', 'success');
+            setTimeout(() => {
+                window.location.href = `/group-chat/${groupId}`;
+            }, 1000);
+        }
+    } catch (error) {
+        toast('Ошибка при присоединении к группе', 'error');
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %}
