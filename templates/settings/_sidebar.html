@@ -1,0 +1,57 @@
+<div class="settings-profile">
+    <img src="{{ current_user.avatar_url }}" alt="{{ current_user.username }}" class="settings-avatar">
+    <div class="settings-profile-info">
+        <h3>{{ current_user.display_name or current_user.username }}</h3>
+        <span>@{{ current_user.username }}</span>
+    </div>
+</div>
+
+<nav class="settings-nav">
+    <a href="{{ url_for('settings_account') }}" class="settings-nav-item {% if request.endpoint == 'settings_account' %}active{% endif %}">
+        <i class="fa-regular fa-user"></i> My account
+    </a>
+    <a href="{{ url_for('settings_notifications') }}" class="settings-nav-item {% if request.endpoint == 'settings_notifications' %}active{% endif %}">
+        <i class="fa-regular fa-bell"></i> Notifications and Sounds
+    </a>
+    <a href="{{ url_for('settings_privacy') }}" class="settings-nav-item {% if request.endpoint == 'settings_privacy' %}active{% endif %}">
+        <i class="fa-solid fa-lock"></i> Privacy
+    </a>
+    <a href="{{ url_for('settings_chats') }}" class="settings-nav-item {% if request.endpoint == 'settings_chats' %}active{% endif %}">
+        <i class="fa-regular fa-comment"></i> Chat Settings
+    </a>
+    <a href="{{ url_for('settings_folders') }}" class="settings-nav-item {% if request.endpoint == 'settings_folders' %}active{% endif %}">
+        <i class="fa-regular fa-folder"></i> Chat Folders
+    </a>
+    <a href="{{ url_for('settings_advanced') }}" class="settings-nav-item {% if request.endpoint == 'settings_advanced' %}active{% endif %}">
+        <i class="fa-solid fa-sliders"></i> Advanced Settings
+    </a>
+    <a href="{{ url_for('settings_sound') }}" class="settings-nav-item {% if request.endpoint == 'settings_sound' %}active{% endif %}">
+        <i class="fa-solid fa-microphone"></i> Sound and Camera
+    </a>
+    <a href="{{ url_for('settings_battery') }}" class="settings-nav-item {% if request.endpoint == 'settings_battery' %}active{% endif %}">
+        <i class="fa-solid fa-battery-full"></i> Battery and Animation
+    </a>
+    <a href="{{ url_for('settings_language') }}" class="settings-nav-item {% if request.endpoint == 'settings_language' %}active{% endif %}">
+        <i class="fa-solid fa-language"></i> Language
+    </a>
+</nav>
+
+<div class="settings-footer">
+    <div class="settings-premium" onclick="if(typeof toast === 'function') toast('Premium coming soon!', 'info')">
+        <i class="fa-brands fa-telegram"></i>
+        <div>
+            <h4>Kildear Premium</h4>
+            <p>Get more features</p>
+        </div>
+    </div>
+    <div class="settings-links">
+        <a href="#"><i class="fa-regular fa-star"></i> My Stars</a>
+        <a href="#"><i class="fa-regular fa-building"></i> Telegram for Business</a>
+        <a href="#" onclick="if(typeof showMyQRCode === 'function') showMyQRCode(); return false;"><i class="fa-regular fa-gift"></i> My QR Code</a>
+    </div>
+    <div class="settings-help">
+        <a href="#"><i class="fa-regular fa-circle-question"></i> Questions about Kildear</a>
+        <a href="#"><i class="fa-regular fa-lightbulb"></i> Kildear Features</a>
+        <a href="#"><i class="fa-regular fa-message"></i> Ask a question</a>
+    </div>
+</div>

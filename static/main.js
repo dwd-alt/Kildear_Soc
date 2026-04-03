@@ -734,6 +734,73 @@ async function unblockUser(userId) {
     }
 }
 
+/* ── Settings functions ──────────────────────────────────────────────────── */
+async function saveSettings(form) {
+    const formData = new FormData(form);
+    const data = {};
+    formData.forEach((value, key) => {
+        if (key === 'default_scale' || key === 'sound_volume' || key === 'auto_delete_messages') {
+            data[key] = parseInt(value);
+        } else if (value === 'on' || value === 'true') {
+            data[key] = true;
+        } else if (value === 'off' || value === 'false') {
+            data[key] = false;
+        } else {
+            data[key] = value;
+        }
+    });
+
+    try {
+        const response = await fetch('/settings/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRF()
+            },
+            body: JSON.stringify(data)
+        });
+        const result = await response.json();
+        if (result.success) {
+            toast('Settings saved!', 'success');
+
+            // Apply language change
+            if (data.language) {
+                window.location.reload();
+            }
+
+            // Apply scale change
+            if (data.default_scale) {
+                document.documentElement.style.fontSize = (data.default_scale / 100) + 'rem';
+            }
+        } else {
+            toast('Error saving settings', 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        toast('Error saving settings', 'error');
+    }
+}
+
+function initSettingsForm() {
+    const form = document.getElementById('settings-form');
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await saveSettings(form);
+        });
+    }
+
+    // Volume slider
+    const volumeSlider = document.querySelector('.volume-slider');
+    if (volumeSlider) {
+        volumeSlider.addEventListener('input', (e) => {
+            const value = e.target.value;
+            const valueSpan = e.target.closest('.setting-item')?.querySelector('.volume-value');
+            if (valueSpan) valueSpan.textContent = value + '%';
+        });
+    }
+}
+
 /* ── Admin functions ─────────────────────────────────────────────────────── */
 async function toggleBan(userId, username, isBanned) {
     const action = isBanned ? 'unban' : 'ban';
@@ -1071,7 +1138,8 @@ function initVoiceRecorder(buttonId, onComplete) {
                 </button>
             </div>
         `;
-        document.querySelector('.chat-input-area').appendChild(recordingUI);
+        const inputArea = document.querySelector('.chat-input-area');
+        if (inputArea) inputArea.appendChild(recordingUI);
     }
 }
 
@@ -1091,6 +1159,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initRelativeTimes();
     initColorPicker();
     initPageTransitions();
+    initSettingsForm();
 
     initCharCounter('post-content', 'post-char-count', 2000);
 

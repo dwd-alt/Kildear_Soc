@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+
+{% block title %}Chat Folders - Kildear{% endblock %}
+
+{% block content %}
+<style>
+/* Same styles */
+.settings-container { display: flex; min-height: calc(100vh - 60px); background: var(--bg); }
+.settings-sidebar { width: 320px; background: var(--surface); border-right: 1px solid var(--border); padding: 20px 0; position: sticky; top: 60px; height: calc(100vh - 60px); overflow-y: auto; }
+.settings-profile { display: flex; align-items: center; gap: 12px; padding: 0 20px 20px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+.settings-avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; }
+.settings-profile-info h3 { font-size: 15px; font-weight: 600; margin: 0 0 2px; }
+.settings-profile-info span { font-size: 13px; color: var(--text-muted); }
+.settings-nav { display: flex; flex-direction: column; margin-bottom: 20px; }
+.settings-nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 20px; color: var(--text); text-decoration: none; transition: background 0.2s; font-size: 14px; }
+.settings-nav-item i { width: 20px; font-size: 16px; color: var(--text-muted); }
+.settings-nav-item:hover { background: var(--card-hover); }
+.settings-nav-item.active { background: var(--card-hover); border-left: 3px solid var(--primary); }
+.settings-nav-item.active i { color: var(--primary); }
+.settings-footer { padding: 20px; border-top: 1px solid var(--border); margin-top: auto; }
+.settings-premium { display: flex; align-items: center; gap: 12px; padding: 12px; background: linear-gradient(135deg, #2a2a4a, #1a1a2e); border-radius: 12px; margin-bottom: 20px; cursor: pointer; }
+.settings-premium i { font-size: 28px; color: #6c63ff; }
+.settings-premium h4 { font-size: 14px; margin: 0 0 2px; }
+.settings-premium p { font-size: 12px; color: var(--text-muted); margin: 0; }
+.settings-links, .settings-help { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.settings-links a, .settings-help a { display: flex; align-items: center; gap: 10px; padding: 8px 0; color: var(--text-muted); text-decoration: none; font-size: 13px; transition: color 0.2s; }
+.settings-links a:hover, .settings-help a:hover { color: var(--primary); }
+.settings-content { flex: 1; padding: 30px 40px; overflow-y: auto; }
+.settings-content h1 { font-size: 28px; margin-bottom: 8px; }
+.settings-subtitle { color: var(--text-muted); margin-bottom: 30px; }
+.folder-item { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+.folder-info h4 { margin: 0 0 4px; font-size: 16px; }
+.folder-info p { margin: 0; font-size: 12px; color: var(--text-muted); }
+.folder-actions { display: flex; gap: 8px; }
+.btn-icon { background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 8px; border-radius: 8px; }
+.btn-icon:hover { background: var(--card-hover); color: var(--danger); }
+.btn-primary { background: linear-gradient(135deg, var(--primary), #9b8fff); color: #fff; border: none; padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 10px 24px; border-radius: 8px; cursor: pointer; }
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+@media (max-width: 768px) { .settings-sidebar { display: none; } .settings-content { padding: 20px; } }
+</style>
+
+<div class="settings-container">
+    <div class="settings-sidebar">
+        {% include "settings/_sidebar.html" %}
+    </div>
+
+    <div class="settings-content">
+        <h1>Chat Folders</h1>
+        <p class="settings-subtitle">Organize your chats into custom folders</p>
+
+        <div id="folders-list">
+            {% if folders %}
+                {% for folder in folders %}
+                <div class="folder-item">
+                    <div class="folder-info">
+                        <h4>{{ folder.name }}</h4>
+                        <p>{{ folder.chats|length }} chats • {{ folder.description or '' }}</p>
+                    </div>
+                    <div class="folder-actions">
+                        <button class="btn-icon" onclick="editFolder({{ loop.index0 }})" title="Edit">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button class="btn-icon" onclick="deleteFolder({{ loop.index0 }})" title="Delete">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <i class="fa-regular fa-folder-open" style="font-size: 48px; margin-bottom: 16px;"></i>
+                    <h3>No folders yet</h3>
+                    <p>Create folders to organize your chats</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="settings-actions" style="margin-top: 24px;">
+            <button class="btn-primary" onclick="createFolder()">
+                <i class="fa-solid fa-plus"></i> Create Folder
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Create/Edit Folder Modal -->
+<div id="folderModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 10000; align-items: center; justify-content: center;">
+    <div style="background: var(--surface); border-radius: var(--radius); padding: 24px; max-width: 500px; width: 90%;">
+        <h3 id="modalTitle">Create Folder</h3>
+        <div class="form-group">
+            <label class="form-label">Folder Name</label>
+            <input type="text" id="folderName" class="form-control" placeholder="e.g., Friends, Work, Family">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Description (optional)</label>
+            <textarea id="folderDesc" class="form-control" rows="2" placeholder="What's this folder for?"></textarea>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Select Chats</label>
+            <div id="chatSelector" style="max-height: 200px; overflow-y: auto; background: var(--card); border-radius: 8px; padding: 8px;">
+                <div class="text-muted" style="text-align: center; padding: 20px;">Loading chats...</div>
+            </div>
+        </div>
+        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px;">
+            <button class="btn-outline" onclick="closeFolderModal()">Cancel</button>
+            <button class="btn-primary" onclick="saveFolder()">Save</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let folders = {{ folders|tojson }};
+let editIndex = -1;
+
+function renderFolders() {
+    const container = document.getElementById('folders-list');
+    if (!folders.length) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fa-regular fa-folder-open" style="font-size: 48px; margin-bottom: 16px;"></i>
+                <h3>No folders yet</h3>
+                <p>Create folders to organize your chats</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = folders.map((folder, idx) => `
+        <div class="folder-item">
+            <div class="folder-info">
+                <h4>${escapeHtml(folder.name)}</h4>
+                <p>${folder.chats?.length || 0} chats • ${folder.description || ''}</p>
+            </div>
+            <div class="folder-actions">
+                <button class="btn-icon" onclick="editFolder(${idx})" title="Edit">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
+                <button class="btn-icon" onclick="deleteFolder(${idx})" title="Delete">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function createFolder() {
+    editIndex = -1;
+    document.getElementById('modalTitle').textContent = 'Create Folder';
+    document.getElementById('folderName').value = '';
+    document.getElementById('folderDesc').value = '';
+    loadChats();
+    document.getElementById('folderModal').style.display = 'flex';
+}
+
+function editFolder(index) {
+    editIndex = index;
+    const folder = folders[index];
+    document.getElementById('modalTitle').textContent = 'Edit Folder';
+    document.getElementById('folderName').value = folder.name;
+    document.getElementById('folderDesc').value = folder.description || '';
+    loadChats(folder.chats || []);
+    document.getElementById('folderModal').style.display = 'flex';
+}
+
+async function loadChats(selectedChats = []) {
+    try {
+        const response = await fetch('/api/unread_counts');
+        // In real app, fetch actual chat list
+        const selector = document.getElementById('chatSelector');
+        selector.innerHTML = `
+            <div style="padding: 8px;">
+                <label style="display: flex; align-items: center; gap: 8px; padding: 8px;">
+                    <input type="checkbox" value="all"> All Chats
+                </label>
+                <hr class="divider">
+                <div class="text-muted" style="padding: 8px;">Chat list will appear here in production</div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error loading chats:', error);
+    }
+}
+
+function saveFolder() {
+    const name = document.getElementById('folderName').value.trim();
+    const description = document.getElementById('folderDesc').value;
+
+    if (!name) {
+        toast('Please enter a folder name', 'error');
+        return;
+    }
+
+    const folder = {
+        name: name,
+        description: description,
+        chats: []
+    };
+
+    if (editIndex >= 0) {
+        folders[editIndex] = folder;
+    } else {
+        folders.push(folder);
+    }
+
+    // Save to server
+    fetch('/settings/update', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRF()
+        },
+        body: JSON.stringify({ folders_data: folders })
+    }).then(response => response.json())
+      .then(result => {
+          if (result.success) {
+              renderFolders();
+              closeFolderModal();
+              toast('Folder saved!', 'success');
+          } else {
+              toast('Error saving folder', 'error');
+          }
+      });
+}
+
+function deleteFolder(index) {
+    if (confirm('Delete this folder?')) {
+        folders.splice(index, 1);
+        fetch('/settings/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRF()
+            },
+            body: JSON.stringify({ folders_data: folders })
+        }).then(response => response.json())
+          .then(result => {
+              if (result.success) {
+                  renderFolders();
+                  toast('Folder deleted', 'success');
+              } else {
+                  toast('Error deleting folder', 'error');
+              }
+          });
+    }
+}
+
+function closeFolderModal() {
+    document.getElementById('folderModal').style.display = 'none';
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Initialize
+renderFolders();
+</script>
+{% endblock %}

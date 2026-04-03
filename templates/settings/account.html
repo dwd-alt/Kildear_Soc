@@ -1,0 +1,556 @@
+{% extends "base.html" %}
+
+{% block title %}Account Settings - Kildear{% endblock %}
+
+{% block content %}
+<style>
+.settings-container {
+    display: flex;
+    min-height: calc(100vh - 60px);
+    background: var(--bg);
+}
+.settings-sidebar {
+    width: 320px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 20px 0;
+    position: sticky;
+    top: 60px;
+    height: calc(100vh - 60px);
+    overflow-y: auto;
+}
+.settings-profile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+}
+.settings-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+.settings-profile-info h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 2px;
+}
+.settings-profile-info span {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+.settings-nav {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 20px;
+}
+.settings-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    color: var(--text);
+    text-decoration: none;
+    transition: background 0.2s;
+    font-size: 14px;
+}
+.settings-nav-item i {
+    width: 20px;
+    font-size: 16px;
+    color: var(--text-muted);
+}
+.settings-nav-item:hover {
+    background: var(--card-hover);
+}
+.settings-nav-item.active {
+    background: var(--card-hover);
+    border-left: 3px solid var(--primary);
+}
+.settings-nav-item.active i {
+    color: var(--primary);
+}
+.settings-footer {
+    padding: 20px;
+    border-top: 1px solid var(--border);
+    margin-top: auto;
+}
+.settings-premium {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: linear-gradient(135deg, #2a2a4a, #1a1a2e);
+    border-radius: 12px;
+    margin-bottom: 20px;
+    cursor: pointer;
+}
+.settings-premium i {
+    font-size: 28px;
+    color: #6c63ff;
+}
+.settings-premium h4 {
+    font-size: 14px;
+    margin: 0 0 2px;
+}
+.settings-premium p {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 0;
+}
+.settings-links, .settings-help {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+.settings-links a, .settings-help a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 13px;
+    transition: color 0.2s;
+}
+.settings-links a:hover, .settings-help a:hover {
+    color: var(--primary);
+}
+.settings-content {
+    flex: 1;
+    padding: 30px 40px;
+    overflow-y: auto;
+}
+.settings-content h1 {
+    font-size: 28px;
+    margin-bottom: 8px;
+}
+.settings-subtitle {
+    color: var(--text-muted);
+    margin-bottom: 30px;
+}
+.settings-form {
+    max-width: 600px;
+}
+.settings-section {
+    background: var(--surface);
+    border-radius: 12px;
+    margin-bottom: 24px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+.settings-section h3 {
+    padding: 16px 20px;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+}
+.setting-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+}
+.setting-item:last-child {
+    border-bottom: none;
+}
+.setting-info {
+    flex: 1;
+}
+.setting-info label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+.setting-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.setting-value {
+    font-size: 14px;
+    color: var(--primary);
+    font-weight: 500;
+}
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 26px;
+    flex-shrink: 0;
+}
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #3a3a4a;
+    transition: 0.3s;
+    border-radius: 34px;
+}
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+}
+input:checked + .toggle-slider {
+    background-color: var(--primary);
+}
+input:checked + .toggle-slider:before {
+    transform: translateX(24px);
+}
+.setting-select {
+    padding: 8px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    cursor: pointer;
+    min-width: 160px;
+}
+.setting-input {
+    padding: 8px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    width: 200px;
+}
+.setting-input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+.settings-actions {
+    margin-top: 32px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+}
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary), #9b8fff);
+    color: #fff;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+}
+.btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 10px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.btn-outline:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+.text-danger {
+    color: var(--danger);
+}
+.mt-3 {
+    margin-top: 16px;
+}
+.gap-2 {
+    gap: 12px;
+}
+.flex {
+    display: flex;
+}
+@media (max-width: 768px) {
+    .settings-sidebar { display: none; }
+    .settings-content { padding: 20px; }
+    .setting-item { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .toggle-switch { align-self: flex-end; }
+}
+</style>
+
+<div class="settings-container">
+    <div class="settings-sidebar">
+        {% include "settings/_sidebar.html" %}
+    </div>
+
+    <div class="settings-content">
+        <h1>My Account</h1>
+        <p class="settings-subtitle">Manage your personal information and security</p>
+
+        <form id="account-form" class="settings-form">
+            <!-- Profile Information -->
+            <div class="settings-section">
+                <h3><i class="fa-regular fa-user"></i> Profile Information</h3>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Display Name</label>
+                        <span class="setting-desc">Your name that others see</span>
+                    </div>
+                    <input type="text" name="display_name" class="setting-input" value="{{ current_user.display_name or current_user.username }}">
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Username</label>
+                        <span class="setting-desc">Your unique identifier (@username)</span>
+                    </div>
+                    <div class="setting-value">@{{ current_user.username }}</div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Email Address</label>
+                        <span class="setting-desc">Used for login and notifications</span>
+                    </div>
+                    <input type="email" name="email" class="setting-input" value="{{ current_user.email }}">
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Bio</label>
+                        <span class="setting-desc">Tell others about yourself</span>
+                    </div>
+                    <textarea name="bio" class="setting-input" rows="3" style="width: 100%;">{{ current_user.bio }}</textarea>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Location</label>
+                        <span class="setting-desc">Where are you from?</span>
+                    </div>
+                    <input type="text" name="location" class="setting-input" value="{{ current_user.location or '' }}">
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Website</label>
+                        <span class="setting-desc">Your personal website or social link</span>
+                    </div>
+                    <input type="url" name="website" class="setting-input" value="{{ current_user.website or '' }}">
+                </div>
+            </div>
+
+            <!-- Avatar Selection -->
+            <div class="settings-section">
+                <h3><i class="fa-regular fa-image"></i> Profile Picture</h3>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Preset Avatar</label>
+                        <span class="setting-desc">Choose from 10 preset avatars</span>
+                    </div>
+                    <select name="preset_avatar" class="setting-select" id="presetAvatar">
+                        {% for i in range(1, 11) %}
+                        <option value="{{ i }}" {% if current_user.preset_avatar == i %}selected{% endif %}>
+                            Avatar {{ i }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Current Avatar</label>
+                        <span class="setting-desc">Preview of your selected avatar</span>
+                    </div>
+                    <img src="{{ current_user.avatar_url }}" style="width: 60px; height: 60px; border-radius: 50%;">
+                </div>
+            </div>
+
+            <!-- Cover Image -->
+            <div class="settings-section">
+                <h3><i class="fa-regular fa-image"></i> Cover Image</h3>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Preset Cover</label>
+                        <span class="setting-desc">Choose from 5 preset covers</span>
+                    </div>
+                    <select name="preset_cover" class="setting-select" id="presetCover">
+                        <option value="">None</option>
+                        {% for i in range(1, 6) %}
+                        <option value="{{ i }}" {% if current_user.preset_cover == i %}selected{% endif %}>
+                            Cover {{ i }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Change Password -->
+            <div class="settings-section">
+                <h3><i class="fa-solid fa-lock"></i> Change Password</h3>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Current Password</label>
+                        <span class="setting-desc">Enter your current password</span>
+                    </div>
+                    <input type="password" name="current_password" class="setting-input" placeholder="••••••••">
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>New Password</label>
+                        <span class="setting-desc">Minimum 8 characters</span>
+                    </div>
+                    <input type="password" name="new_password" class="setting-input" placeholder="••••••••">
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Confirm Password</label>
+                        <span class="setting-desc">Re-enter your new password</span>
+                    </div>
+                    <input type="password" name="confirm_password" class="setting-input" placeholder="••••••••">
+                </div>
+            </div>
+
+            <!-- Theme -->
+            <div class="settings-section">
+                <h3><i class="fa-solid fa-palette"></i> Appearance</h3>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Theme</label>
+                        <span class="setting-desc">Choose your preferred theme</span>
+                    </div>
+                    <select name="theme" class="setting-select" id="themeSelect">
+                        <option value="dark" {% if settings.theme == 'dark' %}selected{% endif %}>🌙 Dark</option>
+                        <option value="light" {% if settings.theme == 'light' %}selected{% endif %}>☀️ Light</option>
+                        <option value="system" {% if settings.theme == 'system' %}selected{% endif %}>💻 System Default</option>
+                    </select>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Accent Color</label>
+                        <span class="setting-desc">Customize the primary color</span>
+                    </div>
+                    <input type="color" name="accent_color" class="setting-input" style="width: 60px; height: 40px;" value="{{ current_user.accent_color }}">
+                </div>
+            </div>
+
+            <!-- Account Actions -->
+            <div class="settings-section">
+                <h3><i class="fa-solid fa-triangle-exclamation"></i> Account Actions</h3>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Private Account</label>
+                        <span class="setting-desc">Only followers can see your posts</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="is_private" {% if current_user.is_private %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Delete Account</label>
+                        <span class="setting-desc text-danger">Permanently delete your account</span>
+                    </div>
+                    <button type="button" class="btn-outline" onclick="confirmDeleteAccount()" style="color: var(--danger); border-color: var(--danger);">
+                        <i class="fa-solid fa-trash"></i> Delete Account
+                    </button>
+                </div>
+            </div>
+
+            <div class="settings-actions">
+                <button type="submit" class="btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.getElementById('account-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const data = {};
+    formData.forEach((value, key) => {
+        if (key === 'is_private') data[key] = value === 'on';
+        else if (value) data[key] = value;
+    });
+
+    // Check password match
+    if (data.new_password && data.new_password !== data.confirm_password) {
+        toast('Passwords do not match!', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/settings/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRF()
+            },
+            body: JSON.stringify(data)
+        });
+        const result = await response.json();
+        if (result.success) {
+            toast('Settings saved! Page will reload...', 'success');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            toast('Error saving settings', 'error');
+        }
+    } catch (error) {
+        toast('Error saving settings', 'error');
+    }
+});
+
+function confirmDeleteAccount() {
+    if (confirm('⚠️ WARNING: This will permanently delete your account and all data. This cannot be undone!\n\nAre you absolutely sure?')) {
+        if (confirm('Type "DELETE" to confirm')) {
+            const confirmation = prompt('Type DELETE to confirm:');
+            if (confirmation === 'DELETE') {
+                toast('Account deletion requested. Contact support.', 'info');
+            }
+        }
+    }
+}
+
+// Theme switcher
+document.getElementById('themeSelect')?.addEventListener('change', (e) => {
+    const theme = e.target.value;
+    if (theme === 'light') {
+        document.documentElement.style.setProperty('--bg', '#ffffff');
+        document.documentElement.style.setProperty('--surface', '#f5f5f5');
+        document.documentElement.style.setProperty('--text', '#1a1a2e');
+        document.documentElement.style.setProperty('--text-muted', '#666');
+    } else if (theme === 'dark') {
+        document.documentElement.style.setProperty('--bg', '#07070f');
+        document.documentElement.style.setProperty('--surface', '#0f0f1a');
+        document.documentElement.style.setProperty('--text', '#e4e4f0');
+        document.documentElement.style.setProperty('--text-muted', '#7070a0');
+    } else {
+        // System default
+        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        // Apply system theme
+    }
+});
+</script>
+{% endblock %}

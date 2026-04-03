@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+
+{% block title %}Language - Kildear{% endblock %}
+
+{% block content %}
+<style>
+/* Те же стили */
+.settings-container { display: flex; min-height: calc(100vh - 60px); background: var(--bg); }
+.settings-sidebar { width: 320px; background: var(--surface); border-right: 1px solid var(--border); padding: 20px 0; position: sticky; top: 60px; height: calc(100vh - 60px); overflow-y: auto; }
+.settings-profile { display: flex; align-items: center; gap: 12px; padding: 0 20px 20px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+.settings-avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; }
+.settings-profile-info h3 { font-size: 15px; font-weight: 600; margin: 0 0 2px; }
+.settings-profile-info span { font-size: 13px; color: var(--text-muted); }
+.settings-nav { display: flex; flex-direction: column; margin-bottom: 20px; }
+.settings-nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 20px; color: var(--text); text-decoration: none; transition: background 0.2s; font-size: 14px; }
+.settings-nav-item i { width: 20px; font-size: 16px; color: var(--text-muted); }
+.settings-nav-item:hover { background: var(--card-hover); }
+.settings-nav-item.active { background: var(--card-hover); border-left: 3px solid var(--primary); }
+.settings-nav-item.active i { color: var(--primary); }
+.settings-footer { padding: 20px; border-top: 1px solid var(--border); margin-top: auto; }
+.settings-premium { display: flex; align-items: center; gap: 12px; padding: 12px; background: linear-gradient(135deg, #2a2a4a, #1a1a2e); border-radius: 12px; margin-bottom: 20px; cursor: pointer; }
+.settings-premium i { font-size: 28px; color: #6c63ff; }
+.settings-premium h4 { font-size: 14px; margin: 0 0 2px; }
+.settings-premium p { font-size: 12px; color: var(--text-muted); margin: 0; }
+.settings-links, .settings-help { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.settings-links a, .settings-help a { display: flex; align-items: center; gap: 10px; padding: 8px 0; color: var(--text-muted); text-decoration: none; font-size: 13px; transition: color 0.2s; }
+.settings-links a:hover, .settings-help a:hover { color: var(--primary); }
+.settings-content { flex: 1; padding: 30px 40px; overflow-y: auto; }
+.settings-content h1 { font-size: 28px; margin-bottom: 8px; }
+.settings-subtitle { color: var(--text-muted); margin-bottom: 30px; }
+.settings-form { max-width: 600px; }
+.settings-section { background: var(--surface); border-radius: 12px; margin-bottom: 24px; overflow: hidden; border: 1px solid var(--border); }
+.settings-section h3 { padding: 16px 20px; margin: 0; font-size: 16px; font-weight: 600; border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.02); }
+.setting-item { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.setting-item:last-child { border-bottom: none; }
+.setting-info { flex: 1; }
+.setting-info label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+.setting-desc { font-size: 12px; color: var(--text-muted); }
+.setting-select { padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; cursor: pointer; min-width: 200px; }
+.scale-preview { margin-top: 20px; padding: 20px; background: var(--card); border-radius: 12px; text-align: center; }
+.scale-value { font-size: 18px; font-weight: 600; color: var(--primary); }
+.settings-actions { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border); }
+.btn-primary { background: linear-gradient(135deg, var(--primary), #9b8fff); color: #fff; border: none; padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; }
+@media (max-width: 768px) { .settings-sidebar { display: none; } .settings-content { padding: 20px; } .setting-item { flex-direction: column; align-items: flex-start; gap: 12px; } }
+</style>
+
+<div class="settings-container">
+    <div class="settings-sidebar">
+        {% include "settings/_sidebar.html" %}
+    </div>
+
+    <div class="settings-content">
+        <h1>Language & Region</h1>
+        <p class="settings-subtitle">Choose your preferred language and interface scale</p>
+
+        <form id="language-form" class="settings-form">
+            <!-- Language Selection -->
+            <div class="settings-section">
+                <h3><i class="fa-solid fa-language"></i> App Language</h3>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Language</label>
+                        <span class="setting-desc">Select your preferred language for the interface</span>
+                    </div>
+                    <select name="language" class="setting-select" id="languageSelect">
+                        <option value="ru" {% if settings.language == 'ru' %}selected{% endif %}>🇷🇺 Русский</option>
+                        <option value="en" {% if settings.language == 'en' %}selected{% endif %}>🇬🇧 English</option>
+                        <option value="es" {% if settings.language == 'es' %}selected{% endif %}>🇪🇸 Español</option>
+                        <option value="fr" {% if settings.language == 'fr' %}selected{% endif %}>🇫🇷 Français</option>
+                        <option value="de" {% if settings.language == 'de' %}selected{% endif %}>🇩🇪 Deutsch</option>
+                        <option value="it" {% if settings.language == 'it' %}selected{% endif %}>🇮🇹 Italiano</option>
+                        <option value="pt" {% if settings.language == 'pt' %}selected{% endif %}>🇵🇹 Português</option>
+                        <option value="zh" {% if settings.language == 'zh' %}selected{% endif %}>🇨🇳 中文</option>
+                        <option value="ja" {% if settings.language == 'ja' %}selected{% endif %}>🇯🇵 日本語</option>
+                        <option value="ko" {% if settings.language == 'ko' %}selected{% endif %}>🇰🇷 한국어</option>
+                        <option value="ar" {% if settings.language == 'ar' %}selected{% endif %}>🇸🇦 العربية</option>
+                        <option value="hi" {% if settings.language == 'hi' %}selected{% endif %}>🇮🇳 हिन्दी</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Interface Scale -->
+            <div class="settings-section">
+                <h3><i class="fa-solid fa-arrows-up-down-left-right"></i> Display & Zoom</h3>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Default Scale</label>
+                        <span class="setting-desc">Adjust the interface zoom level</span>
+                    </div>
+                    <select name="default_scale" class="setting-select" id="scaleSelect">
+                        <option value="50" {% if settings.default_scale == 50 %}selected{% endif %}>50% - Very Small</option>
+                        <option value="75" {% if settings.default_scale == 75 %}selected{% endif %}>75% - Small</option>
+                        <option value="90" {% if settings.default_scale == 90 %}selected{% endif %}>90% - Compact</option>
+                        <option value="100" {% if settings.default_scale == 100 %}selected{% endif %}>100% - Default</option>
+                        <option value="110" {% if settings.default_scale == 110 %}selected{% endif %}>110% - Large</option>
+                        <option value="125" {% if settings.default_scale == 125 %}selected{% endif %}>125% - Larger</option>
+                        <option value="150" {% if settings.default_scale == 150 %}selected{% endif %}>150% - Extra Large</option>
+                        <option value="200" {% if settings.default_scale == 200 %}selected{% endif %}>200% - Maximum</option>
+                    </select>
+                </div>
+
+                <div class="scale-preview" id="scalePreview">
+                    <p>Preview text size</p>
+                    <div class="scale-value" id="scaleValue">{{ settings.default_scale }}%</div>
+                    <p class="text-muted text-sm">This is how text will appear</p>
+                </div>
+            </div>
+
+            <!-- Font Settings -->
+            <div class="settings-section">
+                <h3><i class="fa-solid fa-font"></i> Font Settings</h3>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Font Size</label>
+                        <span class="setting-desc">Adjust the base font size</span>
+                    </div>
+                    <select name="font_size" class="setting-select">
+                        <option value="small" {% if settings.font_size == 'small' %}selected{% endif %}>Small</option>
+                        <option value="medium" {% if settings.font_size == 'medium' %}selected{% endif %}>Medium</option>
+                        <option value="large" {% if settings.font_size == 'large' %}selected{% endif %}>Large</option>
+                    </select>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Chat Font Size</label>
+                        <span class="setting-desc">Adjust message text size in chats</span>
+                    </div>
+                    <select name="chat_font_size" class="setting-select">
+                        <option value="small" {% if settings.chat_font_size == 'small' %}selected{% endif %}>Small</option>
+                        <option value="medium" {% if settings.chat_font_size == 'medium' %}selected{% endif %}>Medium</option>
+                        <option value="large" {% if settings.chat_font_size == 'large' %}selected{% endif %}>Large</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Date & Time -->
+            <div class="settings-section">
+                <h3><i class="fa-regular fa-clock"></i> Date & Time</h3>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Time Format</label>
+                        <span class="setting-desc">Choose 12-hour or 24-hour format</span>
+                    </div>
+                    <select name="time_format" class="setting-select">
+                        <option value="24h">24-hour (13:00)</option>
+                        <option value="12h">12-hour (1:00 PM)</option>
+                    </select>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Date Format</label>
+                        <span class="setting-desc">Choose how dates are displayed</span>
+                    </div>
+                    <select name="date_format" class="setting-select">
+                        <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                        <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                        <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="settings-actions">
+                <button type="submit" class="btn-primary">Save Changes</button>
+                <button type="button" class="btn-outline" onclick="resetScale()" style="margin-left: 12px;">Reset to Default</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Update scale preview
+const scaleSelect = document.getElementById('scaleSelect');
+const scaleValue = document.getElementById('scaleValue');
+
+if (scaleSelect) {
+    scaleSelect.addEventListener('change', (e) => {
+        const value = e.target.value;
+        scaleValue.textContent = value + '%';
+        document.documentElement.style.fontSize = (parseInt(value) / 100) + 'rem';
+    });
+}
+
+document.getElementById('language-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const data = {};
+    formData.forEach((value, key) => {
+        if (key === 'default_scale') data[key] = parseInt(value);
+        else data[key] = value;
+    });
+
+    try {
+        const response = await fetch('/settings/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRF()
+            },
+            body: JSON.stringify(data)
+        });
+        const result = await response.json();
+        if (result.success) {
+            toast('Language settings saved!', 'success');
+            localStorage.setItem('ui-scale', data.default_scale);
+            if (data.language) {
+                setTimeout(() => location.reload(), 1000);
+            }
+        } else {
+            toast('Error saving settings', 'error');
+        }
+    } catch (error) {
+        toast('Error saving settings', 'error');
+    }
+});
+
+function resetScale() {
+    if (scaleSelect) {
+        scaleSelect.value = '100';
+        scaleValue.textContent = '100%';
+        document.documentElement.style.fontSize = '1rem';
+        localStorage.setItem('ui-scale', '100');
+        toast('Scale reset to default', 'success');
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}Advanced Settings - Kildear{% endblock %}
+
+{% block content %}
+<style>
+/* Same styles as above */
+.settings-container { display: flex; min-height: calc(100vh - 60px); background: var(--bg); }
+.settings-sidebar { width: 320px; background: var(--surface); border-right: 1px solid var(--border); padding: 20px 0; position: sticky; top: 60px; height: calc(100vh - 60px); overflow-y: auto; }
+.settings-profile { display: flex; align-items: center; gap: 12px; padding: 0 20px 20px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+.settings-avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; }
+.settings-profile-info h3 { font-size: 15px; font-weight: 600; margin: 0 0 2px; }
+.settings-profile-info span { font-size: 13px; color: var(--text-muted); }
+.settings-nav { display: flex; flex-direction: column; margin-bottom: 20px; }
+.settings-nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 20px; color: var(--text); text-decoration: none; transition: background 0.2s; font-size: 14px; }
+.settings-nav-item i { width: 20px; font-size: 16px; color: var(--text-muted); }
+.settings-nav-item:hover { background: var(--card-hover); }
+.settings-nav-item.active { background: var(--card-hover); border-left: 3px solid var(--primary); }
+.settings-nav-item.active i { color: var(--primary); }
+.settings-footer { padding: 20px; border-top: 1px solid var(--border); margin-top: auto; }
+.settings-premium { display: flex; align-items: center; gap: 12px; padding: 12px; background: linear-gradient(135deg, #2a2a4a, #1a1a2e); border-radius: 12px; margin-bottom: 20px; cursor: pointer; }
+.settings-premium i { font-size: 28px; color: #6c63ff; }
+.settings-premium h4 { font-size: 14px; margin: 0 0 2px; }
+.settings-premium p { font-size: 12px; color: var(--text-muted); margin: 0; }
+.settings-links, .settings-help { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.settings-links a, .settings-help a { display: flex; align-items: center; gap: 10px; padding: 8px 0; color: var(--text-muted); text-decoration: none; font-size: 13px; transition: color 0.2s; }
+.settings-links a:hover, .settings-help a:hover { color: var(--primary); }
+.settings-content { flex: 1; padding: 30px 40px; overflow-y: auto; }
+.settings-content h1 { font-size: 28px; margin-bottom: 8px; }
+.settings-subtitle { color: var(--text-muted); margin-bottom: 30px; }
+.settings-form { max-width: 600px; }
+.settings-section { background: var(--surface); border-radius: 12px; margin-bottom: 24px; overflow: hidden; border: 1px solid var(--border); }
+.settings-section h3 { padding: 16px 20px; margin: 0; font-size: 16px; font-weight: 600; border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.02); }
+.setting-item { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.setting-item:last-child { border-bottom: none; }
+.setting-info { flex: 1; }
+.setting-info label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+.setting-desc { font-size: 12px; color: var(--text-muted); }
+.toggle-switch { position: relative; display: inline-block; width: 50px; height: 26px; flex-shrink: 0; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #3a3a4a; transition: 0.3s; border-radius: 34px; }
+.toggle-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: 0.3s; border-radius: 50%; }
+input:checked + .toggle-slider { background-color: var(--primary); }
+input:checked + .toggle-slider:before { transform: translateX(24px); }
+.setting-select { padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; cursor: pointer; min-width: 160px; }
+.settings-actions { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border); }
+.btn-primary { background: linear-gradient(135deg, var(--primary), #9b8fff); color: #fff; border: none; padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 10px 24px; border-radius: 8px; cursor: pointer; margin-left: 12px; }
+.text-danger { color: var(--danger); }
+@media (max-width: 768px) { .settings-sidebar { display: none; } .settings-content { padding: 20px; } .setting-item { flex-direction: column; align-items: flex-start; gap: 12px; } .toggle-switch { align-self: flex-end; } }
+</style>
+
+<div class="settings-container">
+    <div class="settings-sidebar">
+        {% include "settings/_sidebar.html" %}
+    </div>
+
+    <div class="settings-content">
+        <h1>Advanced Settings</h1>
+        <p class="settings-subtitle">Fine-tune your experience</p>
+
+        <form id="advanced-form" class="settings-form">
+            <!-- Message Settings -->
+            <div class="settings-section">
+                <h3><i class="fa-regular fa-message"></i> Message Settings</h3>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Save Edited Messages</label>
+                        <span class="setting-desc">Keep history of message edits</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="save_edited_messages" {% if settings.save_edited_messages %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Auto-Delete Messages</label>
+                        <span class="setting-desc">Automatically delete messages after period</span>
+                    </div>
+                    <select name="auto_delete_messages" class="setting-select">
+                        <option value="0" {% if settings.auto_delete_messages == 0 %}selected{% endif %}>Never</option>
+                        <option value="86400" {% if settings.auto_delete_messages == 86400 %}selected{% endif %}>After 24 hours</option>
+                        <option value="604800" {% if settings.auto_delete_messages == 604800 %}selected{% endif %}>After 7 days</option>
+                        <option value="2592000" {% if settings.auto_delete_messages == 2592000 %}selected{% endif %}>After 30 days</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Media Settings -->
+            <div class="settings-section">
+                <h3><i class="fa-solid fa-photo-film"></i> Media Settings</h3>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Data Saver Mode</label>
+                        <span class="setting-desc">Reduce data usage for images and videos</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="data_saver_mode" {% if settings.data_saver_mode %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Auto-Play Videos</label>
+                        <span class="setting-desc">Automatically play videos in feed</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="auto_play_videos" {% if settings.auto_play_videos %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Auto-Play GIFs</label>
+                        <span class="setting-desc">Automatically play animated GIFs</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="auto_play_gifs" {% if settings.auto_play_gifs %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Data Management -->
+            <div class="settings-section">
+                <h3><i class="fa-solid fa-database"></i> Data Management</h3>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Export My Data</label>
+                        <span class="setting-desc">Download all your data as JSON</span>
+                    </div>
+                    <button type="button" class="btn-outline" onclick="exportData()">
+                        <i class="fa-solid fa-download"></i> Export
+                    </button>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <label>Clear Cache</label>
+                        <span class="setting-desc">Clear locally stored data</span>
+                    </div>
+                    <button type="button" class="btn-outline" onclick="clearCache()">
+                        <i class="fa-solid fa-trash"></i> Clear
+                    </button>
+                </div>
+            </div>
+
+            <div class="settings-actions">
+                <button type="submit" class="btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.getElementById('advanced-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const data = {};
+    formData.forEach((value, key) => {
+        if (value === 'on') data[key] = true;
+        else if (key === 'auto_delete_messages') data[key] = parseInt(value);
+        else data[key] = value;
+    });
+
+    try {
+        const response = await fetch('/settings/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRF()
+            },
+            body: JSON.stringify(data)
+        });
+        const result = await response.json();
+        if (result.success) {
+            toast('Advanced settings saved!', 'success');
+        } else {
+            toast('Error saving settings', 'error');
+        }
+    } catch (error) {
+        toast('Error saving settings', 'error');
+    }
+});
+
+function exportData() {
+    window.location.href = '/settings/export_data';
+    toast('Exporting your data...', 'info');
+}
+
+function clearCache() {
+    if (confirm('Clear all locally cached data? This may affect performance.')) {
+        localStorage.clear();
+        sessionStorage.clear();
+        toast('Cache cleared! Page will reload.', 'success');
+        setTimeout(() => location.reload(), 1500);
+    }
+}
+</script>
+{% endblock %}

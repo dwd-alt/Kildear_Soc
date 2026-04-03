@@ -10,6 +10,7 @@ import uuid
 import base64
 import logging
 import platform
+import json
 from io import BytesIO
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -27,7 +28,7 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import or_, func, and_, text
 from PIL import Image
-import qrcode  # ДОБАВЛЕНО ДЛЯ QR
+import qrcode
 from io import BytesIO
 
 # Настройка логирования
@@ -59,7 +60,7 @@ if is_render:
 else:
     SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'instance', 'kildear.db')
 
-# Настройки для загрузки файлов (только для видео)
+# Настройки для загрузки файлов
 if is_render:
     UPLOAD_FOLDER = '/tmp/uploads'
 else:
@@ -344,6 +345,92 @@ class User(UserMixin, db.Model):
     @property
     def post_count(self):
         return self.posts.count()
+
+    def get_settings(self):
+        """Get user settings, create default if not exists"""
+        if not hasattr(self, '_settings_cache'):
+            settings = UserSettings.query.filter_by(user_id=self.id).first()
+            if not settings:
+                settings = UserSettings(user_id=self.id)
+                db.session.add(settings)
+                db.session.commit()
+            self._settings_cache = settings
+        return self._settings_cache
+
+
+class UserSettings(db.Model):
+    """User settings model"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, unique=True)
+
+    # Notification settings
+    notify_likes = db.Column(db.Boolean, default=True)
+    notify_comments = db.Column(db.Boolean, default=True)
+    notify_follows = db.Column(db.Boolean, default=True)
+    notify_messages = db.Column(db.Boolean, default=True)
+    notify_voice_messages = db.Column(db.Boolean, default=True)
+    notify_calls = db.Column(db.Boolean, default=True)
+    notify_group_posts = db.Column(db.Boolean, default=True)
+    notify_channel_posts = db.Column(db.Boolean, default=True)
+
+    # Sound settings
+    sound_enabled = db.Column(db.Boolean, default=True)
+    sound_volume = db.Column(db.Integer, default=70)
+    call_sound_enabled = db.Column(db.Boolean, default=True)
+    notification_sound = db.Column(db.String(50), default="default")
+
+    # Privacy settings
+    show_last_seen = db.Column(db.Boolean, default=True)
+    show_online_status = db.Column(db.Boolean, default=True)
+    allow_messages_from = db.Column(db.String(20), default="everyone")
+    allow_calls_from = db.Column(db.String(20), default="everyone")
+    allow_voice_messages_from = db.Column(db.String(20), default="everyone")
+    show_profile_photo = db.Column(db.Boolean, default=True)
+    show_bio = db.Column(db.Boolean, default=True)
+
+    # Chat settings
+    chat_background = db.Column(db.String(200), default="")
+    bubble_color_own = db.Column(db.String(7), default="#6c63ff")
+    bubble_color_other = db.Column(db.String(7), default="#e4e6eb")
+    enter_to_send = db.Column(db.Boolean, default=False)
+    show_typing = db.Column(db.Boolean, default=True)
+    show_read_receipts = db.Column(db.Boolean, default=True)
+
+    # Appearance
+    theme = db.Column(db.String(20), default="dark")
+    font_size = db.Column(db.String(10), default="medium")
+    chat_font_size = db.Column(db.String(10), default="medium")
+    default_scale = db.Column(db.Integer, default=100)
+
+    # Animation
+    animations_enabled = db.Column(db.Boolean, default=True)
+    animation_speed = db.Column(db.String(10), default="normal")
+
+    # Language
+    language = db.Column(db.String(10), default="ru")
+
+    # Folders
+    folders_data = db.Column(db.Text, default="[]")
+
+    # Advanced
+    save_edited_messages = db.Column(db.Boolean, default=True)
+    auto_delete_messages = db.Column(db.Integer, default=0)
+    data_saver_mode = db.Column(db.Boolean, default=False)
+    auto_play_videos = db.Column(db.Boolean, default=True)
+    auto_play_gifs = db.Column(db.Boolean, default=True)
+
+    # Camera & Mic
+    camera_enabled = db.Column(db.Boolean, default=True)
+    mic_enabled = db.Column(db.Boolean, default=True)
+
+    # Battery
+    battery_saver_mode = db.Column(db.Boolean, default=False)
+    reduce_animations = db.Column(db.Boolean, default=False)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = db.relationship("User", backref=db.backref("settings", uselist=False))
 
 
 class LoginHistory(db.Model):
@@ -979,6 +1066,459 @@ def admin_logs():
     page = request.args.get("page", 1, type=int)
     logs = LoginHistory.query.order_by(LoginHistory.created_at.desc()).paginate(page=page, per_page=50)
     return render_template("admin/logs.html", logs=logs)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Settings Routes (FULL VERSION with POST support)
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.route("/settings")
+@login_required
+def settings_index():
+    """Main settings page"""
+    settings = current_user.get_settings()
+    return render_template("settings/index.html", settings=settings)
+
+
+@app.route("/settings/account", methods=["GET", "POST"])
+@login_required
+def settings_account():
+    """Account settings page with POST support"""
+    settings = current_user.get_settings()
+
+    if request.method == "POST":
+        try:
+            data = request.get_json()
+
+            # Update basic info
+            if 'display_name' in data:
+                current_user.display_name = data['display_name'][:60]
+            if 'bio' in data:
+                current_user.bio = data['bio'][:500]
+            if 'location' in data:
+                current_user.location = data['location'][:100]
+            if 'website' in data:
+                current_user.website = data['website'][:200]
+            if 'email' in data:
+                import re
+                if re.match(r"^[^@]+@[^@]+\.[^@]+$", data['email']):
+                    current_user.email = data['email'].lower()
+            if 'accent_color' in data and data['accent_color']:
+                current_user.accent_color = data['accent_color'][:7]
+            if 'is_private' in data:
+                current_user.is_private = bool(data['is_private'])
+
+            # Update avatar
+            if 'preset_avatar' in data:
+                avatar_num = int(data['preset_avatar'])
+                if 1 <= avatar_num <= 10:
+                    current_user.set_preset_avatar(avatar_num)
+
+            # Update cover
+            if 'preset_cover' in data:
+                cover_num = data['preset_cover']
+                if cover_num and cover_num != '':
+                    current_user.set_preset_cover(int(cover_num))
+                else:
+                    current_user.set_preset_cover(None)
+
+            # Update theme
+            if 'theme' in data:
+                settings.theme = data['theme']
+
+            # Change password if provided
+            if 'current_password' in data and data['current_password']:
+                if current_user.check_password(data['current_password']):
+                    if 'new_password' in data and len(data['new_password']) >= 8:
+                        if data['new_password'] == data.get('confirm_password'):
+                            current_user.set_password(data['new_password'])
+                        else:
+                            return jsonify({"success": False, "error": "Passwords don't match"}), 400
+                    else:
+                        return jsonify({"success": False, "error": "Password must be at least 8 characters"}), 400
+                else:
+                    return jsonify({"success": False, "error": "Current password is incorrect"}), 400
+
+            db.session.commit()
+            return jsonify({"success": True, "message": "Account settings updated"})
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error updating account settings: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
+
+    return render_template("settings/account.html", settings=settings)
+
+
+@app.route("/settings/notifications", methods=["GET", "POST"])
+@login_required
+def settings_notifications():
+    """Notification settings page with POST support"""
+    settings = current_user.get_settings()
+
+    if request.method == "POST":
+        try:
+            data = request.get_json()
+
+            # Update notification settings
+            for key in ['notify_likes', 'notify_comments', 'notify_follows',
+                        'notify_messages', 'notify_voice_messages', 'notify_calls',
+                        'notify_group_posts', 'notify_channel_posts', 'sound_enabled',
+                        'call_sound_enabled']:
+                if key in data:
+                    setattr(settings, key, bool(data[key]))
+
+            if 'notification_sound' in data:
+                settings.notification_sound = data['notification_sound']
+            if 'sound_volume' in data:
+                settings.sound_volume = int(data['sound_volume'])
+
+            db.session.commit()
+            return jsonify({"success": True, "message": "Notification settings updated"})
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error updating notification settings: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
+
+    return render_template("settings/notifications.html", settings=settings)
+
+
+@app.route("/settings/privacy", methods=["GET", "POST"])
+@login_required
+def settings_privacy():
+    """Privacy settings page with POST support"""
+    settings = current_user.get_settings()
+
+    if request.method == "POST":
+        try:
+            data = request.get_json()
+
+            # Update privacy settings
+            if 'show_last_seen' in data:
+                settings.show_last_seen = bool(data['show_last_seen'])
+            if 'show_online_status' in data:
+                settings.show_online_status = bool(data['show_online_status'])
+            if 'allow_messages_from' in data:
+                settings.allow_messages_from = data['allow_messages_from']
+            if 'allow_calls_from' in data:
+                settings.allow_calls_from = data['allow_calls_from']
+            if 'allow_voice_messages_from' in data:
+                settings.allow_voice_messages_from = data['allow_voice_messages_from']
+            if 'show_profile_photo' in data:
+                settings.show_profile_photo = bool(data['show_profile_photo'])
+            if 'show_bio' in data:
+                settings.show_bio = bool(data['show_bio'])
+            if 'data_saver_mode' in data:
+                settings.data_saver_mode = bool(data['data_saver_mode'])
+
+            db.session.commit()
+            return jsonify({"success": True, "message": "Privacy settings updated"})
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error updating privacy settings: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
+
+    return render_template("settings/privacy.html", settings=settings)
+
+
+@app.route("/settings/chats", methods=["GET", "POST"])
+@login_required
+def settings_chats():
+    """Chat settings page with POST support"""
+    settings = current_user.get_settings()
+
+    if request.method == "POST":
+        try:
+            data = request.get_json()
+
+            # Update chat settings
+            if 'enter_to_send' in data:
+                settings.enter_to_send = bool(data['enter_to_send'])
+            if 'show_typing' in data:
+                settings.show_typing = bool(data['show_typing'])
+            if 'show_read_receipts' in data:
+                settings.show_read_receipts = bool(data['show_read_receipts'])
+            if 'bubble_color_own' in data:
+                settings.bubble_color_own = data['bubble_color_own'][:7]
+            if 'bubble_color_other' in data:
+                settings.bubble_color_other = data['bubble_color_other'][:7]
+            if 'chat_background' in data:
+                settings.chat_background = data['chat_background'][:200]
+
+            db.session.commit()
+            return jsonify({"success": True, "message": "Chat settings updated"})
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error updating chat settings: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
+
+    return render_template("settings/chats.html", settings=settings)
+
+
+@app.route("/settings/folders", methods=["GET", "POST"])
+@login_required
+def settings_folders():
+    """Chat folders settings page with POST support"""
+    settings = current_user.get_settings()
+
+    if request.method == "POST":
+        try:
+            data = request.get_json()
+
+            # Update folders data (JSON string)
+            if 'folders_data' in data:
+                import json
+                settings.folders_data = json.dumps(data['folders_data'])
+
+            db.session.commit()
+            return jsonify({"success": True, "message": "Folders updated"})
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error updating folders: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
+
+    # Parse folders data
+    import json
+    folders = json.loads(settings.folders_data) if settings.folders_data else []
+
+    return render_template("settings/folders.html", settings=settings, folders=folders)
+
+
+@app.route("/settings/advanced", methods=["GET", "POST"])
+@login_required
+def settings_advanced():
+    """Advanced settings page with POST support"""
+    settings = current_user.get_settings()
+
+    if request.method == "POST":
+        try:
+            data = request.get_json()
+
+            # Update advanced settings
+            if 'save_edited_messages' in data:
+                settings.save_edited_messages = bool(data['save_edited_messages'])
+            if 'auto_delete_messages' in data:
+                settings.auto_delete_messages = int(data['auto_delete_messages'])
+            if 'data_saver_mode' in data:
+                settings.data_saver_mode = bool(data['data_saver_mode'])
+                session['data_saver_mode'] = settings.data_saver_mode
+            if 'auto_play_videos' in data:
+                settings.auto_play_videos = bool(data['auto_play_videos'])
+            if 'auto_play_gifs' in data:
+                settings.auto_play_gifs = bool(data['auto_play_gifs'])
+
+            db.session.commit()
+            return jsonify({"success": True, "message": "Advanced settings updated"})
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error updating advanced settings: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
+
+    return render_template("settings/advanced.html", settings=settings)
+
+
+@app.route("/settings/sound", methods=["GET", "POST"])
+@login_required
+def settings_sound():
+    """Sound and camera settings page with POST support"""
+    settings = current_user.get_settings()
+
+    if request.method == "POST":
+        try:
+            data = request.get_json()
+
+            # Update sound settings
+            if 'camera_enabled' in data:
+                settings.camera_enabled = bool(data['camera_enabled'])
+            if 'mic_enabled' in data:
+                settings.mic_enabled = bool(data['mic_enabled'])
+
+            db.session.commit()
+            return jsonify({"success": True, "message": "Sound settings updated"})
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error updating sound settings: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
+
+    return render_template("settings/sound.html", settings=settings)
+
+
+@app.route("/settings/battery", methods=["GET", "POST"])
+@login_required
+def settings_battery():
+    """Battery and animation settings page with POST support"""
+    settings = current_user.get_settings()
+
+    if request.method == "POST":
+        try:
+            data = request.get_json()
+
+            # Update battery settings
+            if 'battery_saver_mode' in data:
+                settings.battery_saver_mode = bool(data['battery_saver_mode'])
+                session['battery_saver_mode'] = settings.battery_saver_mode
+            if 'reduce_animations' in data:
+                settings.reduce_animations = bool(data['reduce_animations'])
+            if 'animations_enabled' in data:
+                settings.animations_enabled = bool(data['animations_enabled'])
+            if 'animation_speed' in data:
+                settings.animation_speed = data['animation_speed']
+
+            db.session.commit()
+            return jsonify({"success": True, "message": "Battery settings updated"})
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error updating battery settings: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
+
+    return render_template("settings/battery.html", settings=settings)
+
+
+@app.route("/settings/language", methods=["GET", "POST"])
+@login_required
+def settings_language():
+    """Language settings page with POST support"""
+    settings = current_user.get_settings()
+
+    if request.method == "POST":
+        try:
+            data = request.get_json()
+
+            # Update language settings
+            if 'language' in data:
+                settings.language = data['language']
+                session['language'] = settings.language
+            if 'default_scale' in data:
+                settings.default_scale = int(data['default_scale'])
+                session['default_scale'] = settings.default_scale
+            if 'font_size' in data:
+                settings.font_size = data['font_size']
+            if 'chat_font_size' in data:
+                settings.chat_font_size = data['chat_font_size']
+
+            db.session.commit()
+            return jsonify({"success": True, "message": "Language settings updated"})
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error updating language settings: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
+
+    return render_template("settings/language.html", settings=settings)
+
+
+@app.route("/settings/update", methods=["POST"])
+@login_required
+def update_settings():
+    """Universal update settings via AJAX"""
+    try:
+        data = request.get_json()
+        settings = current_user.get_settings()
+
+        # Обновляем переданные настройки
+        for key, value in data.items():
+            if hasattr(settings, key):
+                # Конвертируем типы
+                if key in ['default_scale', 'sound_volume', 'auto_delete_messages']:
+                    value = int(value) if value else 0
+                elif key in ['notify_likes', 'notify_comments', 'notify_follows',
+                             'notify_messages', 'notify_voice_messages', 'notify_calls',
+                             'notify_group_posts', 'notify_channel_posts', 'sound_enabled',
+                             'call_sound_enabled', 'show_last_seen', 'show_online_status',
+                             'show_profile_photo', 'show_bio', 'enter_to_send', 'show_typing',
+                             'show_read_receipts', 'animations_enabled', 'save_edited_messages',
+                             'data_saver_mode', 'auto_play_videos', 'auto_play_gifs',
+                             'camera_enabled', 'mic_enabled', 'battery_saver_mode', 'reduce_animations']:
+                    value = bool(value)
+                setattr(settings, key, value)
+
+        settings.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        # Применяем настройки к сессии
+        if 'default_scale' in data:
+            session['default_scale'] = data['default_scale']
+        if 'language' in data:
+            session['language'] = data['language']
+
+        return jsonify({"success": True, "message": "Settings updated"})
+
+    except Exception as e:
+        logger.error(f"Error updating settings: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/settings/blocked")
+@login_required
+def settings_blocked():
+    """View blocked users"""
+    blocked_users = current_user.blocked_users.all()
+    return render_template("settings/blocked.html", blocked_users=blocked_users)
+
+
+@app.route("/settings/unblock/<int:user_id>", methods=["POST"])
+@login_required
+def settings_unblock(user_id):
+    """Unblock a user"""
+    user = User.query.get_or_404(user_id)
+    if current_user.unblock(user):
+        db.session.commit()
+        flash(f"Unblocked @{user.username}", "success")
+    return redirect(url_for("settings_blocked"))
+
+
+@app.route("/settings/export_data")
+@login_required
+def settings_export_data():
+    """Export user data"""
+    try:
+        import json
+        from datetime import datetime
+
+        user_data = {
+            "user": {
+                "username": current_user.username,
+                "email": current_user.email,
+                "display_name": current_user.display_name,
+                "bio": current_user.bio,
+                "location": current_user.location,
+                "website": current_user.website,
+                "created_at": current_user.created_at.isoformat(),
+                "is_verified": current_user.is_verified
+            },
+            "stats": {
+                "followers": current_user.follower_count,
+                "following": current_user.following_count,
+                "posts": current_user.post_count,
+                "likes": sum(post.like_count for post in current_user.posts)
+            },
+            "posts": [
+                {
+                    "content": post.content,
+                    "created_at": post.created_at.isoformat(),
+                    "likes": post.like_count,
+                    "comments": post.comment_count
+                }
+                for post in current_user.posts.limit(100).all()
+            ],
+            "exported_at": datetime.utcnow().isoformat()
+        }
+
+        response = jsonify(user_data)
+        response.headers['Content-Disposition'] = f'attachment; filename=kildear_data_{current_user.username}.json'
+        return response
+
+    except Exception as e:
+        logger.error(f"Error exporting data: {e}")
+        flash("Error exporting data", "error")
+        return redirect(url_for("settings_advanced"))
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -2547,7 +3087,7 @@ def notifications():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  QR Code Routes (ДОБАВЛЕНО)
+#  QR Code Routes
 # ──────────────────────────────────────────────────────────────────────────────
 @app.route("/user/<int:user_id>/qrcode")
 @login_required
@@ -2555,17 +3095,14 @@ def generate_user_qrcode(user_id):
     """Generate QR code for user (any user)"""
     user = User.query.get_or_404(user_id)
 
-    # Проверка прав: нельзя смотреть QR заблокированного или забаненного пользователя
     if current_user.is_blocked(user):
         return jsonify({"error": "Cannot view blocked user's QR code"}), 403
 
     if user.is_banned:
         return jsonify({"error": "User is banned"}), 403
 
-    # Формируем данные для QR-кода
     qr_data = f"kildear://user/{user.username}"
 
-    # Создаем QR-код
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -2575,10 +3112,8 @@ def generate_user_qrcode(user_id):
     qr.add_data(qr_data)
     qr.make(fit=True)
 
-    # Создаем изображение
     img = qr.make_image(fill_color="black", back_color="white")
 
-    # Конвертируем в base64
     buffered = BytesIO()
     img.save(buffered, format="PNG")
     img_base64 = base64.b64encode(buffered.getvalue()).decode()
@@ -2970,7 +3505,13 @@ def run_migrations():
         else:
             logger.info("✅ Все колонки уже существуют")
 
+        # Check for UserSettings table
         tables = inspector.get_table_names()
+        if 'user_settings' not in tables:
+            logger.info("➕ Creating user_settings table...")
+            db.create_all()
+            logger.info("✅ UserSettings table created")
+
         for table in ['login_history', 'voice_message', 'call', 'report']:
             if table not in tables:
                 logger.info(f"➕ Создание таблицы {table}...")
