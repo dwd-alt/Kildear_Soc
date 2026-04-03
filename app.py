@@ -27,9 +27,8 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import or_, func, and_, text
 from PIL import Image
-import qrcode
+import qrcode  # ДОБАВЛЕНО ДЛЯ QR
 from io import BytesIO
-import base64
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -240,9 +239,7 @@ class User(UserMixin, db.Model):
     display_name = db.Column(db.String(60), default="")
     bio = db.Column(db.String(500), default="")
 
-    # Preset avatar (1-10, default 1)
     preset_avatar = db.Column(db.Integer, default=1)
-    # Preset cover (1-5, None = no cover)
     preset_cover = db.Column(db.Integer, nullable=True)
 
     website = db.Column(db.String(200), default="")
@@ -259,19 +256,13 @@ class User(UserMixin, db.Model):
     two_factor_enabled = db.Column(db.Boolean, default=False)
     two_factor_secret = db.Column(db.String(32), nullable=True)
 
-    # Relationships
-    posts = db.relationship("Post", backref="author", lazy="dynamic",
-                            foreign_keys="Post.user_id")
-    sent_msgs = db.relationship("Message", backref="sender", lazy="dynamic",
-                                foreign_keys="Message.sender_id")
-    recv_msgs = db.relationship("Message", backref="receiver", lazy="dynamic",
-                                foreign_keys="Message.receiver_id")
-    notifications = db.relationship("Notification", backref="recipient", lazy="dynamic",
-                                    foreign_keys="Notification.user_id")
-    comments = db.relationship("Comment", backref="author", lazy="dynamic")
-    owned_groups = db.relationship("Group", backref="owner", lazy="dynamic")
-    owned_channels = db.relationship("Channel", backref="owner", lazy="dynamic")
-    login_history = db.relationship("LoginHistory", backref="user", lazy="dynamic")
+    following = db.relationship(
+        "User", secondary=follows,
+        primaryjoin=follows.c.follower_id == id,
+        secondaryjoin=follows.c.followed_id == id,
+        backref=db.backref("followers", lazy="dynamic"),
+        lazy="dynamic"
+    )
 
     blocked_users = db.relationship(
         "User", secondary=blocks,
@@ -281,37 +272,35 @@ class User(UserMixin, db.Model):
         lazy="dynamic"
     )
 
-    following = db.relationship(
-        "User", secondary=follows,
-        primaryjoin=follows.c.follower_id == id,
-        secondaryjoin=follows.c.followed_id == id,
-        backref=db.backref("followers", lazy="dynamic"),
-        lazy="dynamic"
-    )
+    posts = db.relationship("Post", backref="author", lazy="dynamic", foreign_keys="Post.user_id")
+    sent_msgs = db.relationship("Message", backref="sender", lazy="dynamic", foreign_keys="Message.sender_id")
+    recv_msgs = db.relationship("Message", backref="receiver", lazy="dynamic", foreign_keys="Message.receiver_id")
+    notifications = db.relationship("Notification", backref="recipient", lazy="dynamic",
+                                    foreign_keys="Notification.user_id")
+    comments = db.relationship("Comment", backref="author", lazy="dynamic")
+    owned_groups = db.relationship("Group", backref="owner", lazy="dynamic")
+    owned_channels = db.relationship("Channel", backref="owner", lazy="dynamic")
+    login_history = db.relationship("LoginHistory", backref="user", lazy="dynamic")
 
     @property
     def avatar_url(self):
-        """Get avatar URL from preset"""
         if self.preset_avatar and self.preset_avatar in PRESET_AVATARS:
             return PRESET_AVATARS[self.preset_avatar]
         return PRESET_AVATARS[1]
 
     @property
     def cover_url(self):
-        """Get cover URL from preset"""
         if self.preset_cover and self.preset_cover in PRESET_COVERS:
             return PRESET_COVERS[self.preset_cover]
         return None
 
     def set_preset_avatar(self, avatar_num):
-        """Set preset avatar (1-10)"""
         if 1 <= avatar_num <= 10:
             self.preset_avatar = avatar_num
             return True
         return False
 
     def set_preset_cover(self, cover_num):
-        """Set preset cover (1-5) or None to remove"""
         if cover_num is None:
             self.preset_cover = None
             return True
@@ -478,10 +467,8 @@ class Group(db.Model):
     is_private = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    members = db.relationship("User", secondary=group_members,
-                              backref="groups", lazy="dynamic")
-    posts = db.relationship("GroupPost", backref="group", lazy="dynamic",
-                            cascade="all,delete")
+    members = db.relationship("User", secondary=group_members, backref="groups", lazy="dynamic")
+    posts = db.relationship("GroupPost", backref="group", lazy="dynamic", cascade="all,delete")
 
     @property
     def member_count(self):
@@ -511,10 +498,8 @@ class Channel(db.Model):
     is_nsfw = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    subscribers = db.relationship("User", secondary=channel_subs,
-                                  backref="subscribed_channels", lazy="dynamic")
-    posts = db.relationship("ChannelPost", backref="channel", lazy="dynamic",
-                            cascade="all,delete")
+    subscribers = db.relationship("User", secondary=channel_subs, backref="subscribed_channels", lazy="dynamic")
+    posts = db.relationship("ChannelPost", backref="channel", lazy="dynamic", cascade="all,delete")
 
     @property
     def sub_count(self):
@@ -604,7 +589,6 @@ def notification_text(notif):
 
 
 def ensure_upload_folders():
-    """Create necessary folders"""
     for folder in UPLOAD_SUBFOLDERS:
         folder_path = os.path.join(app.config['UPLOAD_FOLDER'], folder)
         try:
@@ -612,7 +596,6 @@ def ensure_upload_folders():
         except Exception as e:
             logger.error(f"Failed to create folder {folder_path}: {e}")
 
-    # Create preset folders
     preset_avatar_folder = os.path.join('static', 'avatars', 'preset')
     preset_cover_folder = os.path.join('static', 'covers', 'preset')
     try:
@@ -624,7 +607,6 @@ def ensure_upload_folders():
 
 
 def save_file(file, subfolder: str):
-    """Save video file"""
     if not file or not file.filename:
         return None
     try:
@@ -644,10 +626,6 @@ def save_file(file, subfolder: str):
         logger.error(f"Error saving file: {e}")
         return None
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-#  Маршрут для доступа к загруженным файлам
-# ──────────────────────────────────────────────────────────────────────────────
 
 @app.route('/uploads/<path:subfolder>/<path:filename>')
 def serve_upload(subfolder, filename):
@@ -703,7 +681,7 @@ def security_headers(response):
 
     csp = [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' https://cdn.socket.io https://cdnjs.cloudflare.com",
+        "script-src 'self' 'unsafe-inline' https://cdn.socket.io https://cdnjs.cloudflare.com https://unpkg.com",
         "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com",
         "font-src 'self' https://cdnjs.cloudflare.com",
         "img-src 'self' data: blob:",
@@ -976,110 +954,6 @@ def admin_verification():
         page=page, per_page=20)
     return render_template("admin/verification.html", users=users)
 
-
-@app.route("/qr/my")
-@login_required
-def my_qr_code():
-    """Generate QR code for current user"""
-    user_data = {
-        'type': 'user',
-        'user_id': current_user.id,
-        'username': current_user.username,
-        'timestamp': datetime.utcnow().isoformat()
-    }
-
-    # Create QR code with user profile URL
-    qr_url = url_for('profile', username=current_user.username, _external=True)
-
-    qr = qrcode.QRCode(
-        version=3,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=8,
-        border=2,
-    )
-    qr.add_data(qr_url)
-    qr.make(fit=True)
-
-    img = qr.make_image(fill_color="#6c63ff", back_color="white")
-
-    # Convert to base64 for inline display
-    buffered = BytesIO()
-    img.save(buffered, format="PNG")
-    img_str = base64.b64encode(buffered.getvalue()).decode()
-
-    return render_template("qr_code.html", qr_image=f"data:image/png;base64,{img_str}")
-
-
-@app.route("/qr/scan", methods=["GET", "POST"])
-@login_required
-def scan_qr():
-    """Page for scanning QR codes"""
-    if request.method == "POST":
-        qr_data = request.form.get("qr_data", "").strip()
-
-        if not qr_data:
-            flash("No QR code data provided", "error")
-            return redirect(url_for("scan_qr"))
-
-        # Extract username from URL or direct data
-        username = None
-
-        # Check if it's a URL
-        if qr_data.startswith(('http://', 'https://')):
-            # Try to extract username from profile URL
-            import re
-            match = re.search(r'/u/([a-zA-Z0-9_]+)', qr_data)
-            if match:
-                username = match.group(1)
-
-        # If not a URL, try direct username
-        if not username and not qr_data.startswith(('http://', 'https://')):
-            username = qr_data
-
-        # Try to parse JSON data
-        if not username:
-            try:
-                import json
-                data = json.loads(qr_data)
-                if data.get('type') == 'user':
-                    username = data.get('username')
-            except:
-                pass
-
-        if username:
-            user = User.query.filter(func.lower(User.username) == username.lower()).first()
-            if user:
-                return redirect(url_for("profile", username=user.username))
-            else:
-                flash(f"User '{username}' not found", "error")
-        else:
-            flash("Invalid QR code data", "error")
-
-        return redirect(url_for("scan_qr"))
-
-    return render_template("scan_qr.html")
-
-
-@app.route("/api/user/qr/<username>")
-@login_required
-def get_user_qr_data(username):
-    """API endpoint to get QR data for a user"""
-    user = User.query.filter(func.lower(User.username) == username.lower()).first_or_404()
-
-    # Check if blocked
-    if current_user.is_blocked(user):
-        return jsonify({"error": "User blocked"}), 403
-
-    qr_data = {
-        'type': 'user',
-        'user_id': user.id,
-        'username': user.username,
-        'display_name': user.display_name,
-        'avatar': user.avatar_url,
-        'profile_url': url_for('profile', username=user.username, _external=True)
-    }
-
-    return jsonify(qr_data)
 
 @app.route("/admin/banned")
 @login_required
@@ -1871,20 +1745,17 @@ def profile(username):
 def edit_profile():
     if request.method == "POST":
         try:
-            # Basic info
             current_user.display_name = request.form.get("display_name", "")[:60]
             current_user.bio = request.form.get("bio", "")[:500]
             current_user.website = request.form.get("website", "")[:200]
             current_user.location = request.form.get("location", "")[:100]
             current_user.is_private = bool(request.form.get("is_private"))
 
-            # Accent color
             accent_color = request.form.get("accent_color")
             if not accent_color:
                 accent_color = request.form.get("accent_color_custom", "#6c63ff")
             current_user.accent_color = accent_color[:7]
 
-            # Handle preset avatar selection
             preset_avatar = request.form.get("preset_avatar")
             if preset_avatar:
                 try:
@@ -1895,7 +1766,6 @@ def edit_profile():
                 except (ValueError, TypeError):
                     pass
 
-            # Handle preset cover selection
             preset_cover = request.form.get("preset_cover")
             if preset_cover:
                 try:
@@ -1909,7 +1779,6 @@ def edit_profile():
                 current_user.set_preset_cover(None)
                 flash("Cover removed", "info")
 
-            # Handle password change
             current_password = request.form.get("current_password")
             new_password = request.form.get("new_password")
             if current_password and new_password:
@@ -2678,6 +2547,144 @@ def notifications():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+#  QR Code Routes (ДОБАВЛЕНО)
+# ──────────────────────────────────────────────────────────────────────────────
+@app.route("/user/<int:user_id>/qrcode")
+@login_required
+def generate_user_qrcode(user_id):
+    """Generate QR code for user (any user)"""
+    user = User.query.get_or_404(user_id)
+
+    # Проверка прав: нельзя смотреть QR заблокированного или забаненного пользователя
+    if current_user.is_blocked(user):
+        return jsonify({"error": "Cannot view blocked user's QR code"}), 403
+
+    if user.is_banned:
+        return jsonify({"error": "User is banned"}), 403
+
+    # Формируем данные для QR-кода
+    qr_data = f"kildear://user/{user.username}"
+
+    # Создаем QR-код
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(qr_data)
+    qr.make(fit=True)
+
+    # Создаем изображение
+    img = qr.make_image(fill_color="black", back_color="white")
+
+    # Конвертируем в base64
+    buffered = BytesIO()
+    img.save(buffered, format="PNG")
+    img_base64 = base64.b64encode(buffered.getvalue()).decode()
+
+    return jsonify({
+        "success": True,
+        "qr_code": f"data:image/png;base64,{img_base64}",
+        "data": qr_data,
+        "username": user.username,
+        "display_name": user.display_name or user.username
+    })
+
+
+@app.route("/qr/scan", methods=["GET"])
+@login_required
+def scan_qr_page():
+    """Page for scanning QR code"""
+    return render_template("scan_qr.html")
+
+
+@app.route("/qr/search", methods=["POST"])
+@login_required
+def search_by_qr():
+    """Search user by QR code data"""
+    data = request.get_json()
+    qr_data = data.get("qr_data", "").strip()
+
+    if not qr_data:
+        return jsonify({"error": "No QR data provided"}), 400
+
+    if qr_data.startswith("kildear://user/"):
+        username = qr_data.replace("kildear://user/", "")
+        user = User.query.filter(func.lower(User.username) == username.lower()).first()
+
+        if user:
+            if current_user.is_blocked(user):
+                return jsonify({
+                    "success": False,
+                    "error": "You have blocked this user"
+                }), 403
+
+            if user.is_banned:
+                return jsonify({
+                    "success": False,
+                    "error": "This user is banned"
+                }), 403
+
+            return jsonify({
+                "success": True,
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "display_name": user.display_name or user.username,
+                    "avatar": user.avatar_url,
+                    "bio": user.bio,
+                    "is_following": current_user.is_following(user),
+                    "follower_count": user.follower_count,
+                    "following_count": user.following_count,
+                    "post_count": user.post_count,
+                    "is_verified": user.is_verified
+                }
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "User not found"
+            }), 404
+
+    return jsonify({
+        "success": False,
+        "error": "Invalid QR code format"
+    }), 400
+
+
+@app.route("/qr/generate", methods=["POST"])
+@login_required
+def generate_qr():
+    """Generate QR code for current user"""
+    user = current_user
+
+    qr_data = f"kildear://user/{user.username}"
+
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(qr_data)
+    qr.make(fit=True)
+
+    img = qr.make_image(fill_color="black", back_color="white")
+
+    buffered = BytesIO()
+    img.save(buffered, format="PNG")
+    img_base64 = base64.b64encode(buffered.getvalue()).decode()
+
+    return jsonify({
+        "success": True,
+        "qr_code": f"data:image/png;base64,{img_base64}",
+        "data": qr_data,
+        "username": user.username
+    })
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 #  Debug endpoint
 # ──────────────────────────────────────────────────────────────────────────────
 @app.route("/debug/uploads")
@@ -2947,13 +2954,11 @@ def run_migrations():
 
         changes = []
 
-        # Добавляем колонку для preset_avatar
         if 'preset_avatar' not in columns:
             logger.info("➕ Добавление колонки preset_avatar...")
             db.session.execute(text('ALTER TABLE "user" ADD COLUMN preset_avatar INTEGER DEFAULT 1'))
             changes.append('preset_avatar')
 
-        # Добавляем колонку для preset_cover
         if 'preset_cover' not in columns:
             logger.info("➕ Добавление колонки preset_cover...")
             db.session.execute(text('ALTER TABLE "user" ADD COLUMN preset_cover INTEGER'))
@@ -2965,7 +2970,6 @@ def run_migrations():
         else:
             logger.info("✅ Все колонки уже существуют")
 
-        # Проверяем существование таблиц
         tables = inspector.get_table_names()
         for table in ['login_history', 'voice_message', 'call', 'report']:
             if table not in tables:
@@ -2973,7 +2977,6 @@ def run_migrations():
                 db.create_all()
                 logger.info(f"✅ Таблица {table} создана")
 
-        # Обновляем существующих пользователей
         db.session.execute(text('UPDATE "user" SET is_admin = FALSE WHERE is_admin IS NULL'))
         db.session.execute(text('UPDATE "user" SET two_factor_enabled = FALSE WHERE two_factor_enabled IS NULL'))
         db.session.execute(text('UPDATE "user" SET is_online = FALSE WHERE is_online IS NULL'))
@@ -2993,17 +2996,12 @@ def init_app():
     """Initialize application"""
     with app.app_context():
         try:
-            # Создаем таблицы (только если их нет)
             db.create_all()
             logger.info("✅ Базовые таблицы созданы")
 
-            # Запускаем миграции
             run_migrations()
-
-            # Создаем папки для загрузок (для видео)
             ensure_upload_folders()
 
-            # Тест прав на запись
             test_file = os.path.join(app.config['UPLOAD_FOLDER'], 'test.txt')
             try:
                 with open(test_file, 'w') as f:
@@ -3013,9 +3011,7 @@ def init_app():
             except Exception as e:
                 logger.warning(f"⚠️ Временная папка может быть недоступна: {e}")
 
-            # Создаем администратора
             create_admin_user()
-
             logger.info("🎉 Инициализация приложения завершена!")
 
         except Exception as e:

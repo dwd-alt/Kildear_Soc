@@ -1,196 +1,646 @@
 {% extends "base.html" %}
+
 {% block title %}Scan QR Code — Kildear{% endblock %}
 
+{% block head %}
+<style>
+.scan-container {
+    max-width: 650px;
+    margin: 40px auto;
+    padding: 24px;
+}
+
+.scan-header {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.scan-header h2 {
+    font-family: var(--font-head);
+    font-size: 28px;
+    margin-bottom: 8px;
+}
+
+.scan-header p {
+    color: var(--text-muted);
+}
+
+.scan-area {
+    background: var(--surface);
+    border: 2px dashed var(--border);
+    border-radius: 20px;
+    padding: 60px 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.scan-area:hover {
+    border-color: var(--accent);
+    background: var(--surface-hover);
+    transform: translateY(-2px);
+}
+
+.scan-area.drag-over {
+    border-color: var(--accent);
+    background: rgba(124, 111, 255, 0.1);
+    transform: scale(1.02);
+}
+
+.scan-icon {
+    font-size: 72px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+}
+
+.scan-area h3 {
+    margin-bottom: 8px;
+    font-size: 20px;
+}
+
+.scan-area p {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.file-input {
+    display: none;
+}
+
+.preview-area {
+    margin-top: 24px;
+    text-align: center;
+}
+
+.preview-image {
+    max-width: 300px;
+    max-height: 300px;
+    border-radius: 16px;
+    margin-top: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+}
+
+.result-card {
+    margin-top: 24px;
+    padding: 24px;
+    background: var(--card);
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.result-user {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.result-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--accent);
+}
+
+.result-info {
+    flex: 1;
+    min-width: 200px;
+}
+
+.result-name {
+    font-family: var(--font-head);
+    font-size: 22px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.result-username {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-top: 4px;
+}
+
+.result-bio {
+    font-size: 14px;
+    margin-top: 12px;
+    color: var(--text);
+    line-height: 1.5;
+}
+
+.result-stats {
+    display: flex;
+    gap: 24px;
+    margin: 16px 0;
+    padding: 12px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-value {
+    font-family: var(--font-head);
+    font-size: 18px;
+    font-weight: 700;
+    display: block;
+}
+
+.stat-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.result-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
+
+.loader {
+    width: 50px;
+    height: 50px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 40px auto;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.error-message {
+    text-align: center;
+    padding: 40px;
+    color: var(--danger);
+}
+
+.camera-container {
+    margin-top: 20px;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #000;
+}
+
+#qr-reader {
+    width: 100%;
+    border: none;
+}
+
+#qr-reader video {
+    width: 100%;
+    height: auto;
+}
+
+.switch-mode {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 24px;
+}
+
+.mode-btn {
+    flex: 1;
+    max-width: 200px;
+    padding: 10px;
+    border-radius: 99px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.mode-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+.mode-btn i {
+    margin-right: 8px;
+}
+
+.verified-badge-small {
+    background: var(--accent);
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: white;
+}
+
+@media (max-width: 600px) {
+    .scan-container {
+        padding: 16px;
+    }
+    .scan-area {
+        padding: 40px 20px;
+    }
+    .result-user {
+        flex-direction: column;
+        text-align: center;
+    }
+    .result-actions {
+        justify-content: center;
+    }
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container" style="max-width: 600px; margin: 40px auto;">
-    <div class="card" style="padding: 30px;">
-        <h1 class="h3 mb-3 text-center">
-            <i class="fa-solid fa-camera"></i> Scan QR Code
-        </h1>
-        <p class="text-muted text-center mb-4">
-            Point your camera at a Kildear QR code
-        </p>
+<div class="scan-container">
+    <div class="scan-header">
+        <h2><i class="fa-solid fa-qrcode"></i> Scan QR Code</h2>
+        <p>Scan a Kildear user's QR code to quickly find and follow them</p>
+    </div>
 
-        <!-- Camera view -->
-        <div id="cameraContainer" style="position: relative; margin-bottom: 20px;">
-            <video id="camera" autoplay playsinline style="width: 100%; border-radius: 12px; background: #000;"></video>
-            <canvas id="canvas" style="display: none;"></canvas>
-            <div id="scanOverlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; border: 2px solid var(--accent); border-radius: 12px; pointer-events: none;"></div>
+    <div class="switch-mode">
+        <button class="mode-btn active" id="uploadModeBtn" onclick="switchMode('upload')">
+            <i class="fa-solid fa-image"></i> Upload Image
+        </button>
+        <button class="mode-btn" id="cameraModeBtn" onclick="switchMode('camera')">
+            <i class="fa-solid fa-camera"></i> Use Camera
+        </button>
+    </div>
+
+    <div id="uploadMode">
+        <div class="scan-area" id="scanArea">
+            <div class="scan-icon">
+                <i class="fa-solid fa-cloud-upload-alt"></i>
+            </div>
+            <h3>Upload QR Code Image</h3>
+            <p>Click or drag & drop a QR code image here</p>
+            <p style="font-size: 12px; margin-top: 8px;">
+                <i class="fa-regular fa-image"></i> JPG, PNG, GIF, WEBP
+            </p>
+            <input type="file" id="qrFileInput" class="file-input" accept="image/*">
         </div>
 
-        <!-- Or input field -->
-        <div class="mt-3">
-            <div class="divider">or</div>
-            <form method="POST" id="qrForm">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <div class="input-group">
-                    <input type="text" name="qr_data" id="qrInput" class="form-control"
-                           placeholder="Paste QR code data or profile link">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fa-solid fa-magnifying-glass"></i> Find
-                    </button>
-                </div>
-            </form>
-        </div>
-
-        <div class="text-center mt-4">
-            <a href="{{ url_for('my_qr_code') }}" class="btn btn-outline">
-                <i class="fa-solid fa-qrcode"></i> Show My QR Code
-            </a>
+        <div id="previewArea" class="preview-area" style="display: none;">
+            <img id="previewImage" class="preview-image" alt="Preview">
+            <div style="margin-top: 12px;">
+                <button class="btn btn-outline btn-sm" onclick="resetScanner()">
+                    <i class="fa-solid fa-arrow-left"></i> Scan Another
+                </button>
+            </div>
         </div>
     </div>
+
+    <div id="cameraMode" style="display: none;">
+        <div class="camera-container" id="cameraContainer">
+            <div id="qr-reader" style="width: 100%;"></div>
+        </div>
+        <div style="text-align: center; margin-top: 16px;">
+            <button class="btn btn-outline btn-sm" onclick="stopCamera()">
+                <i class="fa-solid fa-stop"></i> Stop Camera
+            </button>
+        </div>
+    </div>
+
+    <div id="resultArea" style="display: none;"></div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script>
-let cameraStream = null;
-let scanning = true;
+let html5QrCode = null;
+let currentMode = 'upload';
+
+function getCSRF() {
+    const m = document.querySelector('meta[name="csrf-token"]');
+    return m ? m.content : (window._csrf || '');
+}
+
+function toast(msg, type) {
+    let container = document.getElementById('flashContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'flashContainer';
+        container.className = 'flash-container';
+        document.body.appendChild(container);
+    }
+    const el = document.createElement('div');
+    el.className = `flash flash-${type}`;
+    const icons = {
+        success: 'circle-check',
+        error: 'circle-xmark',
+        info: 'circle-info',
+        warning: 'triangle-exclamation'
+    };
+    el.innerHTML = `<i class="fa-solid fa-${icons[type] || 'circle-info'}"></i> ${msg}`;
+    el.style.cursor = 'pointer';
+    el.onclick = () => el.remove();
+    container.appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+}
+
+function switchMode(mode) {
+    currentMode = mode;
+
+    document.getElementById('uploadModeBtn').classList.toggle('active', mode === 'upload');
+    document.getElementById('cameraModeBtn').classList.toggle('active', mode === 'camera');
+
+    document.getElementById('uploadMode').style.display = mode === 'upload' ? 'block' : 'none';
+    document.getElementById('cameraMode').style.display = mode === 'camera' ? 'block' : 'none';
+
+    document.getElementById('resultArea').style.display = 'none';
+    document.getElementById('resultArea').innerHTML = '';
+
+    if (mode === 'camera') {
+        startCamera();
+    } else {
+        stopCamera();
+        resetScanner();
+    }
+}
 
 async function startCamera() {
+    if (html5QrCode) {
+        try {
+            await html5QrCode.stop();
+        } catch(e) {}
+    }
+
+    html5QrCode = new Html5Qrcode("qr-reader");
+
+    const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0
+    };
+
     try {
-        cameraStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "environment" }
-        });
-        const video = document.getElementById('camera');
-        video.srcObject = cameraStream;
-        video.setAttribute('playsinline', true);
-        await video.play();
-        requestAnimationFrame(scanQR);
-    } catch (error) {
-        console.error('Camera error:', error);
+        await html5QrCode.start(
+            { facingMode: "environment" },
+            config,
+            onScanSuccess,
+            onScanError
+        );
+    } catch (err) {
+        console.error('Camera error:', err);
         document.getElementById('cameraContainer').innerHTML = `
-            <div style="background: var(--surface); padding: 40px; text-align: center; border-radius: 12px;">
-                <i class="fa-solid fa-camera-slash" style="font-size: 48px; opacity: 0.5;"></i>
-                <p class="mt-2">Could not access camera.<br>Please use the text input above.</p>
+            <div class="error-message">
+                <i class="fa-solid fa-exclamation-triangle"></i>
+                <p>Could not access camera. Please check permissions or use upload mode.</p>
+                <button class="btn btn-primary btn-sm" onclick="switchMode('upload')" style="margin-top:16px;">
+                    <i class="fa-solid fa-image"></i> Switch to Upload
+                </button>
             </div>
         `;
     }
 }
 
-async function scanQR() {
-    if (!scanning) return;
-
-    const video = document.getElementById('camera');
-    const canvas = document.getElementById('canvas');
-    const context = canvas.getContext('2d');
-
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        canvas.height = video.videoHeight;
-        canvas.width = video.videoWidth;
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-
-        const code = jsQR(imageData.data, canvas.width, canvas.height, {
-            inversionAttempts: "dontInvert",
-        });
-
-        if (code && code.data) {
-            scanning = false;
-            stopCamera();
-
-            // Found QR code
-            const qrData = code.data;
-            toast('QR code detected!', 'success');
-
-            // Process the QR data
-            processQRData(qrData);
-            return;
-        }
+function stopCamera() {
+    if (html5QrCode && html5QrCode.isScanning) {
+        html5QrCode.stop().catch(err => console.error('Stop error:', err));
     }
-    requestAnimationFrame(scanQR);
 }
 
-function stopCamera() {
-    if (cameraStream) {
-        cameraStream.getTracks().forEach(track => track.stop());
-        cameraStream = null;
+async function onScanSuccess(decodedText, decodedResult) {
+    console.log('QR scanned:', decodedText);
+    stopCamera();
+    await processQRData(decodedText);
+}
+
+function onScanError(errorMessage) {
+    // Silent fail - continue scanning
+}
+
+document.getElementById('scanArea').addEventListener('click', () => {
+    document.getElementById('qrFileInput').click();
+});
+
+document.getElementById('qrFileInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const preview = document.getElementById('previewImage');
+    preview.src = URL.createObjectURL(file);
+    document.getElementById('previewArea').style.display = 'block';
+    document.getElementById('scanArea').style.display = 'none';
+
+    document.getElementById('resultArea').style.display = 'block';
+    document.getElementById('resultArea').innerHTML = '<div class="loader"></div>';
+
+    await processQRCodeImage(file);
+});
+
+const scanArea = document.getElementById('scanArea');
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    scanArea.addEventListener(eventName, preventDefaults, false);
+});
+
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+['dragenter', 'dragover'].forEach(eventName => {
+    scanArea.addEventListener(eventName, () => {
+        scanArea.classList.add('drag-over');
+    });
+});
+
+['dragleave', 'drop'].forEach(eventName => {
+    scanArea.addEventListener(eventName, () => {
+        scanArea.classList.remove('drag-over');
+    });
+});
+
+scanArea.addEventListener('drop', async (e) => {
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+        const preview = document.getElementById('previewImage');
+        preview.src = URL.createObjectURL(file);
+        document.getElementById('previewArea').style.display = 'block';
+        document.getElementById('scanArea').style.display = 'none';
+        document.getElementById('resultArea').innerHTML = '<div class="loader"></div>';
+        document.getElementById('resultArea').style.display = 'block';
+        await processQRCodeImage(file);
+    }
+});
+
+async function processQRCodeImage(imageFile) {
+    try {
+        // Создаем временный элемент для сканирования
+        const tempDiv = document.createElement('div');
+        tempDiv.id = 'temp-scanner';
+        tempDiv.style.display = 'none';
+        document.body.appendChild(tempDiv);
+
+        const tempScanner = new Html5Qrcode("temp-scanner");
+        const qrData = await tempScanner.scanFile(imageFile, true);
+
+        // Удаляем временный элемент
+        tempScanner.clear();
+        document.body.removeChild(tempDiv);
+
+        await processQRData(qrData);
+    } catch (error) {
+        console.error('QR scan error:', error);
+        displayError('Could not read QR code. Please make sure the image contains a valid Kildear QR code.');
     }
 }
 
 async function processQRData(qrData) {
+    console.log('Processing QR data:', qrData);
+
+    // Проверяем формат QR данных
+    if (!qrData || !qrData.startsWith('kildear://')) {
+        displayError('Invalid QR code format. Please scan a valid Kildear QR code.');
+        return;
+    }
+
     try {
-        // Try to extract username
-        let username = null;
+        const response = await fetch('/qr/search', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRF()
+            },
+            body: JSON.stringify({ qr_data: qrData })
+        });
 
-        // Check if it's a URL
-        if (qrData.startsWith(('http://', 'https://'))) {
-            const match = qrData.match(/\/u\/([a-zA-Z0-9_]+)/);
-            if (match) username = match[1];
-        }
+        const data = await response.json();
+        console.log('Response:', data);
 
-        // If not a URL, try direct username
-        if (!username && !qrData.startsWith(('http://', 'https://'))) {
-            username = qrData;
-        }
-
-        // Try to parse JSON
-        if (!username) {
-            try {
-                const data = JSON.parse(qrData);
-                if (data.type === 'user') {
-                    username = data.username;
-                }
-            } catch(e) {}
-        }
-
-        if (username) {
-            // Redirect to profile
-            window.location.href = `/u/${username}`;
+        if (data.success && data.user) {
+            displayUserResult(data.user);
         } else {
-            document.getElementById('qrInput').value = qrData;
-            toast('Could not identify user. Please try again or use text input.', 'error');
-            resetScanner();
+            displayError(data.error || 'User not found');
         }
     } catch (error) {
-        console.error('Error processing QR:', error);
-        toast('Error processing QR code', 'error');
-        resetScanner();
+        console.error('Error:', error);
+        displayError('Failed to process QR code. Please try again.');
     }
+}
+
+function displayUserResult(user) {
+    const resultArea = document.getElementById('resultArea');
+    resultArea.innerHTML = `
+        <div class="result-card">
+            <div class="result-user">
+                <img src="${user.avatar}" class="result-avatar" alt="${user.username}">
+                <div class="result-info">
+                    <div class="result-name">
+                        ${escapeHtml(user.display_name)}
+                        ${user.is_verified ? '<span class="verified-badge-small"><i class="fa-solid fa-check"></i></span>' : ''}
+                    </div>
+                    <div class="result-username">@${escapeHtml(user.username)}</div>
+                    ${user.bio ? `<div class="result-bio">${escapeHtml(user.bio)}</div>` : ''}
+                </div>
+            </div>
+            <div class="result-stats">
+                <div class="stat-item">
+                    <span class="stat-value">${user.post_count}</span>
+                    <span class="stat-label">Posts</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">${user.follower_count}</span>
+                    <span class="stat-label">Followers</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">${user.following_count}</span>
+                    <span class="stat-label">Following</span>
+                </div>
+            </div>
+            <div class="result-actions">
+                <a href="/u/${user.username}" class="btn btn-primary">
+                    <i class="fa-solid fa-user"></i> View Profile
+                </a>
+                ${!user.is_following ? `
+                    <button class="btn btn-outline" onclick="followFromQR('${user.username}')">
+                        <i class="fa-solid fa-user-plus"></i> Follow
+                    </button>
+                ` : `
+                    <button class="btn btn-outline" disabled>
+                        <i class="fa-solid fa-check"></i> Following
+                    </button>
+                `}
+                <a href="/chat/${user.username}" class="btn btn-outline">
+                    <i class="fa-solid fa-message"></i> Message
+                </a>
+            </div>
+        </div>
+    `;
+    resultArea.style.display = 'block';
+}
+
+function displayError(message) {
+    const resultArea = document.getElementById('resultArea');
+    resultArea.innerHTML = `
+        <div class="result-card" style="text-align: center;">
+            <i class="fa-solid fa-exclamation-triangle" style="font-size: 48px; color: var(--danger); margin-bottom: 16px;"></i>
+            <h3 style="color: var(--danger);">Scan Failed</h3>
+            <p>${escapeHtml(message)}</p>
+            <button class="btn btn-primary btn-sm" onclick="resetScanner()" style="margin-top: 16px;">
+                <i class="fa-solid fa-arrow-left"></i> Try Again
+            </button>
+        </div>
+    `;
+    resultArea.style.display = 'block';
 }
 
 function resetScanner() {
-    scanning = true;
-    requestAnimationFrame(scanQR);
+    document.getElementById('previewArea').style.display = 'none';
+    document.getElementById('scanArea').style.display = 'block';
+    document.getElementById('resultArea').style.display = 'none';
+    document.getElementById('resultArea').innerHTML = '';
+    document.getElementById('qrFileInput').value = '';
 }
 
-// Handle form submission
-document.getElementById('qrForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const qrData = document.getElementById('qrInput').value.trim();
-    if (qrData) {
-        processQRData(qrData);
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
+    });
+}
+
+async function followFromQR(username) {
+    try {
+        const response = await fetch(`/follow/${username}`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRF(),
+                'Content-Type': 'application/json'
+            }
+        });
+        const data = await response.json();
+        if (data.following) {
+            toast(`You are now following @${username}!`, 'success');
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        }
+    } catch (error) {
+        toast('Failed to follow user', 'error');
     }
-});
-
-// Start camera on page load
-startCamera();
-
-// Cleanup on page unload
-window.addEventListener('beforeunload', () => {
-    stopCamera();
-});
+}
 </script>
-
-<style>
-.divider {
-    text-align: center;
-    margin: 20px 0;
-    position: relative;
-}
-.divider::before,
-.divider::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    width: 45%;
-    height: 1px;
-    background: var(--border);
-}
-.divider::before { left: 0; }
-.divider::after { right: 0; }
-.divider {
-    font-size: 12px;
-    color: var(--text-muted);
-}
-</style>
 {% endblock %}

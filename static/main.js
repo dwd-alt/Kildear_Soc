@@ -1,6 +1,6 @@
 /**
  * Kildear — main.js
- * Complete JavaScript with voice messages, calls, admin features
+ * Complete JavaScript with voice messages, calls, admin features, and QR code
  */
 
 /* ── CSRF Token ──────────────────────────────────────────────────────────── */
@@ -298,11 +298,6 @@ class CallManager {
                         <button class="call-btn mute" id="muteBtn" onclick="callManager.toggleMute()">
                             <i class="fa-solid fa-microphone"></i>
                         </button>
-                        ${this.callType === 'video' ? `
-                            <button class="call-btn video" id="videoBtn" onclick="callManager.toggleVideo()">
-                                <i class="fa-solid fa-video"></i>
-                            </button>
-                        ` : ''}
                         <button class="call-btn end-call" onclick="callManager.endCall()">
                             <i class="fa-solid fa-phone"></i>
                         </button>
@@ -365,7 +360,6 @@ class VoiceRecorder {
             this.mediaRecorder.start();
             this.isRecording = true;
 
-            // Start timer
             this.recordingTimer = setInterval(() => {
                 this.recordingDuration++;
                 this.updateRecordingDisplay();
@@ -407,6 +401,79 @@ class VoiceRecorder {
     }
 }
 
+/* ── QR Code Functions ───────────────────────────────────────────────────── */
+async function showMyQRCode() {
+    const modal = document.getElementById('qrModal');
+    if (!modal) return;
+
+    modal.style.display = 'flex';
+    const container = document.getElementById('qrCodeContainer');
+    if (container) container.innerHTML = '<div class="loader"></div>';
+
+    try {
+        const response = await fetch('/qr/generate', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRF()
+            }
+        });
+        const data = await response.json();
+
+        if (data.success && container) {
+            window.currentQRCodeData = data.qr_code;
+            window.currentQRUsername = data.username;
+            container.innerHTML = `<img src="${data.qr_code}" alt="QR Code" style="width: 250px; height: 250px; display: block; margin: 0 auto;">`;
+        } else if (container) {
+            container.innerHTML = '<p style="color: var(--danger);">Failed to generate QR code</p>';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        if (container) container.innerHTML = '<p style="color: var(--danger);">Error generating QR code</p>';
+    }
+}
+
+function closeQRModal() {
+    const modal = document.getElementById('qrModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function downloadQRCode() {
+    if (window.currentQRCodeData) {
+        const link = document.createElement('a');
+        link.download = `kildear_${window.currentQRUsername}_qrcode.png`;
+        link.href = window.currentQRCodeData;
+        link.click();
+        toast('QR code downloaded!', 'success');
+    }
+}
+
+async function shareQRCode() {
+    if (window.currentQRCodeData) {
+        const response = await fetch(window.currentQRCodeData);
+        const blob = await response.blob();
+        const file = new File([blob], `kildear_qrcode.png`, { type: 'image/png' });
+
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: 'My Kildear QR Code',
+                    text: `Scan my QR code to connect on Kildear!`,
+                    files: [file]
+                });
+                toast('Shared successfully!', 'success');
+            } catch (err) {
+                console.log('Share cancelled:', err);
+            }
+        } else {
+            const link = `${window.location.origin}/qr/scan`;
+            navigator.clipboard.writeText(link);
+            toast('Share link copied to clipboard!', 'success');
+        }
+    }
+}
+
 /* ── Initialize global objects ───────────────────────────────────────────── */
 const callManager = new CallManager();
 const voiceRecorder = new VoiceRecorder();
@@ -429,7 +496,7 @@ function initSocketIO() {
 
     socket.on('new_notification', (data) => {
         updateNotificationBadge();
-        showToast(data.text, 'info');
+        toast(data.text, 'info');
         playNotificationSound();
     });
 
@@ -437,7 +504,7 @@ function initSocketIO() {
         updateMessageBadge();
         const currentChatPartner = document.getElementById('partnerUsername')?.value;
         if (currentChatPartner !== data.sender_username) {
-            showToast(`New message from ${data.sender_username}`, 'info');
+            toast(`New message from ${data.sender_username}`, 'info');
         }
     });
 
@@ -445,7 +512,7 @@ function initSocketIO() {
         updateVoiceBadge();
         const currentChatPartner = document.getElementById('partnerUsername')?.value;
         if (currentChatPartner !== data.sender_username) {
-            showToast(`Voice message from ${data.sender_username}`, 'info');
+            toast(`Voice message from ${data.sender_username}`, 'info');
         }
         if (typeof appendVoiceMessage === 'function') {
             appendVoiceMessage(data);
@@ -516,7 +583,6 @@ async function updateMessageBadge() {
 async function updateVoiceBadge() {
     try {
         const data = await kFetch('/api/unread_counts');
-        // Можно добавить отдельный бейдж для голосовых
     } catch (error) {
         console.error('Error updating badge:', error);
     }
@@ -592,7 +658,7 @@ function initCommentForm(postId) {
             const data = await kFetch(`/post/${postId}/comment`, {
                 method: 'POST',
                 body: fd,
-                headers: {} // Let browser set content-type for FormData
+                headers: {}
             });
 
             if (data.id) {
@@ -928,6 +994,8 @@ document.addEventListener('keydown', e => {
         if (voiceRecorder.isRecording) {
             voiceRecorder.cancelRecording();
         }
+
+        closeQRModal();
     }
 });
 
@@ -998,7 +1066,7 @@ function initVoiceRecorder(buttonId, onComplete) {
             <div class="voice-recording-indicator">
                 <span class="recording-dot"></span>
                 <span id="voiceTimer">00:00</span>
-                <button class="btn btn-sm btn-danger" onclick="voiceRecorder.cancelRecording(); this.parentElement.remove();">
+                <button class="btn btn-sm btn-danger" onclick="voiceRecorder.cancelRecording(); this.parentElement.parentElement.remove();">
                     <i class="fa-solid fa-times"></i>
                 </button>
             </div>
@@ -1006,6 +1074,14 @@ function initVoiceRecorder(buttonId, onComplete) {
         document.querySelector('.chat-input-area').appendChild(recordingUI);
     }
 }
+
+/* ── QR Modal close handler ──────────────────────────────────────────────── */
+document.addEventListener('click', function(e) {
+    const modal = document.getElementById('qrModal');
+    if (modal && e.target === modal) {
+        closeQRModal();
+    }
+});
 
 /* ── Initialize everything ───────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
@@ -1031,4 +1107,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 5000);
 
     startNotifPolling();
+
+    window.showMyQRCode = showMyQRCode;
+    window.closeQRModal = closeQRModal;
+    window.downloadQRCode = downloadQRCode;
+    window.shareQRCode = shareQRCode;
 });

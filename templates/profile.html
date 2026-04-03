@@ -226,6 +226,52 @@
   .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.3; }
   .empty-state h3 { font-family: var(--font-head); font-size: 18px; margin-bottom: 6px; color: var(--text); }
 
+  /* Modal */
+  .modal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.8);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-content {
+    background: var(--card);
+    border-radius: 24px;
+    padding: 32px;
+    max-width: 450px;
+    width: 90%;
+    position: relative;
+    animation: modalIn 0.3s ease;
+  }
+  @keyframes modalIn {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .modal-close {
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    font-size: 28px;
+    cursor: pointer;
+    color: var(--text-muted);
+  }
+  .modal-close:hover { color: var(--text); }
+  .loader {
+    width: 50px;
+    height: 50px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 40px auto;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
   @media (max-width: 600px) {
     .profile-header { padding: 0 16px 20px; }
     .profile-tabs { margin: 16px 0 0; }
@@ -293,6 +339,9 @@
           <a href="{{ url_for('edit_profile') }}" class="btn btn-outline">
             <i class="fa-solid fa-pen"></i> Edit Profile
           </a>
+          <button class="btn btn-outline" onclick="showMyQRCode()">
+            <i class="fa-solid fa-qrcode"></i> My QR Code
+          </button>
         {% else %}
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             <button class="btn-follow {% if is_following %}unfollow-state{% else %}follow-state{% endif %}"
@@ -307,7 +356,9 @@
             <a href="{{ url_for('chat', username=user.username) }}" class="btn btn-outline btn-sm">
               <i class="fa-solid fa-message"></i> Message
             </a>
-            <!-- Кнопка "Пожаловаться" для обычных пользователей -->
+            <button class="btn btn-outline btn-sm" onclick="showUserQRCode({{ user.id }}, '{{ user.username }}')">
+              <i class="fa-solid fa-qrcode"></i> QR Code
+            </button>
             <a href="{{ url_for('report_user', user_id=user.id) }}" class="btn-report">
               <i class="fa-solid fa-flag"></i> Report
             </a>
@@ -417,7 +468,252 @@
 
 </div>
 
+<!-- QR Code Modal для СВОЕГО профиля -->
+<div id="qrModal" class="modal">
+    <div class="modal-content">
+        <span class="modal-close" onclick="closeQRModal()">&times;</span>
+        <h3 style="text-align:center; margin-bottom:20px;">
+            <i class="fa-solid fa-qrcode"></i> My QR Code
+        </h3>
+        <div id="qrCodeContainer" style="background: white; padding: 20px; border-radius: 16px; text-align: center;">
+            <div class="loader"></div>
+        </div>
+        <p style="color: var(--text-muted); font-size: 13px; text-align: center; margin-top: 20px;">
+            <i class="fa-solid fa-info-circle"></i> Scan this QR code to quickly find and follow me on Kildear
+        </p>
+        <div style="display: flex; gap: 12px; margin-top: 20px; justify-content: center;">
+            <button class="btn btn-primary" onclick="downloadQRCode()">
+                <i class="fa-solid fa-download"></i> Download
+            </button>
+            <button class="btn btn-outline" onclick="shareQRCode()">
+                <i class="fa-solid fa-share-alt"></i> Share
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- QR Code Modal для ЧУЖИХ профилей -->
+<div id="userQRModal" class="modal">
+    <div class="modal-content">
+        <span class="modal-close" onclick="closeUserQRModal()">&times;</span>
+        <h3 style="text-align:center; margin-bottom:20px;">
+            <i class="fa-solid fa-qrcode"></i> <span id="userQRName"></span>'s QR Code
+        </h3>
+        <div id="userQRCodeContainer" style="background: white; padding: 20px; border-radius: 16px; text-align: center;">
+            <div class="loader"></div>
+        </div>
+        <p style="color: var(--text-muted); font-size: 13px; text-align: center; margin-top: 20px;">
+            <i class="fa-solid fa-info-circle"></i> Scan this QR code to quickly find and follow this user on Kildear
+        </p>
+        <div style="display: flex; gap: 12px; margin-top: 20px; justify-content: center;">
+            <button class="btn btn-primary" onclick="downloadUserQRCode()">
+                <i class="fa-solid fa-download"></i> Download
+            </button>
+            <button class="btn btn-outline" onclick="shareUserQRCode()">
+                <i class="fa-solid fa-share-alt"></i> Share
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
+// ============================================================
+// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+// ============================================================
+
+function getCSRF() {
+    const m = document.querySelector('meta[name="csrf-token"]');
+    return m ? m.content : (window._csrf || '');
+}
+
+function toast(msg, type) {
+    let container = document.getElementById('flashContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'flashContainer';
+        container.className = 'flash-container';
+        document.body.appendChild(container);
+    }
+    const el = document.createElement('div');
+    el.className = `flash flash-${type}`;
+    const icons = {
+        success: 'circle-check',
+        error: 'circle-xmark',
+        info: 'circle-info',
+        warning: 'triangle-exclamation'
+    };
+    el.innerHTML = `<i class="fa-solid fa-${icons[type] || 'circle-info'}"></i> ${msg}`;
+    el.style.cursor = 'pointer';
+    el.onclick = () => el.remove();
+    container.appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+}
+
+// ============================================================
+// QR CODE ДЛЯ СВОЕГО ПРОФИЛЯ
+// ============================================================
+
+let currentQRCodeData = null;
+let currentQRUsername = null;
+
+async function showMyQRCode() {
+    const modal = document.getElementById('qrModal');
+    if (!modal) return;
+
+    modal.style.display = 'flex';
+    const container = document.getElementById('qrCodeContainer');
+    container.innerHTML = '<div class="loader"></div>';
+
+    try {
+        const response = await fetch('/qr/generate', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRF()
+            }
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            currentQRCodeData = data.qr_code;
+            currentQRUsername = data.username;
+            container.innerHTML = `<img src="${data.qr_code}" alt="QR Code" style="width: 250px; height: 250px; display: block; margin: 0 auto;">`;
+        } else {
+            container.innerHTML = '<p style="color: var(--danger);">Failed to generate QR code</p>';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        container.innerHTML = '<p style="color: var(--danger);">Error generating QR code</p>';
+    }
+}
+
+function closeQRModal() {
+    const modal = document.getElementById('qrModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function downloadQRCode() {
+    if (currentQRCodeData) {
+        const link = document.createElement('a');
+        link.download = `kildear_${currentQRUsername}_qrcode.png`;
+        link.href = currentQRCodeData;
+        link.click();
+        toast('QR code downloaded!', 'success');
+    }
+}
+
+async function shareQRCode() {
+    if (currentQRCodeData) {
+        const response = await fetch(currentQRCodeData);
+        const blob = await response.blob();
+        const file = new File([blob], `kildear_qrcode.png`, { type: 'image/png' });
+
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: 'My Kildear QR Code',
+                    text: `Scan my QR code to connect on Kildear!`,
+                    files: [file]
+                });
+                toast('Shared successfully!', 'success');
+            } catch (err) {
+                console.log('Share cancelled:', err);
+            }
+        } else {
+            const link = `${window.location.origin}/qr/scan`;
+            navigator.clipboard.writeText(link);
+            toast('Share link copied to clipboard!', 'success');
+        }
+    }
+}
+
+// ============================================================
+// QR CODE ДЛЯ ЧУЖИХ ПРОФИЛЕЙ
+// ============================================================
+
+let currentUserQRCodeData = null;
+let currentUserQRUsername = null;
+let currentUserQRDisplayName = null;
+
+async function showUserQRCode(userId, username) {
+    const modal = document.getElementById('userQRModal');
+    if (!modal) return;
+
+    document.getElementById('userQRName').textContent = username;
+    modal.style.display = 'flex';
+
+    const container = document.getElementById('userQRCodeContainer');
+    container.innerHTML = '<div class="loader"></div>';
+
+    try {
+        const response = await fetch(`/user/${userId}/qrcode`, {
+            headers: {
+                'X-CSRFToken': getCSRF()
+            }
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            currentUserQRCodeData = data.qr_code;
+            currentUserQRUsername = data.username;
+            currentUserQRDisplayName = data.display_name;
+            container.innerHTML = `<img src="${data.qr_code}" alt="QR Code" style="width: 250px; height: 250px; display: block; margin: 0 auto;">`;
+        } else {
+            container.innerHTML = `<p style="color: var(--danger);">${data.error || 'Failed to generate QR code'}</p>`;
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        container.innerHTML = '<p style="color: var(--danger);">Error generating QR code</p>';
+    }
+}
+
+function closeUserQRModal() {
+    const modal = document.getElementById('userQRModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function downloadUserQRCode() {
+    if (currentUserQRCodeData) {
+        const link = document.createElement('a');
+        link.download = `kildear_${currentUserQRUsername}_qrcode.png`;
+        link.href = currentUserQRCodeData;
+        link.click();
+        toast('QR code downloaded!', 'success');
+    }
+}
+
+async function shareUserQRCode() {
+    if (currentUserQRCodeData) {
+        const response = await fetch(currentUserQRCodeData);
+        const blob = await response.blob();
+        const file = new File([blob], `kildear_${currentUserQRUsername}_qrcode.png`, { type: 'image/png' });
+
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: `${currentUserQRDisplayName}'s QR Code`,
+                    text: `Scan ${currentUserQRDisplayName}'s QR code to connect on Kildear!`,
+                    files: [file]
+                });
+                toast('Shared successfully!', 'success');
+            } catch (err) {
+                console.log('Share cancelled:', err);
+            }
+        } else {
+            const link = `${window.location.origin}/qr/scan`;
+            navigator.clipboard.writeText(link);
+            toast('Share link copied to clipboard!', 'success');
+        }
+    }
+}
+
+// ============================================================
+// ОСТАЛЬНЫЕ ФУНКЦИИ ПРОФИЛЯ
+// ============================================================
+
 function toggleFollow(username) {
   const btn = document.getElementById('followBtn');
   fetch(`/follow/${username}`, {
@@ -442,13 +738,35 @@ function toggleFollow(username) {
 }
 
 function showFollowers() {
-  // Функция для показа списка подписчиков (можно добавить позже)
   console.log('Show followers');
 }
 
 function showFollowing() {
-  // Функция для показа списка подписок (можно добавить позже)
   console.log('Show following');
 }
+
+// ============================================================
+// ЗАКРЫТИЕ МОДАЛЬНЫХ ОКОН ПРИ КЛИКЕ ВНЕ ИХ
+// ============================================================
+
+document.getElementById('qrModal')?.addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeQRModal();
+    }
+});
+
+document.getElementById('userQRModal')?.addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeUserQRModal();
+    }
+});
+
+// Закрытие по ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeQRModal();
+        closeUserQRModal();
+    }
+});
 </script>
 {% endblock %}

@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <style>
     /* ── Design Tokens ───────────────────────────────────────────────── */
@@ -543,6 +544,12 @@
   <a href="{{ url_for('search') }}"
      class="nav-item {% if request.endpoint == 'search' %}active{% endif %}">
     <i class="fa-solid fa-magnifying-glass"></i> Search
+  </a>
+
+  <!-- QR Code Scanner - НОВАЯ КНОПКА В НАВИГАЦИИ -->
+  <a href="{{ url_for('scan_qr_page') }}"
+     class="nav-item {% if request.endpoint == 'scan_qr_page' %}active{% endif %}">
+    <i class="fa-solid fa-qrcode"></i> Scan QR
   </a>
 
   <span class="nav-section">Social</span>
