@@ -3578,8 +3578,8 @@ if __name__ == "__main__":
     print("📝 Для остановки нажмите Ctrl+C")
     print("=" * 70 + "\n")
 
-    socketio.run(app,
-                 debug=not is_production,
-                 host="0.0.0.0",
-                 port=port,
-                 allow_unsafe_werkzeug=not is_production)
+    # Production запуск без лишних параметров
+    if is_production:
+        socketio.run(app, host="0.0.0.0", port=port)
+    else:
+        socketio.run(app, debug=True, host="0.0.0.0", port=port, allow_unsafe_werkzeug=True)
