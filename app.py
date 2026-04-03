@@ -3559,27 +3559,25 @@ def init_app():
             logger.error(f"❌ Ошибка при инициализации: {e}")
 
 
+# На Render используется Gunicorn, этот блок нужен только для локальной разработки
 if __name__ == "__main__":
     init_app()
 
-    port = int(os.environ.get("PORT", 5000))
+    if not is_production:
+        port = int(os.environ.get("PORT", 5000))
 
-    print("\n" + "=" * 70)
-    print("🚀 ЗАПУСК KILDEAR SOCIAL NETWORK (PRESET AVATARS MODE)")
-    print("=" * 70)
-    print(f"🌐 Сервер запускается на порту: {port}")
-    print(f"📁 Временная папка: {app.config['UPLOAD_FOLDER']}")
-    print(f"🎨 Preset аватары: 10 штук (1av.png - 10av.png)")
-    print(f"🖼️  Preset обложки: 5 штук (1cover.jpg - 5cover.jpg)")
-    print(f"🐍 Python: {platform.python_version()}")
-    print(f"🖥️  Платформа: {platform.system()}")
-    print(f"🎯 Режим: {'PRODUCTION' if is_production else 'DEVELOPMENT'}")
-    print("=" * 70)
-    print("📝 Для остановки нажмите Ctrl+C")
-    print("=" * 70 + "\n")
+        print("\n" + "=" * 70)
+        print("🚀 ЗАПУСК KILDEAR SOCIAL NETWORK (PRESET AVATARS MODE)")
+        print("=" * 70)
+        print(f"🌐 Локальный сервер запускается на порту: {port}")
+        print(f"📁 Временная папка: {app.config['UPLOAD_FOLDER']}")
+        print(f"🎨 Preset аватары: 10 штук (1av.png - 10av.png)")
+        print(f"🖼️  Preset обложки: 5 штук (1cover.jpg - 5cover.jpg)")
+        print(f"🐍 Python: {platform.python_version()}")
+        print(f"🖥️  Платформа: {platform.system()}")
+        print(f"🎯 Режим: {'PRODUCTION' if is_production else 'DEVELOPMENT'}")
+        print("=" * 70)
+        print("📝 Для остановки нажмите Ctrl+C")
+        print("=" * 70 + "\n")
 
-    # Production запуск без лишних параметров
-    if is_production:
-        socketio.run(app, host="0.0.0.0", port=port)
-    else:
         socketio.run(app, debug=True, host="0.0.0.0", port=port, allow_unsafe_werkzeug=True)
