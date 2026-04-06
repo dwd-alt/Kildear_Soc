@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Apply for Staff — Kildear{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 600px; margin: 40px auto;">
+    <div class="card">
+        <div class="card-header" style="padding: 20px; border-bottom: 1px solid var(--border);">
+            <h2 style="margin: 0;"><i class="fa-solid fa-user-tie"></i> Apply for Staff Position</h2>
+            <p style="margin: 8px 0 0; color: var(--text-muted);">Join the Kildear team</p>
+        </div>
+
+        <div class="card-body" style="padding: 24px;">
+            <div class="info-box" style="background: rgba(124,111,255,0.1); padding: 16px; border-radius: 12px; margin-bottom: 24px;">
+                <h4 style="margin: 0 0 8px 0;">📋 Available Positions:</h4>
+                <ul style="margin: 0; padding-left: 20px;">
+                    <li><strong>👑 Administrator</strong> - Full access, user management, bans, verification</li>
+                    <li><strong>🛡️ Moderator</strong> - Content moderation, report handling, user support</li>
+                </ul>
+                <p style="margin-top: 12px;"><strong>Requirements:</strong> Account age &gt;30 days, no violations, active in community</p>
+            </div>
+
+            <form method="POST" onsubmit="event.preventDefault(); submitAdminApplication(this)">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="form-group">
+                    <label for="position">Select Position *</label>
+                    <select id="position" name="position" required class="form-control">
+                        <option value="">-- Select --</option>
+                        <option value="moderator">🛡️ Moderator</option>
+                        <option value="admin">👑 Administrator</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="contacts">Contact Information *</label>
+                    <input type="text" id="contacts" name="contacts" class="form-control"
+                           placeholder="Telegram, Discord, or email for communication" required>
+                    <small class="text-muted">Admins will contact you here</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="about">Tell us about yourself *</label>
+                    <textarea id="about" name="about" rows="5" class="form-control"
+                              placeholder="Who are you? What experience do you have? Why do you want this position?"
+                              required minlength="50"></textarea>
+                    <small class="text-muted">Minimum 50 characters</small>
+                    <div class="char-counter" id="about-counter" style="text-align: right; font-size: 12px; margin-top: 5px;">500</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="experience">Previous Experience (optional)</label>
+                    <textarea id="experience" name="experience" rows="3" class="form-control"
+                              placeholder="Have you moderated/administered before? Which communities?"></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    <i class="fa-solid fa-paper-plane"></i> Submit Application
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.container { max-width: 600px; margin: 40px auto; padding: 0 16px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+.form-group { margin-bottom: 20px; }
+.form-group label { display: block; margin-bottom: 8px; font-weight: 600; }
+.form-control { width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 10px; padding: 12px; color: var(--text); }
+.form-control:focus { outline: none; border-color: var(--primary); }
+select.form-control { cursor: pointer; }
+.text-muted { color: var(--text-muted); font-size: 12px; }
+</style>
+
+<script>
+document.getElementById('about').addEventListener('input', function() {
+    const remaining = 500 - this.value.length;
+    document.getElementById('about-counter').textContent = remaining;
+    document.getElementById('about-counter').style.color = remaining < 0 ? '#f44336' : (remaining < 20 ? '#ffc107' : 'var(--text-muted)');
+});
+
+async function submitAdminApplication(form) {
+    const formData = new FormData(form);
+    const position = formData.get('position');
+    const contacts = formData.get('contacts');
+    const about = formData.get('about');
+
+    if (!position) {
+        toast('Please select a position', 'error');
+        return;
+    }
+    if (!contacts) {
+        toast('Please provide contact information', 'error');
+        return;
+    }
+    if (!about || about.length < 50) {
+        toast('Please provide more details about yourself (minimum 50 characters)', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/apply', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCSRF() },
+            body: formData
+        });
+
+        if (response.ok) {
+            toast('Application submitted successfully!', 'success');
+            setTimeout(() => { window.location.href = '/'; }, 1500);
+        } else {
+            const data = await response.json();
+            toast(data.error || 'Failed to submit application', 'error');
+        }
+    } catch (error) {
+        toast('Error submitting application', 'error');
+    }
+}
+</script>
+{% endblock %}

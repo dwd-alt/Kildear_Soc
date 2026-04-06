@@ -136,6 +136,32 @@
     background: rgba(255, 71, 87, 0.05);
   }
 
+  /* Permission indicators */
+  .permission-indicators {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+  }
+  .permission-badge {
+    font-size: 12px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .permission-badge.success {
+    background: rgba(76, 175, 80, 0.15);
+    color: #4caf50;
+    border: 1px solid rgba(76, 175, 80, 0.3);
+  }
+  .permission-badge.locked {
+    background: rgba(255, 193, 7, 0.15);
+    color: #ffc107;
+    border: 1px solid rgba(255, 193, 7, 0.3);
+  }
+
   /* Tabs */
   .profile-tabs {
     display: flex;
@@ -305,6 +331,11 @@
         <div class="display-name">
           {{ user.display_name or user.username }}
           {% if user.is_verified %}<i class="fa-solid fa-circle-check verified-icon" style="font-size:16px;color:var(--accent)"></i>{% endif %}
+          {% if user.is_admin %}
+          <span class="admin-badge" style="background: #6c63ff20; color: #6c63ff; padding: 2px 8px; border-radius: 20px; font-size: 11px;">Admin</span>
+          {% elif user.is_moderator %}
+          <span class="moderator-badge" style="background: #17a2b820; color: #17a2b8; padding: 2px 8px; border-radius: 20px; font-size: 11px;">Moderator</span>
+          {% endif %}
         </div>
         <div class="username-handle">@{{ user.username }}</div>
 
@@ -332,6 +363,31 @@
             <span class="stat-label">Following</span>
           </div>
         </div>
+
+        <!-- Permission indicators for own profile -->
+        {% if is_own and permissions %}
+        <div class="permission-indicators">
+            {% if permissions.can_upload_custom_avatar %}
+            <span class="permission-badge success">
+                <i class="fa-solid fa-check-circle"></i> Custom avatar unlocked (1000+ followers)
+            </span>
+            {% else %}
+            <span class="permission-badge locked">
+                <i class="fa-solid fa-lock"></i> Custom avatar at 1000 followers
+            </span>
+            {% endif %}
+
+            {% if permissions.can_upload_custom_cover %}
+            <span class="permission-badge success">
+                <i class="fa-solid fa-check-circle"></i> Custom cover unlocked (5000+ followers)
+            </span>
+            {% else %}
+            <span class="permission-badge locked">
+                <i class="fa-solid fa-lock"></i> Custom cover at 5000 followers
+            </span>
+            {% endif %}
+        </div>
+        {% endif %}
       </div>
 
       <div class="profile-actions">
@@ -342,6 +398,16 @@
           <button class="btn btn-outline" onclick="showMyQRCode()">
             <i class="fa-solid fa-qrcode"></i> My QR Code
           </button>
+          {% if not user.is_verified %}
+          <a href="{{ url_for('request_verification') }}" class="btn btn-outline">
+            <i class="fa-solid fa-circle-check"></i> Get Verified
+          </a>
+          {% endif %}
+          {% if not user.is_admin and not user.is_moderator %}
+          <a href="{{ url_for('apply_admin') }}" class="btn btn-outline">
+            <i class="fa-solid fa-user-tie"></i> Apply for Staff
+          </a>
+          {% endif %}
         {% else %}
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             <button class="btn-follow {% if is_following %}unfollow-state{% else %}follow-state{% endif %}"
@@ -719,7 +785,7 @@ function toggleFollow(username) {
   fetch(`/follow/${username}`, {
     method: 'POST',
     headers: {
-      'X-CSRFToken': '{{ csrf_token() }}',
+      'X-CSRFToken': getCSRF(),
       'Content-Type': 'application/json'
     },
     credentials: 'same-origin',
@@ -733,6 +799,9 @@ function toggleFollow(username) {
       btn.className = 'btn-follow follow-state';
       btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Follow';
     }
+    // Update follower count
+    const followerCount = document.querySelector('.stat-item:first-child + .stat-item .stat-value');
+    if (followerCount) followerCount.textContent = data.followers;
   })
   .catch(error => console.error('Error:', error));
 }

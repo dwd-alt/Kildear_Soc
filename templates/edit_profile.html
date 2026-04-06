@@ -99,6 +99,114 @@
         <input type="hidden" name="remove_cover" id="removeCoverInput" value="0">
       </div>
 
+      <!-- ========== НОВЫЕ СЕКЦИИ ========== -->
+
+      <!-- Custom Avatar Upload (1000+ followers) -->
+      {% if permissions and permissions.can_upload_custom_avatar %}
+      <div class="form-section">
+        <h3><i class="fa-solid fa-camera"></i> Custom Avatar</h3>
+        <p class="text-muted">You have 1000+ followers! You can upload your own avatar.</p>
+
+        {% if current_user.custom_avatar %}
+        <div class="current-custom">
+          <img src="{{ current_user.custom_avatar }}" class="custom-avatar-preview">
+          <form method="POST" action="{{ url_for('remove_custom_avatar') }}" style="display: inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-sm btn-danger">Remove Custom Avatar</button>
+          </form>
+        </div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('upload_custom_avatar') }}" enctype="multipart/form-data">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="form-group">
+            <label>Upload New Avatar</label>
+            <input type="file" name="avatar" accept="image/*" class="form-control">
+            <small class="text-muted">Recommended size: 200x200px. Formats: PNG, JPG, GIF, WEBP</small>
+          </div>
+          <button type="submit" class="btn btn-primary">Upload Avatar</button>
+        </form>
+      </div>
+      {% elif permissions %}
+      <div class="form-section">
+        <div class="permission-locked">
+          <i class="fa-solid fa-lock"></i>
+          <div>
+            <strong>Custom Avatar Locked</strong>
+            <p>You need 1000 followers to upload your own avatar. Current: {{ current_user.follower_count }} followers</p>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Custom Cover Upload (5000+ followers) -->
+      {% if permissions and permissions.can_upload_custom_cover %}
+      <div class="form-section">
+        <h3><i class="fa-solid fa-image"></i> Custom Cover</h3>
+        <p class="text-muted">You have 5000+ followers! You can upload your own cover.</p>
+
+        {% if current_user.custom_cover %}
+        <div class="current-custom">
+          <img src="{{ current_user.custom_cover }}" class="custom-cover-preview">
+          <form method="POST" action="{{ url_for('remove_custom_cover') }}" style="display: inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-sm btn-danger">Remove Custom Cover</button>
+          </form>
+        </div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('upload_custom_cover') }}" enctype="multipart/form-data">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="form-group">
+            <label>Upload New Cover</label>
+            <input type="file" name="cover" accept="image/*" class="form-control">
+            <small class="text-muted">Recommended size: 1200x400px. Formats: PNG, JPG, GIF, WEBP</small>
+          </div>
+          <button type="submit" class="btn btn-primary">Upload Cover</button>
+        </form>
+      </div>
+      {% elif permissions %}
+      <div class="form-section">
+        <div class="permission-locked">
+          <i class="fa-solid fa-lock"></i>
+          <div>
+            <strong>Custom Cover Locked</strong>
+            <p>You need 5000 followers to upload your own cover. Current: {{ current_user.follower_count }} followers</p>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Verification Request Button -->
+      {% if not current_user.is_verified %}
+      <div class="form-section">
+        <div class="action-banner verification-banner">
+          <i class="fa-solid fa-circle-check"></i>
+          <div>
+            <h4>Get Verified!</h4>
+            <p>Apply for a verification badge to prove your identity</p>
+          </div>
+          <a href="{{ url_for('request_verification') }}" class="btn btn-primary">Apply Now</a>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Admin Application Button -->
+      {% if not current_user.is_admin and not current_user.is_moderator %}
+      <div class="form-section">
+        <div class="action-banner admin-banner">
+          <i class="fa-solid fa-user-tie"></i>
+          <div>
+            <h4>Join the Team!</h4>
+            <p>Apply for moderator or administrator position</p>
+          </div>
+          <a href="{{ url_for('apply_admin') }}" class="btn btn-primary">Apply Now</a>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- ========== КОНЕЦ НОВЫХ СЕКЦИЙ ========== -->
+
       <div class="edit-fields">
         <!-- Display name -->
         <div class="field-group">
@@ -199,7 +307,6 @@
 .edit-cover-section{margin-bottom:2rem}
 .section-desc{font-size:0.8rem;color:var(--text-muted);margin-bottom:0.75rem}
 
-/* Cover Preview Wrapper */
 .cover-preview-wrapper {
   margin-bottom: 1rem;
   border-radius: 1rem;
@@ -234,15 +341,6 @@
   color: rgba(255,255,255,0.5);
 }
 
-.cover-placeholder svg {
-  opacity: 0.5;
-}
-
-.cover-placeholder span {
-  font-size: 0.875rem;
-}
-
-/* Preset Covers Grid */
 .preset-covers-section{margin-top:1rem}
 .preset-covers-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:0.75rem}
 .cover-option{cursor:pointer;text-align:center;padding:0.5rem;border-radius:0.5rem;transition:all 0.2s;border:2px solid transparent}
@@ -255,22 +353,16 @@
   overflow:hidden;
   background:rgba(255,255,255,0.05);
   margin-bottom:0.5rem;
-  position:relative;
 }
 .cover-option-img{
   width:100%;
   height:100%;
   object-fit:cover;
-  object-position:center;
 }
 .cover-option-preview.no-cover{
   display:flex;
   align-items:center;
   justify-content:center;
-  background:rgba(255,255,255,0.05);
-}
-.cover-option-preview.no-cover svg{
-  opacity:0.3;
 }
 .cover-option span{font-size:0.75rem;color:var(--text-dim)}
 
@@ -288,6 +380,112 @@
 .preset-avatar-img{width:100%;height:100%;border-radius:50%;object-fit:cover;background:rgba(255,255,255,0.05)}
 .preset-avatar-check{position:absolute;bottom:0;right:0;width:24px;height:24px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;opacity:0;transition:opacity 0.2s}
 .preset-avatar-item.selected .preset-avatar-check{opacity:1}
+
+/* New sections */
+.form-section {
+  margin: 24px 0;
+  padding: 20px;
+  background: rgba(255,255,255,0.02);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.form-section h3 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.current-custom {
+  margin: 15px 0;
+  text-align: center;
+}
+
+.custom-avatar-preview {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 10px;
+}
+
+.custom-cover-preview {
+  width: 100%;
+  max-height: 150px;
+  object-fit: cover;
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+.permission-locked {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255,193,7,0.1);
+  border-radius: 8px;
+  color: var(--warning);
+}
+
+.permission-locked i {
+  font-size: 24px;
+}
+
+.permission-locked strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.permission-locked p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.action-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 12px;
+  flex-wrap: wrap;
+}
+
+.verification-banner {
+  background: linear-gradient(135deg, rgba(29,161,242,0.1), rgba(29,161,242,0.05));
+  border: 1px solid rgba(29,161,242,0.2);
+}
+
+.verification-banner i {
+  font-size: 32px;
+  color: #1da1f2;
+}
+
+.admin-banner {
+  background: linear-gradient(135deg, rgba(124,111,255,0.1), rgba(124,111,255,0.05));
+  border: 1px solid rgba(124,111,255,0.2);
+}
+
+.admin-banner i {
+  font-size: 32px;
+  color: var(--primary);
+}
+
+.action-banner div {
+  flex: 1;
+}
+
+.action-banner h4 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+}
+
+.action-banner p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
 
 /* Fields */
 .edit-fields{display:flex;flex-direction:column;gap:1.25rem}
@@ -320,6 +518,8 @@
 
 /* Actions */
 .edit-profile-actions{display:flex;justify-content:flex-end;gap:0.75rem;margin-top:2rem;padding-top:1.5rem;border-top:1px solid rgba(255,255,255,0.07)}
+
+.text-muted { color: var(--text-muted); font-size: 12px; }
 </style>
 
 <script>
@@ -328,27 +528,19 @@ let selectedPresetCover = {{ current_user.preset_cover or 'null' }};
 
 function selectPresetAvatar(avatarNum){
   selectedPresetAvatar = avatarNum;
-
-  // Update UI
   document.querySelectorAll('.preset-avatar-item').forEach(item => {
     item.classList.remove('selected');
     if(parseInt(item.dataset.avatarNum) === avatarNum){
       item.classList.add('selected');
     }
   });
-
-  // Update preview
   const avatarUrl = "{{ url_for('static', filename='avatars/preset/') }}" + avatarNum + "av.png";
   document.getElementById('avatarPreview').src = avatarUrl;
-
-  // Set hidden input
   document.getElementById('presetAvatarInput').value = avatarNum;
 }
 
 function selectPresetCover(coverNum){
   selectedPresetCover = coverNum;
-
-  // Update UI
   document.querySelectorAll('.cover-option').forEach(item => {
     item.classList.remove('selected');
     if(coverNum === null && item.dataset.cover === 'none'){
@@ -357,13 +549,8 @@ function selectPresetCover(coverNum){
       item.classList.add('selected');
     }
   });
-
-  // Update preview
   const coverPreview = document.getElementById('coverPreview');
-  const coverImage = document.getElementById('coverImage');
-
   if(coverNum === null){
-    // Show placeholder
     coverPreview.innerHTML = `
       <div class="cover-placeholder">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -377,7 +564,6 @@ function selectPresetCover(coverNum){
     document.getElementById('presetCoverInput').value = '';
     document.getElementById('removeCoverInput').value = '1';
   } else {
-    // Show image
     const coverUrl = "{{ url_for('static', filename='covers/preset/') }}" + coverNum + "cover.jpg";
     coverPreview.innerHTML = `<img src="${coverUrl}" alt="Cover" class="cover-image" id="coverImage">`;
     document.getElementById('presetCoverInput').value = coverNum;
@@ -393,7 +579,6 @@ function updateAccentPreview(color){
   document.getElementById('accentPreviewBar').style.background = color;
 }
 
-// Color swatch selection
 document.querySelectorAll('.color-swatch').forEach(s => {
   s.addEventListener('click', () => {
     document.querySelectorAll('.color-swatch').forEach(x => x.classList.remove('selected'));
@@ -401,9 +586,7 @@ document.querySelectorAll('.color-swatch').forEach(s => {
   });
 });
 
-// Initialize - set active states on page load
 document.addEventListener('DOMContentLoaded', function() {
-  // Highlight selected avatar
   const currentAvatar = {{ current_user.preset_avatar }};
   if(currentAvatar){
     document.querySelectorAll('.preset-avatar-item').forEach(item => {
@@ -412,8 +595,6 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
   }
-
-  // Highlight selected cover
   const currentCover = {{ current_user.preset_cover or 'null' }};
   document.querySelectorAll('.cover-option').forEach(item => {
     if(currentCover === null && item.dataset.cover === 'none'){

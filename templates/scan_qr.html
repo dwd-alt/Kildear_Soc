@@ -485,7 +485,6 @@ scanArea.addEventListener('drop', async (e) => {
 
 async function processQRCodeImage(imageFile) {
     try {
-        // Создаем временный элемент для сканирования
         const tempDiv = document.createElement('div');
         tempDiv.id = 'temp-scanner';
         tempDiv.style.display = 'none';
@@ -494,7 +493,6 @@ async function processQRCodeImage(imageFile) {
         const tempScanner = new Html5Qrcode("temp-scanner");
         const qrData = await tempScanner.scanFile(imageFile, true);
 
-        // Удаляем временный элемент
         tempScanner.clear();
         document.body.removeChild(tempDiv);
 
@@ -508,11 +506,34 @@ async function processQRCodeImage(imageFile) {
 async function processQRData(qrData) {
     console.log('Processing QR data:', qrData);
 
-    // Проверяем формат QR данных
-    if (!qrData || !qrData.startsWith('kildear://')) {
+    // Извлекаем username из ЛЮБОГО формата
+    let username = null;
+
+    // Формат 1: kildear://user/username
+    if (qrData.startsWith('kildear://user/')) {
+        username = qrData.replace('kildear://user/', '');
+    }
+    // Формат 2: http://localhost:5000/u/username или https://site.com/u/username
+    else if (qrData.includes('/u/')) {
+        const match = qrData.match(/\/u\/([^\/?#]+)/);
+        if (match) username = match[1];
+    }
+    // Формат 3: http://localhost:5000/profile/username
+    else if (qrData.includes('/profile/')) {
+        const match = qrData.match(/\/profile\/([^\/?#]+)/);
+        if (match) username = match[1];
+    }
+    // Формат 4: просто username (без слешей и протоколов)
+    else if (!qrData.includes('/') && !qrData.includes('://') && qrData.length < 40) {
+        username = qrData;
+    }
+
+    if (!username) {
         displayError('Invalid QR code format. Please scan a valid Kildear QR code.');
         return;
     }
+
+    console.log('Extracted username:', username);
 
     try {
         const response = await fetch('/qr/search', {
@@ -521,7 +542,7 @@ async function processQRData(qrData) {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCSRF()
             },
-            body: JSON.stringify({ qr_data: qrData })
+            body: JSON.stringify({ qr_data: username })
         });
 
         const data = await response.json();
@@ -543,7 +564,7 @@ function displayUserResult(user) {
     resultArea.innerHTML = `
         <div class="result-card">
             <div class="result-user">
-                <img src="${user.avatar}" class="result-avatar" alt="${user.username}">
+                <img src="${user.avatar}" class="result-avatar" alt="${user.username}" onerror="this.src='/static/default_avatar.png'">
                 <div class="result-info">
                     <div class="result-name">
                         ${escapeHtml(user.display_name)}

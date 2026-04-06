@@ -95,7 +95,6 @@
     background: var(--primary);
   }
 
-  /* Иконки для разных типов уведомлений */
   .notification-icon {
     width: 48px;
     height: 48px;
@@ -107,32 +106,23 @@
     flex-shrink: 0;
   }
 
-  .icon-like {
-    background: rgba(255, 107, 157, 0.15);
-    color: #ff6b9d;
+  .icon-like { background: rgba(255, 107, 157, 0.15); color: #ff6b9d; }
+  .icon-follow { background: rgba(108, 99, 255, 0.15); color: var(--primary); }
+  .icon-comment { background: rgba(76, 175, 80, 0.15); color: #4caf50; }
+  .icon-mention { background: rgba(255, 193, 7, 0.15); color: #ffc107; }
+  .icon-verification { background: rgba(29, 161, 242, 0.15); color: #1da1f2; }
+  .icon-admin { background: rgba(124, 111, 255, 0.15); color: var(--primary); }
+  .icon-system { background: rgba(158, 158, 158, 0.15); color: #9e9e9e; }
+
+  .notification-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--border);
+    flex-shrink: 0;
   }
 
-  .icon-follow {
-    background: rgba(108, 99, 255, 0.15);
-    color: var(--primary);
-  }
-
-  .icon-comment {
-    background: rgba(76, 175, 80, 0.15);
-    color: #4caf50;
-  }
-
-  .icon-mention {
-    background: rgba(255, 193, 7, 0.15);
-    color: #ffc107;
-  }
-
-  .icon-system {
-    background: rgba(158, 158, 158, 0.15);
-    color: #9e9e9e;
-  }
-
-  /* Контент уведомления */
   .notification-content {
     flex: 1;
     min-width: 0;
@@ -175,17 +165,6 @@
     text-overflow: ellipsis;
   }
 
-  /* Аватар пользователя */
-  .notification-avatar {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 2px solid var(--border);
-    flex-shrink: 0;
-  }
-
-  /* Пустое состояние */
   .empty-notifications {
     text-align: center;
     padding: 80px 20px;
@@ -214,16 +193,9 @@
     margin-bottom: 24px;
   }
 
-  /* Анимации */
   @keyframes slideIn {
-    from {
-      opacity: 0;
-      transform: translateY(-10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
   .notification-item {
@@ -249,29 +221,26 @@
   {% if notifs %}
   <div class="notifications-list">
     {% for notif in notifs %}
-    <a href="{{ notification_link(notif) }}"
-       class="notification-item {% if not notif.is_read %}unread{% endif %}"
-       data-notif-id="{{ notif.id }}"
-       onclick="markAsRead({{ notif.id }})">
-
-      <!-- Иконка в зависимости от типа уведомления -->
-      {% set icon_class = {
-        'like': 'icon-like fa-heart',
-        'follow': 'icon-follow fa-user-plus',
-        'comment': 'icon-comment fa-comment',
-        'mention': 'icon-mention fa-at',
-        'system': 'icon-system fa-bell'
-      } %}
-
-      {% set icon_info = icon_class[notif.type] or 'icon-system fa-bell' %}
-      {% set icon_parts = icon_info.split(' ') %}
+    <a href="{{ notification_link(notif) }}" class="notification-item {% if not notif.is_read %}unread{% endif %}" data-notif-id="{{ notif.id }}" onclick="markAsRead({{ notif.id }})">
 
       {% if notif.from_user %}
-      <img src="{{ notif.from_user.avatar }}" class="notification-avatar" alt="@{{ notif.from_user.username }}">
+      <img src="{{ notif.from_user.avatar_url }}" class="notification-avatar" alt="@{{ notif.from_user.username }}">
       {% else %}
-      <div class="notification-icon {{ icon_parts[0] }}">
-        <i class="fa-solid {{ icon_parts[1] }}"></i>
-      </div>
+        {% if notif.type == 'like' %}
+        <div class="notification-icon icon-like"><i class="fa-solid fa-heart"></i></div>
+        {% elif notif.type == 'follow' %}
+        <div class="notification-icon icon-follow"><i class="fa-solid fa-user-plus"></i></div>
+        {% elif notif.type == 'comment' %}
+        <div class="notification-icon icon-comment"><i class="fa-solid fa-comment"></i></div>
+        {% elif notif.type == 'mention' %}
+        <div class="notification-icon icon-mention"><i class="fa-solid fa-at"></i></div>
+        {% elif notif.type == 'verification' %}
+        <div class="notification-icon icon-verification"><i class="fa-solid fa-circle-check"></i></div>
+        {% elif notif.type == 'admin_approved' or notif.type == 'admin_rejected' %}
+        <div class="notification-icon icon-admin"><i class="fa-solid fa-user-check"></i></div>
+        {% else %}
+        <div class="notification-icon icon-system"><i class="fa-solid fa-bell"></i></div>
+        {% endif %}
       {% endif %}
 
       <div class="notification-content">
@@ -301,20 +270,44 @@
           {% elif notif.type == 'mention' %}
             <i class="fa-solid fa-at" style="color:#ffc107; margin-right:5px;"></i>
             Mentioned you in a post
+          {% elif notif.type == 'verification' %}
+            <i class="fa-solid fa-circle-check" style="color:#1da1f2; margin-right:5px;"></i>
+            {{ notif.text }}
+          {% elif notif.type == 'admin_approved' %}
+            <i class="fa-solid fa-user-check" style="color:#4caf50; margin-right:5px;"></i>
+            {{ notif.text }}
+          {% elif notif.type == 'admin_rejected' %}
+            <i class="fa-solid fa-times-circle" style="color:#f44336; margin-right:5px;"></i>
+            {{ notif.text }}
+          {% elif notif.type == 'group_post' %}
+            <i class="fa-solid fa-users" style="color:var(--primary); margin-right:5px;"></i>
+            New post in group
+          {% elif notif.type == 'channel_post' %}
+            <i class="fa-solid fa-satellite-dish" style="color:var(--accent); margin-right:5px;"></i>
+            New post in channel
+          {% elif notif.type == 'message' %}
+            <i class="fa-solid fa-message" style="color:#22d3a0; margin-right:5px;"></i>
+            {{ notif.text }}
+          {% elif notif.type == 'voice_message' %}
+            <i class="fa-solid fa-microphone" style="color:#ffb347; margin-right:5px;"></i>
+            {{ notif.text }}
+          {% elif notif.type == 'missed_call' or notif.type == 'incoming_call' %}
+            <i class="fa-solid fa-phone" style="color:#ff4757; margin-right:5px;"></i>
+            {{ notif.text }}
           {% else %}
             {{ notif.text or 'New notification' }}
           {% endif %}
         </div>
 
-        {% if notif.text and notif.type not in ['like', 'follow', 'comment', 'mention'] %}
+        {% if notif.text and notif.type not in ['like', 'follow', 'comment', 'mention', 'verification', 'admin_approved', 'admin_rejected'] %}
         <div class="notification-post-preview">
-          {{ notif.text }}
+          {{ notif.text[:100] }}{% if notif.text|length > 100 %}...{% endif %}
         </div>
         {% endif %}
       </div>
 
       {% if not notif.is_read %}
-      <span class="unread-dot"></span>
+      <span class="unread-dot" style="width: 8px; height: 8px; background: var(--primary); border-radius: 50%;"></span>
       {% endif %}
     </a>
     {% endfor %}
@@ -337,32 +330,14 @@
 </div>
 
 <script>
-// Функция для получения ссылки на уведомление
-function notificationLink(notif) {
-  if (notif.type === 'follow') {
-    return `/u/${notif.from_user.username}`;
-  } else if (notif.type === 'like' || notif.type === 'comment') {
-    return `/post/${notif.post_id}`;
-  } else {
-    return 'javascript:void(0)';
-  }
+function getCSRF() {
+  const m = document.querySelector('meta[name="csrf-token"]');
+  return m ? m.content : '';
 }
 
-// Добавляем функцию в глобальную область для использования в шаблоне
-window.notification_link = function(notif) {
-  if (notif.type === 'follow' && notif.from_user) {
-    return `/u/${notif.from_user.username}`;
-  } else if ((notif.type === 'like' || notif.type === 'comment') && notif.post_id) {
-    return `/post/${notif.post_id}`;
-  } else {
-    return '#';
-  }
-};
-
-// Отметить как прочитанное
 async function markAsRead(notifId) {
   try {
-    const response = await fetch(`/api/notification/${notifId}/read`, {
+    const response = await fetch(`/api/mark_notification_read/${notifId}`, {
       method: 'POST',
       headers: {
         'X-CSRFToken': getCSRF(),
@@ -375,13 +350,14 @@ async function markAsRead(notifId) {
       if (item) {
         item.classList.remove('unread');
       }
-
-      // Обновить счетчик
       const badge = document.querySelector('.nav-item[href="/notifications"] .nav-badge');
       if (badge) {
         const count = parseInt(badge.textContent) - 1;
-        badge.textContent = count;
-        badge.style.display = count > 0 ? '' : 'none';
+        if (count > 0) {
+          badge.textContent = count;
+        } else {
+          badge.style.display = 'none';
+        }
       }
     }
   } catch (e) {
@@ -389,10 +365,9 @@ async function markAsRead(notifId) {
   }
 }
 
-// Отметить все как прочитанные
 async function markAllAsRead() {
   try {
-    const response = await fetch('/api/notifications/read-all', {
+    const response = await fetch('/api/mark_all_notifications_read', {
       method: 'POST',
       headers: {
         'X-CSRFToken': getCSRF(),
@@ -404,14 +379,10 @@ async function markAllAsRead() {
       document.querySelectorAll('.notification-item').forEach(item => {
         item.classList.remove('unread');
       });
-
-      // Обновить счетчик
       const badge = document.querySelector('.nav-item[href="/notifications"] .nav-badge');
       if (badge) {
-        badge.textContent = '0';
         badge.style.display = 'none';
       }
-
       toast('All notifications marked as read', 'success');
     }
   } catch (e) {
@@ -420,7 +391,17 @@ async function markAllAsRead() {
   }
 }
 
-// Обновление относительного времени
+function timeAgo(dateStr) {
+  const now = new Date();
+  const then = new Date(dateStr);
+  const secs = Math.floor((now - then) / 1000);
+  if (secs < 60) return 'just now';
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
+  if (secs < 604800) return `${Math.floor(secs / 86400)}d ago`;
+  return then.toLocaleDateString();
+}
+
 function updateRelativeTimes() {
   document.querySelectorAll('[data-time]').forEach(el => {
     const timeStr = el.getAttribute('data-time');
@@ -430,7 +411,22 @@ function updateRelativeTimes() {
   });
 }
 
-// Обновляем время каждую минуту
+function toast(msg, type) {
+  let container = document.getElementById('flashContainer');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'flashContainer';
+    container.className = 'flash-container';
+    document.body.appendChild(container);
+  }
+  const el = document.createElement('div');
+  el.className = `flash flash-${type}`;
+  el.innerHTML = `<i class="fa-solid fa-${type === 'success' ? 'circle-check' : 'circle-info'}"></i> ${msg}`;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
 setInterval(updateRelativeTimes, 60000);
+updateRelativeTimes();
 </script>
 {% endblock %}

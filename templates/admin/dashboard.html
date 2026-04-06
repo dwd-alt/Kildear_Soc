@@ -35,7 +35,17 @@
             <i class="fa-solid fa-check-circle"></i>
         </div>
         <div class="stat-value">{{ stats.pending_verification }}</div>
-        <div class="stat-label">Ожидают верификации</div>
+        <div class="stat-label">Заявок на верификацию</div>
+        <a href="{{ url_for('admin_verification_requests') }}" class="stat-link">Просмотреть →</a>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon">
+            <i class="fa-solid fa-user-tie"></i>
+        </div>
+        <div class="stat-value">{{ stats.pending_admin_apps }}</div>
+        <div class="stat-label">Заявок на должности</div>
+        <a href="{{ url_for('admin_applications') }}" class="stat-link">Просмотреть →</a>
     </div>
 
     <div class="stat-card">
@@ -75,13 +85,13 @@
                 <td>#{{ user.id }}</td>
                 <td>
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <img src="{{ user.avatar or '/static/default_avatar.png' }}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
+                        <img src="{{ user.avatar_url }}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
                         <div>
                             <strong>{{ user.display_name or user.username }}</strong>
                             <div style="font-size: 12px; color: #7f8c8d;">@{{ user.username }}</div>
                         </div>
                     </div>
-                </td>
+                 </td>
                 <td>{{ user.email }}</td>
                 <td>
                     {% if user.is_banned %}
@@ -90,17 +100,99 @@
                     <span class="badge badge-success">Верифицирован</span>
                     {% elif user.is_admin %}
                     <span class="badge badge-info">Админ</span>
+                    {% elif user.is_moderator %}
+                    <span class="badge badge-info" style="background: #17a2b8;">Модератор</span>
                     {% else %}
                     <span class="badge badge-warning">Активен</span>
                     {% endif %}
-                </td>
+                 </td>
                 <td>{{ user.created_at|timeago }}</td>
                 <td>
                     <a href="{{ url_for('admin_users') }}?search={{ user.username }}" class="admin-btn admin-btn-primary" style="padding: 4px 8px; font-size: 11px;">
                         <i class="fa-solid fa-eye"></i>
                     </a>
+                 </td>
+             </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Recent Verification Requests -->
+<div class="admin-table-container">
+    <h3 style="padding: 20px; margin: 0; border-bottom: 1px solid #2a2a3a;">
+        <i class="fa-solid fa-circle-check"></i> Последние заявки на верификацию
+        <a href="{{ url_for('admin_verification_requests') }}" style="float: right; font-size: 13px;">Все →</a>
+    </h3>
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>Пользователь</th>
+                <th>Причина</th>
+                <th>Дата</th>
+                <th>Статус</th>
+                <th>Действия</th>
+             </tr>
+        </thead>
+        <tbody>
+            {% for req in recent_verifications[:5] %}
+            <tr>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <img src="{{ req.user.avatar_url }}" style="width: 32px; height: 32px; border-radius: 50%;">
+                        <span>@{{ req.user.username }}</span>
+                    </div>
                 </td>
-            </tr>
+                <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">{{ req.reason[:50] }}...</td>
+                <td>{{ req.created_at|timeago }}</td>
+                <td><span class="badge badge-warning">pending</span></td>
+                <td>
+                    <a href="{{ url_for('admin_verification_requests') }}" class="admin-btn admin-btn-primary btn-sm">Review</a>
+                </td>
+             </tr>
+            {% else %}
+            <tr><td colspan="5" style="text-align: center;">Нет заявок на верификацию</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Recent Admin Applications -->
+<div class="admin-table-container">
+    <h3 style="padding: 20px; margin: 0; border-bottom: 1px solid #2a2a3a;">
+        <i class="fa-solid fa-user-tie"></i> Последние заявки на должности
+        <a href="{{ url_for('admin_applications') }}" style="float: right; font-size: 13px;">Все →</a>
+    </h3>
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>Пользователь</th>
+                <th>Должность</th>
+                <th>Контакты</th>
+                <th>Дата</th>
+                <th>Статус</th>
+                <th>Действия</th>
+             </tr>
+        </thead>
+        <tbody>
+            {% for app in recent_applications[:5] %}
+            <tr>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <img src="{{ app.user.avatar_url }}" style="width: 32px; height: 32px; border-radius: 50%;">
+                        <span>@{{ app.user.username }}</span>
+                    </div>
+                </td>
+                <td>{% if app.position == 'admin' %}👑 Админ{% else %}🛡️ Модератор{% endif %}</td>
+                <td>{{ app.contacts[:30] }}...</td>
+                <td>{{ app.created_at|timeago }}</td>
+                <td><span class="badge badge-warning">pending</span></td>
+                <td>
+                    <a href="{{ url_for('admin_applications') }}" class="admin-btn admin-btn-primary btn-sm">Review</a>
+                </td>
+             </tr>
+            {% else %}
+            <tr><td colspan="6" style="text-align: center;">Нет заявок на должности</td></tr>
             {% endfor %}
         </tbody>
     </table>
@@ -119,7 +211,7 @@
                 <th>Статус</th>
                 <th>Дата</th>
                 <th>Действия</th>
-            </tr>
+             </tr>
         </thead>
         <tbody>
             {% for report in pending_reports %}
@@ -127,14 +219,14 @@
                 <td>#{{ report.id }}</td>
                 <td>
                     <div style="display: flex; align-items: center; gap: 5px;">
-                        <img src="{{ report.reporter.avatar or '/static/default_avatar.png' }}" style="width: 24px; height: 24px; border-radius: 50%;">
+                        <img src="{{ report.reporter.avatar_url }}" style="width: 24px; height: 24px; border-radius: 50%;">
                         <span>@{{ report.reporter.username }}</span>
                     </div>
                 </td>
                 <td>
                     {% if report.reported_user %}
                     <div style="display: flex; align-items: center; gap: 5px;">
-                        <img src="{{ report.reported_user.avatar or '/static/default_avatar.png' }}" style="width: 24px; height: 24px; border-radius: 50%;">
+                        <img src="{{ report.reported_user.avatar_url }}" style="width: 24px; height: 24px; border-radius: 50%;">
                         <span>@{{ report.reported_user.username }}</span>
                     </div>
                     {% else %}
@@ -142,20 +234,18 @@
                     {% endif %}
                 </td>
                 <td>{{ report.reason }}</td>
-                <td>
-                    <span class="badge badge-warning">{{ report.status }}</span>
-                </td>
+                <td><span class="badge badge-warning">{{ report.status }}</span></td>
                 <td>{{ report.created_at|timeago }}</td>
                 <td>
-                    <a href="{{ url_for('admin_reports') }}?report_id={{ report.id }}" class="admin-btn admin-btn-primary" style="padding: 4px 8px; font-size: 11px;">
+                    <a href="{{ url_for('admin_reports') }}" class="admin-btn admin-btn-primary" style="padding: 4px 8px; font-size: 11px;">
                         <i class="fa-solid fa-eye"></i>
                     </a>
                 </td>
-            </tr>
+             </tr>
             {% else %}
             <tr>
                 <td colspan="7" style="text-align: center; color: #7f8c8d;">Нет новых жалоб</td>
-            </tr>
+             </tr>
             {% endfor %}
         </tbody>
     </table>
@@ -172,7 +262,7 @@
                 <th>Устройство</th>
                 <th>Статус</th>
                 <th>Время</th>
-            </tr>
+             </tr>
         </thead>
         <tbody>
             {% for login in recent_logins %}
@@ -180,7 +270,7 @@
                 <td>
                     {% if login.user %}
                     <div style="display: flex; align-items: center; gap: 5px;">
-                        <img src="{{ login.user.avatar or '/static/default_avatar.png' }}" style="width: 24px; height: 24px; border-radius: 50%;">
+                        <img src="{{ login.user.avatar_url }}" style="width: 24px; height: 24px; border-radius: 50%;">
                         <span>@{{ login.user.username }}</span>
                     </div>
                     {% else %}
@@ -197,9 +287,90 @@
                     {% endif %}
                 </td>
                 <td>{{ login.created_at|timeago }}</td>
-            </tr>
+             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+
+<style>
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+.stat-card {
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid var(--border);
+}
+.stat-icon {
+    font-size: 32px;
+    margin-bottom: 10px;
+}
+.stat-value {
+    font-size: 28px;
+    font-weight: 700;
+}
+.stat-label {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 5px;
+}
+.stat-link {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--primary);
+    text-decoration: none;
+}
+.admin-table-container {
+    background: var(--bg-card);
+    border-radius: 12px;
+    overflow-x: auto;
+    margin-bottom: 30px;
+}
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.admin-table th,
+.admin-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.admin-table th {
+    background: rgba(0,0,0,0.2);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+}
+.badge {
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+}
+.badge-danger { background: #dc354520; color: #dc3545; }
+.badge-success { background: #28a74520; color: #28a745; }
+.badge-info { background: #17a2b820; color: #17a2b8; }
+.badge-warning { background: #ffc10720; color: #ffc107; }
+.admin-btn {
+    padding: 5px 10px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 11px;
+    text-decoration: none;
+    display: inline-block;
+}
+.admin-btn-primary { background: var(--primary); color: white; }
+.btn-sm { padding: 3px 8px; font-size: 10px; }
+</style>
 {% endblock %}

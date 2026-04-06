@@ -1,0 +1,161 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Staff Applications — Admin{% endblock %}
+{% block header %}Staff Applications{% endblock %}
+
+{% block content %}
+<div class="admin-filters" style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+    <a href="?status=pending" class="btn btn-sm {% if current_status == 'pending' %}btn-primary{% else %}btn-outline{% endif %}">
+        Pending ({{ applications|selectattr('status', 'equalto', 'pending')|list|length }})
+    </a>
+    <a href="?status=approved" class="btn btn-sm {% if current_status == 'approved' %}btn-primary{% else %}btn-outline{% endif %}">
+        Approved
+    </a>
+    <a href="?status=rejected" class="btn btn-sm {% if current_status == 'rejected' %}btn-primary{% else %}btn-outline{% endif %}">
+        Rejected
+    </a>
+    <a href="?status=all" class="btn btn-sm {% if current_status == 'all' %}btn-primary{% else %}btn-outline{% endif %}">
+        All
+    </a>
+</div>
+
+<div class="applications-list">
+    {% for app in applications %}
+    <div class="application-card" style="background: var(--card); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 16px; overflow: hidden;">
+        <div class="application-header" style="padding: 16px 20px; background: rgba(0,0,0,0.2); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <img src="{{ app.user.avatar_url }}" style="width: 48px; height: 48px; border-radius: 50%;">
+                <div>
+                    <h3 style="margin: 0;">{{ app.user.display_name or app.user.username }}</h3>
+                    <p style="margin: 0; color: var(--text-muted);">@{{ app.user.username }}</p>
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <span class="badge {% if app.position == 'admin' %}badge-admin{% else %}badge-moderator{% endif %}">
+                    {% if app.position == 'admin' %}👑 Admin{% else %}🛡️ Moderator{% endif %}
+                </span>
+                {% if app.status == 'pending' %}
+                <span class="badge badge-warning">⏳ Pending</span>
+                {% elif app.status == 'approved' %}
+                <span class="badge badge-success">✅ Approved</span>
+                {% else %}
+                <span class="badge badge-danger">❌ Rejected</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="application-body" style="padding: 16px 20px;">
+            <p><strong>📅 Submitted:</strong> {{ app.created_at.strftime('%d.%m.%Y %H:%M') }}</p>
+            <p><strong>📊 Stats:</strong> {{ app.user.follower_count }} followers · {{ app.user.post_count }} posts · Account age: {{ ((now - app.user.created_at).days) }} days</p>
+            <p><strong>📞 Contacts:</strong> {{ app.contacts }}</p>
+            <p><strong>📝 About:</strong></p>
+            <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; margin-top: 5px;">
+                {{ app.about }}
+            </div>
+            {% if app.experience %}
+            <p><strong>💼 Experience:</strong></p>
+            <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; margin-top: 5px;">
+                {{ app.experience }}
+            </div>
+            {% endif %}
+            {% if app.admin_comment %}
+            <p><strong>💬 Admin comment:</strong></p>
+            <div style="background: rgba(255,193,7,0.1); padding: 12px; border-radius: 8px; margin-top: 5px;">
+                {{ app.admin_comment }}
+            </div>
+            {% endif %}
+        </div>
+
+        {% if app.status == 'pending' %}
+        <div class="application-actions" style="padding: 12px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end;">
+            <form method="POST" action="{{ url_for('admin_review_application', app_id=app.id) }}" style="display: inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="approve">
+                <input type="hidden" name="comment" value="">
+                <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Approve this application? User will receive appropriate permissions.')">
+                    <i class="fa-solid fa-check"></i> Approve
+                </button>
+            </form>
+            <button class="btn btn-danger btn-sm" onclick="showRejectModal({{ app.id }})">
+                <i class="fa-solid fa-times"></i> Reject
+            </button>
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 60px; color: var(--text-muted);">
+        <i class="fa-solid fa-inbox" style="font-size: 48px; margin-bottom: 16px;"></i>
+        <p>No staff applications</p>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Reject Modal -->
+<div id="rejectModal" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; z-index: 1000;">
+    <div class="modal-content" style="background: var(--card); border-radius: 16px; width: 90%; max-width: 500px;">
+        <div class="modal-header" style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between;">
+            <h3>Reject Application</h3>
+            <button class="close-btn" onclick="closeRejectModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 20px;">
+            <p>Provide a reason for rejection (user will be notified):</p>
+            <textarea id="rejectComment" rows="4" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 8px; padding: 10px; color: var(--text);"></textarea>
+        </div>
+        <div class="modal-footer" style="padding: 16px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px;">
+            <button class="btn btn-secondary" onclick="closeRejectModal()">Cancel</button>
+            <button class="btn btn-danger" onclick="submitReject()">Reject</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-success { background: #28a745; color: white; border: none; cursor: pointer; border-radius: 6px; }
+.btn-danger { background: #dc3545; color: white; border: none; cursor: pointer; border-radius: 6px; }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); cursor: pointer; }
+.badge { padding: 4px 10px; border-radius: 20px; font-size: 12px; }
+.badge-warning { background: #ffc10720; color: #ffc107; }
+.badge-success { background: #28a74520; color: #28a745; }
+.badge-danger { background: #dc354520; color: #dc3545; }
+.badge-admin { background: #6c63ff20; color: #6c63ff; }
+.badge-moderator { background: #17a2b820; color: #17a2b8; }
+</style>
+
+<script>
+let currentAppId = null;
+
+function showRejectModal(appId) {
+    currentAppId = appId;
+    document.getElementById('rejectModal').style.display = 'flex';
+}
+
+function closeRejectModal() {
+    document.getElementById('rejectModal').style.display = 'none';
+    document.getElementById('rejectComment').value = '';
+}
+
+function submitReject() {
+    const comment = document.getElementById('rejectComment').value;
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/admin/application/${currentAppId}/review`;
+    const csrf = document.createElement('input');
+    csrf.type = 'hidden';
+    csrf.name = 'csrf_token';
+    csrf.value = getCSRF();
+    const action = document.createElement('input');
+    action.type = 'hidden';
+    action.name = 'action';
+    action.value = 'reject';
+    const commentInput = document.createElement('input');
+    commentInput.type = 'hidden';
+    commentInput.name = 'comment';
+    commentInput.value = comment;
+    form.appendChild(csrf);
+    form.appendChild(action);
+    form.appendChild(commentInput);
+    document.body.appendChild(form);
+    form.submit();
+}
+</script>
+{% endblock %}

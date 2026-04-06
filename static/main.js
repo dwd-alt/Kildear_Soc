@@ -1,6 +1,8 @@
 /**
  * Kildear — main.js
  * Complete JavaScript with voice messages, calls, admin features, and QR code
+ * Добавлены: верификация, заявки на админа, кастомные аватарки/обложки
+ * файл main.js
  */
 
 /* ── CSRF Token ──────────────────────────────────────────────────────────── */
@@ -615,6 +617,10 @@ async function followUser(username, btn) {
         }
         const fc = document.getElementById('follower-count');
         if (fc) fc.textContent = data.followers;
+
+        if (data.following) {
+            toast(`You are now following ${username}!`, 'success');
+        }
     } catch (e) {
         toast('Could not update follow status.', 'error');
     }
@@ -763,12 +769,10 @@ async function saveSettings(form) {
         if (result.success) {
             toast('Settings saved!', 'success');
 
-            // Apply language change
             if (data.language) {
                 window.location.reload();
             }
 
-            // Apply scale change
             if (data.default_scale) {
                 document.documentElement.style.fontSize = (data.default_scale / 100) + 'rem';
             }
@@ -790,7 +794,6 @@ function initSettingsForm() {
         });
     }
 
-    // Volume slider
     const volumeSlider = document.querySelector('.volume-slider');
     if (volumeSlider) {
         volumeSlider.addEventListener('input', (e) => {
@@ -840,6 +843,25 @@ async function toggleAdmin(userId, username, isAdmin) {
     }
 }
 
+async function toggleModerator(userId, username, isModerator) {
+    const action = isModerator ? 'remove moderator from' : 'make moderator';
+    if (!confirm(`Are you sure you want to ${action} ${username}?`)) return;
+
+    try {
+        const response = await fetch(`/admin/user/${userId}/toggle-moderator`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCSRF() }
+        });
+
+        if (response.ok) {
+            toast(`User ${username} ${isModerator ? 'is no longer moderator' : 'is now moderator'}`, 'success');
+            location.reload();
+        }
+    } catch (error) {
+        toast('Failed to update moderator status', 'error');
+    }
+}
+
 async function reviewReport(reportId, action) {
     const formData = new FormData();
     formData.append('action', action);
@@ -857,6 +879,136 @@ async function reviewReport(reportId, action) {
         }
     } catch (error) {
         toast('Failed to review report', 'error');
+    }
+}
+
+/* ── Verification and Application Functions ──────────────────────────────── */
+async function submitVerificationRequest(form) {
+    const formData = new FormData(form);
+    const reason = formData.get('reason');
+
+    if (!reason || reason.length < 10) {
+        toast('Please provide a detailed reason (minimum 10 characters)', 'error');
+        return false;
+    }
+
+    try {
+        const response = await fetch('/verification/request', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCSRF() },
+            body: formData
+        });
+
+        if (response.ok) {
+            toast('Verification request submitted!', 'success');
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1500);
+            return true;
+        } else {
+            const data = await response.json();
+            toast(data.error || 'Failed to submit request', 'error');
+            return false;
+        }
+    } catch (error) {
+        toast('Error submitting request', 'error');
+        return false;
+    }
+}
+
+async function submitAdminApplication(form) {
+    const formData = new FormData(form);
+    const position = formData.get('position');
+    const contacts = formData.get('contacts');
+    const about = formData.get('about');
+
+    if (!position) {
+        toast('Please select a position', 'error');
+        return false;
+    }
+
+    if (!contacts) {
+        toast('Please provide contact information', 'error');
+        return false;
+    }
+
+    if (!about || about.length < 50) {
+        toast('Please provide more details about yourself (minimum 50 characters)', 'error');
+        return false;
+    }
+
+    try {
+        const response = await fetch('/apply', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCSRF() },
+            body: formData
+        });
+
+        if (response.ok) {
+            toast('Application submitted successfully!', 'success');
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1500);
+            return true;
+        } else {
+            const data = await response.json();
+            toast(data.error || 'Failed to submit application', 'error');
+            return false;
+        }
+    } catch (error) {
+        toast('Error submitting application', 'error');
+        return false;
+    }
+}
+
+/* ── Custom Avatar/Cover Upload Functions ────────────────────────────────── */
+async function uploadCustomAvatar(file) {
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    try {
+        const response = await fetch('/profile/upload-avatar', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCSRF() },
+            body: formData
+        });
+
+        if (response.ok) {
+            toast('Avatar uploaded successfully!', 'success');
+            location.reload();
+        } else {
+            const data = await response.json();
+            toast(data.error || 'Failed to upload avatar', 'error');
+        }
+    } catch (error) {
+        toast('Error uploading avatar', 'error');
+    }
+}
+
+async function uploadCustomCover(file) {
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('cover', file);
+
+    try {
+        const response = await fetch('/profile/upload-cover', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCSRF() },
+            body: formData
+        });
+
+        if (response.ok) {
+            toast('Cover uploaded successfully!', 'success');
+            location.reload();
+        } else {
+            const data = await response.json();
+            toast(data.error || 'Failed to upload cover', 'error');
+        }
+    } catch (error) {
+        toast('Error uploading cover', 'error');
     }
 }
 
@@ -1181,4 +1333,144 @@ document.addEventListener('DOMContentLoaded', () => {
     window.closeQRModal = closeQRModal;
     window.downloadQRCode = downloadQRCode;
     window.shareQRCode = shareQRCode;
+
+    // New exports
+    window.submitVerificationRequest = submitVerificationRequest;
+    window.submitAdminApplication = submitAdminApplication;
+    window.uploadCustomAvatar = uploadCustomAvatar;
+    window.uploadCustomCover = uploadCustomCover;
+    window.toggleModerator = toggleModerator;
 });
+
+/* ── Additional CSS for new features ─────────────────────────────────────── */
+const additionalStyles = `
+<style>
+/* Verification and Application badges */
+.verification-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: linear-gradient(135deg, #1da1f2, #0d8bd9);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.verified-icon {
+    color: #1da1f2;
+    margin-left: 4px;
+}
+
+/* Admin application banner */
+.admin-banner, .verification-banner {
+    background: linear-gradient(135deg, rgba(124,111,255,0.1), rgba(124,111,255,0.05));
+    border: 1px solid rgba(124,111,255,0.2);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.admin-banner i, .verification-banner i {
+    font-size: 32px;
+    color: var(--primary);
+}
+
+.admin-banner div, .verification-banner div {
+    flex: 1;
+}
+
+.admin-banner h4, .verification-banner h4 {
+    margin: 0 0 5px 0;
+    font-size: 16px;
+}
+
+.admin-banner p, .verification-banner p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-dim);
+}
+
+/* Custom upload sections */
+.custom-upload-section {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.custom-upload-preview {
+    margin-bottom: 15px;
+}
+
+.custom-upload-preview img {
+    border-radius: 50%;
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+}
+
+.custom-cover-preview img {
+    width: 100%;
+    max-height: 150px;
+    object-fit: cover;
+    border-radius: 10px;
+}
+
+/* Post expiration info */
+.expiration-badge {
+    font-size: 11px;
+    color: var(--warning);
+    background: rgba(255,193,7,0.1);
+    padding: 2px 8px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Permission indicators */
+.permission-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(76,175,80,0.1);
+    color: #4caf50;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+}
+
+.permission-indicator.locked {
+    background: rgba(244,67,54,0.1);
+    color: #f44336;
+}
+
+/* Loading spinner */
+.loader {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(124,111,255,0.3);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 20px auto;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+</style>
+`;
+
+// Inject additional styles
+if (!document.querySelector('#kildear-extras')) {
+    const styleTag = document.createElement('style');
+    styleTag.id = 'kildear-extras';
+    styleTag.textContent = additionalStyles;
+    document.head.appendChild(styleTag);
+}

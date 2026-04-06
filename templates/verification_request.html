@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Request Verification — Kildear{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 600px; margin: 40px auto;">
+    <div class="card">
+        <div class="card-header" style="padding: 20px; border-bottom: 1px solid var(--border);">
+            <h2 style="margin: 0;"><i class="fa-solid fa-circle-check"></i> Request Verification</h2>
+            <p style="margin: 8px 0 0; color: var(--text-muted);">Get the official verified badge</p>
+        </div>
+
+        <div class="card-body" style="padding: 24px;">
+            <div class="info-box" style="background: rgba(29,161,242,0.1); padding: 16px; border-radius: 12px; margin-bottom: 24px; border-left: 3px solid #1da1f2;">
+                <h4 style="margin: 0 0 8px 0;">📋 Requirements:</h4>
+                <ul style="margin: 0; padding-left: 20px;">
+                    <li>Authentic account (not fake or parody)</li>
+                    <li>Notable personality, brand, or public figure</li>
+                    <li>Account must be at least 30 days old</li>
+                    <li>No violations of community guidelines</li>
+                </ul>
+            </div>
+
+            <form method="POST" onsubmit="event.preventDefault(); submitVerificationRequest(this)">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="form-group">
+                    <label for="reason">Why should you be verified?</label>
+                    <textarea id="reason" name="reason" rows="6"
+                              placeholder="Describe who you are, what you do, and why you need a verification badge..."
+                              required minlength="10" maxlength="500" class="form-control"></textarea>
+                    <small class="text-muted">10-500 characters. Be specific about your identity and public presence.</small>
+                    <div class="char-counter" id="reason-counter" style="text-align: right; font-size: 12px; margin-top: 5px;">500</div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    <i class="fa-solid fa-paper-plane"></i> Submit Request
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.container { max-width: 600px; margin: 40px auto; padding: 0 16px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+.form-group { margin-bottom: 20px; }
+.form-group label { display: block; margin-bottom: 8px; font-weight: 600; }
+.form-control { width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 10px; padding: 12px; color: var(--text); }
+.form-control:focus { outline: none; border-color: var(--primary); }
+.text-muted { color: var(--text-muted); font-size: 12px; }
+</style>
+
+<script>
+document.getElementById('reason').addEventListener('input', function() {
+    const remaining = 500 - this.value.length;
+    document.getElementById('reason-counter').textContent = remaining;
+    document.getElementById('reason-counter').style.color = remaining < 0 ? '#f44336' : (remaining < 20 ? '#ffc107' : 'var(--text-muted)');
+});
+
+async function submitVerificationRequest(form) {
+    const formData = new FormData(form);
+    const reason = formData.get('reason');
+
+    if (!reason || reason.length < 10) {
+        toast('Please provide a detailed reason (minimum 10 characters)', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/verification/request', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCSRF() },
+            body: formData
+        });
+
+        if (response.ok) {
+            toast('Verification request submitted!', 'success');
+            setTimeout(() => { window.location.href = '/'; }, 1500);
+        } else {
+            const data = await response.json();
+            toast(data.error || 'Failed to submit request', 'error');
+        }
+    } catch (error) {
+        toast('Error submitting request', 'error');
+    }
+}
+</script>
+{% endblock %}

@@ -1,6 +1,9 @@
 """
 Kildear Social Network — Complete Version
 Full-featured backend with admin panel, voice messages, calls, and enhanced security
+Добавлены: система верификации, заявки на админа, автоматическое удаление постов
+
+файл app.py
 """
 
 import os
@@ -66,7 +69,7 @@ if is_render:
 else:
     UPLOAD_FOLDER = os.path.join('static', 'uploads')
 
-UPLOAD_SUBFOLDERS = ['images', 'videos', 'chat_images']
+UPLOAD_SUBFOLDERS = ['images', 'videos', 'chat_images', 'custom_avatars', 'custom_covers']
 
 ALLOWED_IMAGE = {"png", "jpg", "jpeg", "gif", "webp"}
 ALLOWED_VIDEO = {"mp4", "webm", "mov", "avi", "mkv"}
@@ -243,6 +246,12 @@ class User(UserMixin, db.Model):
     preset_avatar = db.Column(db.Integer, default=1)
     preset_cover = db.Column(db.Integer, nullable=True)
 
+    # Custom upload permissions
+    can_upload_custom_avatar = db.Column(db.Boolean, default=False)
+    can_upload_custom_cover = db.Column(db.Boolean, default=False)
+    custom_avatar = db.Column(db.String(300), nullable=True)
+    custom_cover = db.Column(db.String(300), nullable=True)
+
     website = db.Column(db.String(200), default="")
     location = db.Column(db.String(100), default="")
     accent_color = db.Column(db.String(7), default="#6c63ff")
@@ -250,6 +259,7 @@ class User(UserMixin, db.Model):
     is_verified = db.Column(db.Boolean, default=False)
     is_banned = db.Column(db.Boolean, default=False)
     is_admin = db.Column(db.Boolean, default=False)
+    is_moderator = db.Column(db.Boolean, default=False)
     is_online = db.Column(db.Boolean, default=False)
     last_seen = db.Column(db.DateTime, default=datetime.utcnow)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -283,14 +293,24 @@ class User(UserMixin, db.Model):
     owned_channels = db.relationship("Channel", backref="owner", lazy="dynamic")
     login_history = db.relationship("LoginHistory", backref="user", lazy="dynamic")
 
+
+
+    @property
+    def follower_count(self):
+        return self.followers.count()
+
     @property
     def avatar_url(self):
+        if self.custom_avatar and self.can_upload_custom_avatar:
+            return self.custom_avatar
         if self.preset_avatar and self.preset_avatar in PRESET_AVATARS:
             return PRESET_AVATARS[self.preset_avatar]
         return PRESET_AVATARS[1]
 
     @property
     def cover_url(self):
+        if self.custom_cover and self.can_upload_custom_cover:
+            return self.custom_cover
         if self.preset_cover and self.preset_cover in PRESET_COVERS:
             return PRESET_COVERS[self.preset_cover]
         return None
@@ -309,6 +329,43 @@ class User(UserMixin, db.Model):
             self.preset_cover = cover_num
             return True
         return False
+
+    def check_and_update_permissions(self):
+        """Проверка подписчиков и обновление прав на загрузку"""
+        follower_count = self.follower_count
+
+        # 1000 подписчиков - можно загружать свою аватарку
+        if follower_count >= 1000 and not self.can_upload_custom_avatar:
+            self.can_upload_custom_avatar = True
+            db.session.commit()
+            logger.info(f"User {self.username} gained custom avatar permission")
+
+        # 5000 подписчиков - можно загружать свою обложку
+        if follower_count >= 5000 and not self.can_upload_custom_cover:
+            self.can_upload_custom_cover = True
+            db.session.commit()
+            logger.info(f"User {self.username} gained custom cover permission")
+
+        return {
+            'can_upload_custom_avatar': self.can_upload_custom_avatar,
+            'can_upload_custom_cover': self.can_upload_custom_cover
+        }
+
+    def get_post_lifetime_hours(self):
+        """Получить время жизни поста в часах в зависимости от подписчиков"""
+        count = self.follower_count
+        if count >= 5000:
+            return 24
+        elif count >= 3000:
+            return 18
+        elif count >= 2000:
+            return 12
+        elif count >= 1000:
+            return 6
+        elif count >= 500:
+            return 3
+        else:
+            return None  # Не удаляется
 
     def set_password(self, pw: str):
         self.password_hash = generate_password_hash(pw)
@@ -335,10 +392,6 @@ class User(UserMixin, db.Model):
         return False
 
     @property
-    def follower_count(self):
-        return self.followers.count()
-
-    @property
     def following_count(self):
         return self.following.count()
 
@@ -356,6 +409,69 @@ class User(UserMixin, db.Model):
                 db.session.commit()
             self._settings_cache = settings
         return self._settings_cache
+
+
+class VerificationRequest(db.Model):
+    """Заявка на верификацию (галочка)"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    reason = db.Column(db.String(500), nullable=False)
+    status = db.Column(db.String(20), default='pending')  # pending, approved, rejected
+    admin_comment = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    reviewed_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+
+    user = db.relationship("User", foreign_keys=[user_id])
+    reviewer = db.relationship("User", foreign_keys=[reviewed_by])
+
+
+class AdminApplication(db.Model):
+    """Заявка на админа/модера"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    position = db.Column(db.String(20), nullable=False)  # admin, moderator
+    contacts = db.Column(db.String(200), nullable=False)
+    about = db.Column(db.Text, nullable=False)
+    experience = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(20), default='pending')
+    admin_comment = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    reviewed_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+
+    user = db.relationship("User", foreign_keys=[user_id])
+    reviewer = db.relationship("User", foreign_keys=[reviewed_by])
+
+
+class PostExpiration(db.Model):
+    """Управление временем жизни постов"""
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    is_deleted = db.Column(db.Boolean, default=False)
+
+    post = db.relationship("Post")
+
+
+class GroupPostExpiration(db.Model):
+    """Управление временем жизни постов в группах"""
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("group_post.id"), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    is_deleted = db.Column(db.Boolean, default=False)
+
+    post = db.relationship("GroupPost")
+
+
+class ChannelPostExpiration(db.Model):
+    """Управление временем жизни постов в каналах"""
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("channel_post.id"), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    is_deleted = db.Column(db.Boolean, default=False)
+
+    post = db.relationship("ChannelPost")
 
 
 class UserSettings(db.Model):
@@ -508,6 +624,7 @@ class Post(db.Model):
 
     liked_by = db.relationship("User", secondary=post_likes, backref="liked_posts", lazy="dynamic")
     comments = db.relationship("Comment", backref="post", lazy="dynamic", cascade="all,delete")
+    expiration = db.relationship("PostExpiration", backref="post_rel", uselist=False, cascade="all,delete")
 
     @property
     def like_count(self):
@@ -572,6 +689,7 @@ class GroupPost(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     author = db.relationship("User")
+    expiration = db.relationship("GroupPostExpiration", backref="post_rel", uselist=False, cascade="all,delete")
 
 
 class Channel(db.Model):
@@ -602,6 +720,8 @@ class ChannelPost(db.Model):
     views = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    expiration = db.relationship("ChannelPostExpiration", backref="post_rel", uselist=False, cascade="all,delete")
+
 
 class Notification(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -621,6 +741,122 @@ class Notification(db.Model):
 # ──────────────────────────────────────────────────────────────────────────────
 #  Helper Functions
 # ──────────────────────────────────────────────────────────────────────────────
+
+def get_post_lifetime_hours(follower_count):
+    """Получить время жизни поста в часах в зависимости от подписчиков"""
+    if follower_count >= 5000:
+        return 24
+    elif follower_count >= 3000:
+        return 18
+    elif follower_count >= 2000:
+        return 12
+    elif follower_count >= 1000:
+        return 6
+    elif follower_count >= 500:
+        return 3
+    else:
+        return None
+
+
+def schedule_post_expiration(post_id, post_type='post', follower_count=0):
+    """Запланировать удаление поста"""
+    hours = get_post_lifetime_hours(follower_count)
+    if hours is None:
+        return None
+
+    expires_at = datetime.utcnow() + timedelta(hours=hours)
+
+    if post_type == 'post':
+        expiration = PostExpiration(post_id=post_id, expires_at=expires_at)
+    elif post_type == 'group_post':
+        expiration = GroupPostExpiration(post_id=post_id, expires_at=expires_at)
+    elif post_type == 'channel_post':
+        expiration = ChannelPostExpiration(post_id=post_id, expires_at=expires_at)
+    else:
+        return None
+
+    db.session.add(expansion)
+    db.session.commit()
+    return expires_at
+
+
+def cleanup_expired_posts():
+    """Удаление истекших постов"""
+    now = datetime.utcnow()
+
+    # Удаление обычных постов
+    expired_posts = PostExpiration.query.filter(
+        PostExpiration.expires_at <= now,
+        PostExpiration.is_deleted == False
+    ).all()
+
+    for exp in expired_posts:
+        if exp.post:
+            db.session.delete(exp.post)
+        exp.is_deleted = True
+
+    # Удаление постов в группах
+    expired_group_posts = GroupPostExpiration.query.filter(
+        GroupPostExpiration.expires_at <= now,
+        GroupPostExpiration.is_deleted == False
+    ).all()
+
+    for exp in expired_group_posts:
+        if exp.post:
+            db.session.delete(exp.post)
+        exp.is_deleted = True
+
+    # Удаление постов в каналах
+    expired_channel_posts = ChannelPostExpiration.query.filter(
+        ChannelPostExpiration.expires_at <= now,
+        ChannelPostExpiration.is_deleted == False
+    ).all()
+
+    for exp in expired_channel_posts:
+        if exp.post:
+            db.session.delete(exp.post)
+        exp.is_deleted = True
+
+    db.session.commit()
+
+    if expired_posts or expired_group_posts or expired_channel_posts:
+        logger.info(
+            f"Cleaned up {len(expired_posts)} posts, {len(expired_group_posts)} group posts, {len(expired_channel_posts)} channel posts")
+
+
+def save_custom_file(file, subfolder: str):
+    """Сохранить файл для кастомной аватарки/обложки"""
+    if not file or not file.filename:
+        return None
+    try:
+        ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+        if ext not in ALLOWED_IMAGE:
+            return None
+
+        # Обработка изображения
+        img = Image.open(file)
+
+        # Изменение размера для аватарок
+        if subfolder == 'custom_avatars':
+            img = img.resize((200, 200), Image.Resampling.LANCZOS)
+        elif subfolder == 'custom_covers':
+            img = img.resize((1200, 400), Image.Resampling.LANCZOS)
+
+        filename = f"{uuid.uuid4().hex}.{ext}"
+        upload_path = os.path.join(app.config['UPLOAD_FOLDER'], subfolder)
+        os.makedirs(upload_path, exist_ok=True)
+        file_path = os.path.join(upload_path, filename)
+
+        img.save(file_path, optimize=True, quality=85)
+
+        if is_render:
+            return f"/uploads/{subfolder}/{filename}"
+        else:
+            return f"/static/uploads/{subfolder}/{filename}"
+    except Exception as e:
+        logger.error(f"Error saving custom file: {e}")
+        return None
+
 
 def notification_link(notif):
     if notif.type in ['like', 'comment', 'mention']:
@@ -814,7 +1050,8 @@ def inject_globals():
 
         if current_user.is_admin:
             stats['total_reports'] = Report.query.filter_by(status='pending').count()
-            stats['pending_verification'] = User.query.filter_by(is_verified=False, is_banned=False).count()
+            stats['pending_verification'] = VerificationRequest.query.filter_by(status='pending').count()
+            stats['pending_admin_apps'] = AdminApplication.query.filter_by(status='pending').count()
             stats['banned_users'] = User.query.filter_by(is_banned=True).count()
 
     return dict(
@@ -871,7 +1108,194 @@ def mark_all_notifications_read():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  Admin Routes
+#  Verification Request Routes
+# ──────────────────────────────────────────────────────────────────────────────
+@app.route("/verification/request", methods=["GET", "POST"])
+@login_required
+def request_verification():
+    if current_user.is_verified:
+        flash("Вы уже верифицированы!", "info")
+        return redirect(url_for("profile", username=current_user.username))
+
+    existing_request = VerificationRequest.query.filter_by(
+        user_id=current_user.id, status='pending'
+    ).first()
+
+    if existing_request:
+        flash("У вас уже есть активная заявка на верификацию", "warning")
+        return redirect(url_for("profile", username=current_user.username))
+
+    if request.method == "POST":
+        reason = request.form.get("reason", "").strip()
+
+        if not reason or len(reason) < 10:
+            flash("Пожалуйста, опишите причину получения верификации (минимум 10 символов)", "error")
+            return render_template("verification_request.html")
+
+        if len(reason) > 500:
+            flash("Текст не должен превышать 500 символов", "error")
+            return render_template("verification_request.html")
+
+        verification_request = VerificationRequest(
+            user_id=current_user.id,
+            reason=reason
+        )
+        db.session.add(verification_request)
+        db.session.commit()
+
+        flash("Заявка на верификацию отправлена! Администраторы рассмотрят её в ближайшее время.", "success")
+        return redirect(url_for("profile", username=current_user.username))
+
+    return render_template("verification_request.html")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Admin Application Routes
+# ──────────────────────────────────────────────────────────────────────────────
+@app.route("/apply", methods=["GET", "POST"])
+@login_required
+def apply_admin():
+    if current_user.is_admin or current_user.is_moderator:
+        flash("Вы уже являетесь администратором или модератором", "info")
+        return redirect(url_for("index"))
+
+    existing_application = AdminApplication.query.filter_by(
+        user_id=current_user.id, status='pending'
+    ).first()
+
+    if existing_application:
+        flash("У вас уже есть активная заявка", "warning")
+        return redirect(url_for("index"))
+
+    if request.method == "POST":
+        position = request.form.get("position")
+        contacts = request.form.get("contacts", "").strip()
+        about = request.form.get("about", "").strip()
+        experience = request.form.get("experience", "").strip()
+
+        if position not in ['admin', 'moderator']:
+            flash("Выберите должность", "error")
+            return render_template("apply_admin.html")
+
+        if not contacts:
+            flash("Укажите контакты для связи", "error")
+            return render_template("apply_admin.html")
+
+        if not about or len(about) < 50:
+            flash("Опишите себя и причины (минимум 50 символов)", "error")
+            return render_template("apply_admin.html")
+
+        application = AdminApplication(
+            user_id=current_user.id,
+            position=position,
+            contacts=contacts,
+            about=about,
+            experience=experience if experience else None
+        )
+        db.session.add(application)
+        db.session.commit()
+
+        flash("Заявка отправлена! Администраторы рассмотрят её и свяжутся с вами.", "success")
+        return redirect(url_for("index"))
+
+    return render_template("apply_admin.html")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Custom Avatar/Cover Upload Routes
+# ──────────────────────────────────────────────────────────────────────────────
+@app.route("/profile/upload-avatar", methods=["POST"])
+@login_required
+def upload_custom_avatar():
+    if not current_user.can_upload_custom_avatar:
+        return jsonify(
+            {"error": "У вас недостаточно подписчиков для загрузки своей аватарки. Нужно 1000 подписчиков."}), 403
+
+    if 'avatar' not in request.files:
+        return jsonify({"error": "Файл не выбран"}), 400
+
+    file = request.files['avatar']
+    if file.filename == '':
+        return jsonify({"error": "Файл не выбран"}), 400
+
+    avatar_url = save_custom_file(file, "custom_avatars")
+    if not avatar_url:
+        return jsonify({"error": "Неверный формат файла. Поддерживаются: PNG, JPG, JPEG, GIF, WEBP"}), 400
+
+    # Удаляем старую кастомную аватарку если есть
+    if current_user.custom_avatar and current_user.custom_avatar.startswith('/static/uploads/custom_avatars/'):
+        old_path = os.path.join(app.config['UPLOAD_FOLDER'], 'custom_avatars',
+                                current_user.custom_avatar.split('/')[-1])
+        try:
+            if os.path.exists(old_path):
+                os.remove(old_path)
+        except:
+            pass
+
+    current_user.custom_avatar = avatar_url
+    db.session.commit()
+
+    flash("Аватарка успешно обновлена!", "success")
+    return redirect(url_for("profile", username=current_user.username))
+
+
+@app.route("/profile/upload-cover", methods=["POST"])
+@login_required
+def upload_custom_cover():
+    if not current_user.can_upload_custom_cover:
+        return jsonify(
+            {"error": "У вас недостаточно подписчиков для загрузки своей обложки. Нужно 5000 подписчиков."}), 403
+
+    if 'cover' not in request.files:
+        return jsonify({"error": "Файл не выбран"}), 400
+
+    file = request.files['cover']
+    if file.filename == '':
+        return jsonify({"error": "Файл не выбран"}), 400
+
+    cover_url = save_custom_file(file, "custom_covers")
+    if not cover_url:
+        return jsonify({"error": "Неверный формат файла. Поддерживаются: PNG, JPG, JPEG, GIF, WEBP"}), 400
+
+    # Удаляем старую кастомную обложку если есть
+    if current_user.custom_cover and current_user.custom_cover.startswith('/static/uploads/custom_covers/'):
+        old_path = os.path.join(app.config['UPLOAD_FOLDER'], 'custom_covers',
+                                current_user.custom_cover.split('/')[-1])
+        try:
+            if os.path.exists(old_path):
+                os.remove(old_path)
+        except:
+            pass
+
+    current_user.custom_cover = cover_url
+    db.session.commit()
+
+    flash("Обложка успешно обновлена!", "success")
+    return redirect(url_for("profile", username=current_user.username))
+
+
+@app.route("/profile/remove-custom-avatar", methods=["POST"])
+@login_required
+def remove_custom_avatar():
+    if current_user.custom_avatar:
+        current_user.custom_avatar = None
+        db.session.commit()
+        flash("Кастомная аватарка удалена", "success")
+    return redirect(url_for("profile", username=current_user.username))
+
+
+@app.route("/profile/remove-custom-cover", methods=["POST"])
+@login_required
+def remove_custom_cover():
+    if current_user.custom_cover:
+        current_user.custom_cover = None
+        db.session.commit()
+        flash("Кастомная обложка удалена", "success")
+    return redirect(url_for("profile", username=current_user.username))
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Admin Routes (расширенные)
 # ──────────────────────────────────────────────────────────────────────────────
 @app.route("/admin")
 @login_required
@@ -886,6 +1310,8 @@ def admin_dashboard():
             User.created_at >= datetime.utcnow().date()
         ).count(),
         "banned_users": User.query.filter_by(is_banned=True).count(),
+        "pending_verification": VerificationRequest.query.filter_by(status='pending').count(),
+        "pending_admin_apps": AdminApplication.query.filter_by(status='pending').count(),
     }
 
     recent_users = User.query.order_by(User.created_at.desc()).limit(10).all()
@@ -896,12 +1322,22 @@ def admin_dashboard():
         LoginHistory.created_at.desc()
     ).limit(20).all()
 
+    recent_verifications = VerificationRequest.query.order_by(
+        VerificationRequest.created_at.desc()
+    ).limit(10).all()
+
+    recent_applications = AdminApplication.query.order_by(
+        AdminApplication.created_at.desc()
+    ).limit(10).all()
+
     return render_template(
         "admin/dashboard.html",
         stats=stats,
         recent_users=recent_users,
         pending_reports=pending_reports,
-        recent_logins=recent_logins
+        recent_logins=recent_logins,
+        recent_verifications=recent_verifications,
+        recent_applications=recent_applications
     )
 
 
@@ -963,6 +1399,23 @@ def admin_toggle_admin(user_id):
     return redirect(url_for("admin_users"))
 
 
+@app.route("/admin/user/<int:user_id>/toggle-moderator", methods=["POST"])
+@login_required
+@admin_required
+def admin_toggle_moderator(user_id):
+    user = User.query.get_or_404(user_id)
+    if user.id == current_user.id:
+        flash("Нельзя изменить свои права", "error")
+        return redirect(url_for("admin_users"))
+
+    user.is_moderator = not user.is_moderator
+    db.session.commit()
+
+    status = "назначен модератором" if user.is_moderator else "лишен прав модератора"
+    flash(f"Пользователь {user.username} {status}", "success")
+    return redirect(url_for("admin_users"))
+
+
 @app.route("/admin/user/<int:user_id>/toggle-verify", methods=["POST"])
 @login_required
 @admin_required
@@ -991,6 +1444,127 @@ def admin_delete_user(user_id):
 
     flash(f"Пользователь {username} полностью удален", "success")
     return redirect(url_for("admin_users"))
+
+
+@app.route("/admin/verification-requests")
+@login_required
+@admin_required
+def admin_verification_requests():
+    status = request.args.get("status", "pending")
+
+    query = VerificationRequest.query
+    if status != "all":
+        query = query.filter_by(status=status)
+
+    requests = query.order_by(VerificationRequest.created_at.desc()).all()
+    return render_template("admin/verification_requests.html", requests=requests, current_status=status)
+
+
+@app.route("/admin/verification-request/<int:request_id>/review", methods=["POST"])
+@login_required
+@admin_required
+def admin_review_verification(request_id):
+    verification_request = VerificationRequest.query.get_or_404(request_id)
+    action = request.form.get("action")
+    comment = request.form.get("comment", "")
+
+    if action == "approve":
+        verification_request.status = "approved"
+        user = verification_request.user
+        user.is_verified = True
+        flash(f"Пользователь {user.username} верифицирован", "success")
+
+        # Отправляем уведомление пользователю
+        notif = Notification(
+            user_id=user.id,
+            from_user_id=current_user.id,
+            type="verification",
+            text=f"Ваша заявка на верификацию одобрена! Поздравляем!"
+        )
+        db.session.add(notif)
+
+    elif action == "reject":
+        verification_request.status = "rejected"
+        flash(f"Заявка отклонена", "warning")
+
+        # Отправляем уведомление пользователю
+        notif = Notification(
+            user_id=verification_request.user.id,
+            from_user_id=current_user.id,
+            type="verification",
+            text=f"Ваша заявка на верификацию отклонена. Причина: {comment if comment else 'Не соответствует критериям'}"
+        )
+        db.session.add(notif)
+
+    verification_request.admin_comment = comment
+    verification_request.reviewed_at = datetime.utcnow()
+    verification_request.reviewed_by = current_user.id
+    db.session.commit()
+
+    return redirect(url_for("admin_verification_requests"))
+
+
+@app.route("/admin/applications")
+@login_required
+@admin_required
+def admin_applications():
+    status = request.args.get("status", "pending")
+
+    query = AdminApplication.query
+    if status != "all":
+        query = query.filter_by(status=status)
+
+    applications = query.order_by(AdminApplication.created_at.desc()).all()
+    return render_template("admin/applications.html", applications=applications, current_status=status)
+
+
+@app.route("/admin/application/<int:app_id>/review", methods=["POST"])
+@login_required
+@admin_required
+def admin_review_application(app_id):
+    application = AdminApplication.query.get_or_404(app_id)
+    action = request.form.get("action")
+    comment = request.form.get("comment", "")
+
+    if action == "approve":
+        application.status = "approved"
+        user = application.user
+
+        if application.position == "admin":
+            user.is_admin = True
+        elif application.position == "moderator":
+            user.is_moderator = True
+
+        flash(f"Заявка одобрена. Пользователь {user.username} назначен {application.position}ом", "success")
+
+        # Отправляем уведомление пользователю
+        notif = Notification(
+            user_id=user.id,
+            from_user_id=current_user.id,
+            type="admin_approved",
+            text=f"Ваша заявка на должность {application.position} одобрена! Поздравляем!"
+        )
+        db.session.add(notif)
+
+    elif action == "reject":
+        application.status = "rejected"
+        flash(f"Заявка отклонена", "warning")
+
+        # Отправляем уведомление пользователю
+        notif = Notification(
+            user_id=application.user.id,
+            from_user_id=current_user.id,
+            type="admin_rejected",
+            text=f"Ваша заявка на должность {application.position} отклонена. Причина: {comment if comment else 'Не соответствует требованиям'}"
+        )
+        db.session.add(notif)
+
+    application.admin_comment = comment
+    application.reviewed_at = datetime.utcnow()
+    application.reviewed_by = current_user.id
+    db.session.commit()
+
+    return redirect(url_for("admin_applications"))
 
 
 @app.route("/admin/reports")
@@ -1666,12 +2240,12 @@ def start_call():
 
         webrtc_config = {
             'iceServers': [
-                {'urls': 'stun:stun.l.google.com:19302'},
+        {'urls': 'stun:stun.l.google.com:19302'},
                 {'urls': 'stun:stun1.l.google.com:19302'},
-                {'urls': 'stun:stun2.l.google.com:19302'},
-                {'urls': 'stun:stun3.l.google.com:19302'},
-                {'urls': 'stun:stun4.l.google.com:19302'}
-            ]
+        {'urls': 'stun:stun2.l.google.com:19302'},
+        {'urls': 'stun:stun3.l.google.com:19302'},
+        {'urls': 'stun:stun4.l.google.com:19302'}
+        ]
         }
 
         room = f"user_{callee.id}"
@@ -2025,6 +2599,9 @@ def login():
             user.is_online = True
             user.last_seen = datetime.utcnow()
 
+            # Проверяем права на загрузку при входе
+            user.check_and_update_permissions()
+
             login_success = True
             flash(f"С возвращением, {user.username}! 👋", "success")
         else:
@@ -2086,7 +2663,10 @@ def index():
                    .filter(User.id != current_user.id)
                    .order_by(func.random()).limit(5).all())
 
-    return render_template("index.html", posts=posts, suggestions=suggestions)
+    # Проверяем права пользователя
+    permissions = current_user.check_and_update_permissions()
+
+    return render_template("index.html", posts=posts, suggestions=suggestions, permissions=permissions)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -2133,7 +2713,15 @@ def create_post():
     db.session.add(post)
     db.session.commit()
 
-    flash("Пост опубликован!", "success")
+    # Запланировать удаление поста если нужно
+    follower_count = current_user.follower_count
+    hours = get_post_lifetime_hours(follower_count)
+    if hours:
+        schedule_post_expiration(post.id, 'post', follower_count)
+        flash(f"Пост опубликован! Он будет автоматически удалён через {hours} часов.", "info")
+    else:
+        flash("Пост опубликован!", "success")
+
     return redirect(url_for("index"))
 
 
@@ -2274,10 +2862,13 @@ def profile(username):
     is_own = user.id == current_user.id
     is_following = current_user.is_following(user) if not is_own else False
 
+    # Проверяем права пользователя
+    permissions = user.check_and_update_permissions() if is_own else None
+
     return render_template("profile.html", user=user, posts=posts,
                            videos=videos, is_own=is_own,
                            is_following=is_following, is_blocked=is_blocked,
-                           tab=tab)
+                           tab=tab, permissions=permissions)
 
 
 @app.route("/profile/edit", methods=["GET", "POST"])
@@ -2341,7 +2932,9 @@ def edit_profile():
 
         return redirect(url_for("profile", username=current_user.username))
 
-    return render_template("edit_profile.html")
+    permissions = current_user.check_and_update_permissions()
+
+    return render_template("edit_profile.html", permissions=permissions)
 
 
 @app.route("/follow/<username>", methods=["POST"])
@@ -2379,6 +2972,10 @@ def follow(username):
         })
 
     db.session.commit()
+
+    # Проверяем права пользователя после изменения подписчиков
+    user.check_and_update_permissions()
+
     return jsonify({"following": following, "followers": user.follower_count})
 
 
@@ -2396,7 +2993,7 @@ def block_user(user_id):
         if current_user.is_following(user):
             current_user.following.remove(user)
         if user.is_following(current_user):
-            user.following.remove(current_user)
+            user.following.remove(user)
         db.session.commit()
         return jsonify({"success": True, "blocked": True})
     return jsonify({"error": "User already blocked"}), 400
@@ -3089,6 +3686,80 @@ def notifications():
 # ──────────────────────────────────────────────────────────────────────────────
 #  QR Code Routes
 # ──────────────────────────────────────────────────────────────────────────────
+
+
+
+@app.route("/qr/scan", methods=["GET"])
+@login_required
+def scan_qr_page():
+    """Page for scanning QR code"""
+    return render_template("scan_qr.html")
+
+
+@app.route("/qr/search", methods=["POST"])
+@login_required
+def search_by_qr():
+    """Search user by QR code data"""
+    data = request.get_json()
+    qr_data = data.get("qr_data", "").strip()
+
+    if not qr_data:
+        return jsonify({"error": "No QR data provided"}), 400
+
+    # Извлекаем username из разных форматов
+    username = None
+
+    # Формат 1: просто username
+    if re.match(r'^[a-zA-Z0-9_]{3,40}$', qr_data):
+        username = qr_data
+
+    # Формат 2: kildear://user/username
+    elif qr_data.startswith("kildear://user/"):
+        username = qr_data.replace("kildear://user/", "")
+
+    # Формат 3: URL с /u/username
+    elif '/u/' in qr_data:
+        match = re.search(r'/u/([^/?&#]+)', qr_data)
+        if match:
+            username = match.group(1)
+
+    # Формат 4: URL с /profile/username
+    elif '/profile/' in qr_data:
+        match = re.search(r'/profile/([^/?&#]+)', qr_data)
+        if match:
+            username = match.group(1)
+
+    if not username:
+        return jsonify({"error": "Invalid QR code format"}), 400
+
+    user = User.query.filter(func.lower(User.username) == username.lower()).first()
+
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    if current_user.is_blocked(user):
+        return jsonify({"error": "You have blocked this user"}), 403
+
+    if user.is_banned:
+        return jsonify({"error": "This user is banned"}), 403
+
+    return jsonify({
+        "success": True,
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "display_name": user.display_name or user.username,
+            "avatar": user.avatar_url,
+            "bio": user.bio,
+            "is_following": current_user.is_following(user),
+            "follower_count": user.follower_count,
+            "following_count": user.following_count,
+            "post_count": user.post_count,
+            "is_verified": user.is_verified
+        }
+    })
+
+
 @app.route("/user/<int:user_id>/qrcode")
 @login_required
 def generate_user_qrcode(user_id):
@@ -3101,7 +3772,13 @@ def generate_user_qrcode(user_id):
     if user.is_banned:
         return jsonify({"error": "User is banned"}), 403
 
-    qr_data = f"kildear://user/{user.username}"
+    # Генерируем полную ссылку на профиль пользователя
+    if request.host.startswith('127.0.0.1') or request.host.startswith('localhost'):
+        base_url = f"{request.scheme}://{request.host}"
+    else:
+        base_url = f"{request.scheme}://{request.host}"
+
+    qr_data = f"{base_url}/u/{user.username}"
 
     qr = qrcode.QRCode(
         version=1,
@@ -3123,99 +3800,8 @@ def generate_user_qrcode(user_id):
         "qr_code": f"data:image/png;base64,{img_base64}",
         "data": qr_data,
         "username": user.username,
-        "display_name": user.display_name or user.username
-    })
-
-
-@app.route("/qr/scan", methods=["GET"])
-@login_required
-def scan_qr_page():
-    """Page for scanning QR code"""
-    return render_template("scan_qr.html")
-
-
-@app.route("/qr/search", methods=["POST"])
-@login_required
-def search_by_qr():
-    """Search user by QR code data"""
-    data = request.get_json()
-    qr_data = data.get("qr_data", "").strip()
-
-    if not qr_data:
-        return jsonify({"error": "No QR data provided"}), 400
-
-    if qr_data.startswith("kildear://user/"):
-        username = qr_data.replace("kildear://user/", "")
-        user = User.query.filter(func.lower(User.username) == username.lower()).first()
-
-        if user:
-            if current_user.is_blocked(user):
-                return jsonify({
-                    "success": False,
-                    "error": "You have blocked this user"
-                }), 403
-
-            if user.is_banned:
-                return jsonify({
-                    "success": False,
-                    "error": "This user is banned"
-                }), 403
-
-            return jsonify({
-                "success": True,
-                "user": {
-                    "id": user.id,
-                    "username": user.username,
-                    "display_name": user.display_name or user.username,
-                    "avatar": user.avatar_url,
-                    "bio": user.bio,
-                    "is_following": current_user.is_following(user),
-                    "follower_count": user.follower_count,
-                    "following_count": user.following_count,
-                    "post_count": user.post_count,
-                    "is_verified": user.is_verified
-                }
-            })
-        else:
-            return jsonify({
-                "success": False,
-                "error": "User not found"
-            }), 404
-
-    return jsonify({
-        "success": False,
-        "error": "Invalid QR code format"
-    }), 400
-
-
-@app.route("/qr/generate", methods=["POST"])
-@login_required
-def generate_qr():
-    """Generate QR code for current user"""
-    user = current_user
-
-    qr_data = f"kildear://user/{user.username}"
-
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
-    )
-    qr.add_data(qr_data)
-    qr.make(fit=True)
-
-    img = qr.make_image(fill_color="black", back_color="white")
-
-    buffered = BytesIO()
-    img.save(buffered, format="PNG")
-    img_base64 = base64.b64encode(buffered.getvalue()).decode()
-
-    return jsonify({
-        "success": True,
-        "qr_code": f"data:image/png;base64,{img_base64}",
-        "data": qr_data,
-        "username": user.username
+        "display_name": user.display_name or user.username,
+        "profile_url": qr_data
     })
 
 
@@ -3407,6 +3993,24 @@ def on_webrtc_ice_candidate(data):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+#  Background Tasks
+# ──────────────────────────────────────────────────────────────────────────────
+def start_background_tasks():
+    """Запуск фоновых задач"""
+    import threading
+
+    def cleanup_task():
+        while True:
+            time.sleep(3600)  # Раз в час
+            with app.app_context():
+                cleanup_expired_posts()
+
+    thread = threading.Thread(target=cleanup_task, daemon=True)
+    thread.start()
+    logger.info("Background cleanup task started")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 #  Error Handlers
 # ──────────────────────────────────────────────────────────────────────────────
 @app.errorhandler(404)
@@ -3499,14 +4103,48 @@ def run_migrations():
             db.session.execute(text('ALTER TABLE "user" ADD COLUMN preset_cover INTEGER'))
             changes.append('preset_cover')
 
+        if 'can_upload_custom_avatar' not in columns:
+            logger.info("➕ Добавление колонки can_upload_custom_avatar...")
+            db.session.execute(text('ALTER TABLE "user" ADD COLUMN can_upload_custom_avatar BOOLEAN DEFAULT FALSE'))
+            changes.append('can_upload_custom_avatar')
+
+        if 'can_upload_custom_cover' not in columns:
+            logger.info("➕ Добавление колонки can_upload_custom_cover...")
+            db.session.execute(text('ALTER TABLE "user" ADD COLUMN can_upload_custom_cover BOOLEAN DEFAULT FALSE'))
+            changes.append('can_upload_custom_cover')
+
+        if 'custom_avatar' not in columns:
+            logger.info("➕ Добавление колонки custom_avatar...")
+            db.session.execute(text('ALTER TABLE "user" ADD COLUMN custom_avatar VARCHAR(300)'))
+            changes.append('custom_avatar')
+
+        if 'custom_cover' not in columns:
+            logger.info("➕ Добавление колонки custom_cover...")
+            db.session.execute(text('ALTER TABLE "user" ADD COLUMN custom_cover VARCHAR(300)'))
+            changes.append('custom_cover')
+
+        if 'is_moderator' not in columns:
+            logger.info("➕ Добавление колонки is_moderator...")
+            db.session.execute(text('ALTER TABLE "user" ADD COLUMN is_moderator BOOLEAN DEFAULT FALSE'))
+            changes.append('is_moderator')
+
         if changes:
             db.session.commit()
             logger.info(f"✅ Добавлены колонки: {', '.join(changes)}")
         else:
             logger.info("✅ Все колонки уже существуют")
 
-        # Check for UserSettings table
+        # Создание новых таблиц
         tables = inspector.get_table_names()
+
+        for table in ['verification_request', 'admin_application', 'post_expiration',
+                      'group_post_expiration', 'channel_post_expiration']:
+            if table not in tables:
+                logger.info(f"➕ Создание таблицы {table}...")
+                db.create_all()
+                logger.info(f"✅ Таблица {table} создана")
+
+        # Check for UserSettings table
         if 'user_settings' not in tables:
             logger.info("➕ Creating user_settings table...")
             db.create_all()
@@ -3553,31 +4191,44 @@ def init_app():
                 logger.warning(f"⚠️ Временная папка может быть недоступна: {e}")
 
             create_admin_user()
+
+            # Запуск фоновых задач
+            start_background_tasks()
+
             logger.info("🎉 Инициализация приложения завершена!")
 
         except Exception as e:
             logger.error(f"❌ Ошибка при инициализации: {e}")
 
 
-# На Render используется Gunicorn, этот блок нужен только для локальной разработки
 if __name__ == "__main__":
     init_app()
 
-    if not is_production:
-        port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 5000))
 
-        print("\n" + "=" * 70)
-        print("🚀 ЗАПУСК KILDEAR SOCIAL NETWORK (PRESET AVATARS MODE)")
-        print("=" * 70)
-        print(f"🌐 Локальный сервер запускается на порту: {port}")
-        print(f"📁 Временная папка: {app.config['UPLOAD_FOLDER']}")
-        print(f"🎨 Preset аватары: 10 штук (1av.png - 10av.png)")
-        print(f"🖼️  Preset обложки: 5 штук (1cover.jpg - 5cover.jpg)")
-        print(f"🐍 Python: {platform.python_version()}")
-        print(f"🖥️  Платформа: {platform.system()}")
-        print(f"🎯 Режим: {'PRODUCTION' if is_production else 'DEVELOPMENT'}")
-        print("=" * 70)
-        print("📝 Для остановки нажмите Ctrl+C")
-        print("=" * 70 + "\n")
+    print("\n" + "=" * 70)
+    print("🚀 ЗАПУСК KILDEAR SOCIAL NETWORK (COMPLETE VERSION)")
+    print("=" * 70)
+    print(f"🌐 Сервер запускается на порту: {port}")
+    print(f"📁 Временная папка: {app.config['UPLOAD_FOLDER']}")
+    print(f"🎨 Preset аватары: 10 штук (1av.png - 10av.png)")
+    print(f"🖼️  Preset обложки: 5 штук (1cover.jpg - 5cover.jpg)")
+    print(f"🐍 Python: {platform.python_version()}")
+    print(f"🖥️  Платформа: {platform.system()}")
+    print(f"🎯 Режим: {'PRODUCTION' if is_production else 'DEVELOPMENT'}")
+    print("=" * 70)
+    print("📝 Новые функции:")
+    print("   ✅ Верификация пользователей (галочка)")
+    print("   ✅ Заявки на админа/модера")
+    print("   ✅ Автоматическое удаление постов")
+    print("   ✅ Кастомные аватарки (1000+ подписчиков)")
+    print("   ✅ Кастомные обложки (5000+ подписчиков)")
+    print("=" * 70)
+    print("📝 Для остановки нажмите Ctrl+C")
+    print("=" * 70 + "\n")
 
+    # Production запуск без лишних параметров
+    if is_production:
+        socketio.run(app, host="0.0.0.0", port=port)
+    else:
         socketio.run(app, debug=True, host="0.0.0.0", port=port, allow_unsafe_werkzeug=True)

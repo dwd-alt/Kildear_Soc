@@ -4,16 +4,30 @@
 {% block content %}
 <div class="feed-layout">
 
+  <!-- Quick action buttons -->
+  <div class="quick-actions" style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+    {% if not current_user.is_verified %}
+    <a href="{{ url_for('request_verification') }}" class="btn btn-outline btn-sm">
+      <i class="fa-solid fa-circle-check"></i> Get Verified
+    </a>
+    {% endif %}
+
+    {% if not current_user.is_admin and not current_user.is_moderator %}
+    <a href="{{ url_for('apply_admin') }}" class="btn btn-outline btn-sm">
+      <i class="fa-solid fa-user-tie"></i> Apply for Staff
+    </a>
+    {% endif %}
+
+    <button class="btn btn-outline btn-sm" onclick="showMyQRCode()">
+      <i class="fa-solid fa-qrcode"></i> My QR Code
+    </button>
+  </div>
+
   <!-- CREATE POST CARD -->
   <div class="card create-post-card" id="createPostCard">
     <div class="create-post-header">
       <a href="{{ url_for('profile', username=current_user.username) }}">
-        {% if current_user.avatar %}
-          <img src="{{ url_for('static', filename='uploads/avatars/' + current_user.avatar) }}"
-               class="avatar avatar-md" alt="You">
-        {% else %}
-          <div class="avatar avatar-md avatar-placeholder">{{ current_user.username[0].upper() }}</div>
-        {% endif %}
+        <img src="{{ current_user.avatar_url }}" class="avatar avatar-md" alt="You">
       </a>
       <button class="create-post-trigger" id="createPostTrigger">
         What's on your mind, {{ current_user.username }}?
@@ -22,7 +36,6 @@
 
     <form id="createPostForm" class="create-post-form hidden"
           action="{{ url_for('create_post') }}" method="POST" enctype="multipart/form-data">
-      {{ csrf_token() if csrf_token is defined else '' }}
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
       <textarea name="content" id="postContent" class="post-textarea"
@@ -71,12 +84,7 @@
     <article class="card post-card" id="post-{{ post.id }}">
       <div class="post-header">
         <a href="{{ url_for('profile', username=post.author.username) }}" class="post-author-link">
-          {% if post.author.avatar %}
-            <img src="{{ url_for('static', filename='uploads/avatars/' + post.author.avatar) }}"
-                 class="avatar avatar-sm" alt="{{ post.author.username }}">
-          {% else %}
-            <div class="avatar avatar-sm avatar-placeholder">{{ post.author.username[0].upper() }}</div>
-          {% endif %}
+          <img src="{{ post.author.avatar_url }}" class="avatar avatar-sm" alt="{{ post.author.username }}">
           <div class="post-author-info">
             <span class="post-author-name">{{ post.author.display_name or post.author.username }}</span>
             <span class="post-author-sub">@{{ post.author.username }} · <time class="rel-time" data-ts="{{ post.created_at.isoformat() }}">{{ post.created_at.strftime('%b %d') }}</time></span>
@@ -106,39 +114,35 @@
       </div>
       {% endif %}
 
-      {% if post.image_file %}
+      {% if post.media_url %}
       <div class="post-media">
-        <img src="{{ url_for('static', filename='uploads/images/' + post.image_file) }}"
-             alt="Post image" class="post-image" loading="lazy"
-             onclick="openLightbox(this.src, 'image')">
-      </div>
-      {% endif %}
-
-      {% if post.video_file %}
-      <div class="post-media">
+        {% if post.media_type == 'image' %}
+        <img src="{{ post.media_url }}" alt="Post image" class="post-image" loading="lazy" onclick="openLightbox(this.src, 'image')">
+        {% elif post.media_type == 'video' %}
         <video class="post-video" controls preload="metadata" playsinline>
-          <source src="{{ url_for('static', filename='uploads/videos/' + post.video_file) }}">
+          <source src="{{ post.media_url }}">
         </video>
+        {% endif %}
       </div>
       {% endif %}
 
       <div class="post-footer">
-        <button class="post-action {% if current_user in post.likes %}liked{% endif %}"
-                onclick="likePost({{ post.id }}, this)">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="{% if current_user in post.likes %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2">
+        <button class="post-action {% if post.is_liked_by(current_user) %}liked{% endif %}"
+                onclick="likePost({{ post.id }})">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="{% if post.is_liked_by(current_user) %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2">
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
           </svg>
-         <span class="like-count">{{ post.like_count }}</span>
+          <span class="like-count" id="like-count-{{ post.id }}">{{ post.like_count }}</span>
         </button>
 
         <a href="{{ url_for('view_post', post_id=post.id) }}" class="post-action">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
           </svg>
-          <span>{{ post.comments.count() }}</span>
+          <span id="comment-count-{{ post.id }}">{{ post.comment_count }}</span>
         </a>
 
-        <button class="post-action" onclick="sharePost({{ post.id }}, '{{ post.content[:60] if post.content else 'Check this out' }}')">
+        <button class="post-action" onclick="sharePost({{ post.id }})">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
             <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
@@ -149,13 +153,14 @@
 
       <!-- inline comment box -->
       <div class="inline-comment">
-        <div class="avatar avatar-xs avatar-placeholder">{{ current_user.username[0].upper() }}</div>
-        <form class="inline-comment-form" onsubmit="submitInlineComment(event, {{ post.id }})">
+        <img src="{{ current_user.avatar_url }}" class="avatar avatar-xs" alt="">
+        <form class="inline-comment-form" id="comment-form-{{ post.id }}" onsubmit="submitInlineComment(event, {{ post.id }})">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="text" name="content" class="inline-comment-input" placeholder="Write a comment…" maxlength="1000">
           <button type="submit" class="btn btn-primary btn-xs">Send</button>
         </form>
       </div>
+      <div id="comments-list-{{ post.id }}" class="comments-list"></div>
     </article>
     {% endfor %}
 
@@ -189,18 +194,13 @@
       {% for user in suggestions %}
       <div class="suggestion-row">
         <a href="{{ url_for('profile', username=user.username) }}" class="suggestion-user">
-          {% if user.avatar %}
-            <img src="{{ url_for('static', filename='uploads/avatars/' + user.avatar) }}"
-                 class="avatar avatar-xs" alt="{{ user.username }}">
-          {% else %}
-            <div class="avatar avatar-xs avatar-placeholder">{{ user.username[0].upper() }}</div>
-          {% endif %}
+          <img src="{{ user.avatar_url }}" class="avatar avatar-xs" alt="{{ user.username }}">
           <div>
             <div class="suggestion-name">{{ user.display_name or user.username }}</div>
-            <div class="suggestion-sub">{{ user.followers.count() }} followers</div>
+            <div class="suggestion-sub">{{ user.follower_count }} followers</div>
           </div>
         </a>
-        <button class="btn btn-outline btn-xs" onclick="followUser({{ user.id }}, this)">Follow</button>
+        <button class="btn btn-outline btn-xs" onclick="followUser('{{ user.username }}', this)">Follow</button>
       </div>
       {% endfor %}
     {% else %}
@@ -211,19 +211,38 @@
 
   <div class="card sidebar-card">
     <h4 class="sidebar-title">Trending</h4>
-    {% if trending %}
-      {% for tag in trending %}
-      <a href="{{ url_for('search', q=tag) }}" class="trending-tag">#{{ tag }}</a>
-      {% endfor %}
-    {% else %}
-      <p class="sidebar-empty">Nothing trending yet.</p>
-    {% endif %}
+    <div class="trending-tags">
+      <a href="{{ url_for('search', q='kildear') }}" class="trending-tag">#kildear</a>
+      <a href="{{ url_for('search', q='social') }}" class="trending-tag">#social</a>
+      <a href="{{ url_for('search', q='community') }}" class="trending-tag">#community</a>
+    </div>
   </div>
 </aside>
 
 <style>
 .feed-layout{display:grid;grid-template-columns:1fr 300px;gap:1.5rem;align-items:start}
 @media(max-width:900px){.feed-layout{grid-template-columns:1fr}.right-sidebar{display:none}}
+
+/* Quick actions */
+.quick-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.quick-actions .btn-outline {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 6px 14px;
+  border-radius: 99px;
+  font-size: 12px;
+}
+.quick-actions .btn-outline:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-glow);
+}
 
 /* Create post */
 .create-post-card{padding:1.25rem}
@@ -272,6 +291,7 @@
 .inline-comment-form{flex:1;display:flex;gap:.4rem}
 .inline-comment-input{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:1.5rem;padding:.4rem .85rem;color:var(--text);font-size:.85rem}
 .inline-comment-input:focus{outline:none;border-color:var(--primary)}
+.comments-list{margin-top:10px;padding-left:40px}
 
 /* Pagination */
 .pagination-row{display:flex;align-items:center;justify-content:center;gap:1rem;padding:1rem 0}
@@ -342,10 +362,129 @@ async function submitInlineComment(e, postId){
   e.preventDefault();
   const form=e.target; const inp=form.querySelector('input[name=content]');
   const val=inp.value.trim(); if(!val) return;
-  const fd=new FormData(form); fd.set('content',val);
-  const r=await fetch(`/post/${postId}/comment`,{method:'POST',headers:{'X-CSRFToken':document.querySelector('[name=csrf_token]').value},body:fd});
-  if(r.ok){ inp.value=''; toast('Comment posted!','success'); }
-  else toast('Could not post comment.','error');
+  const fd=new FormData(form);
+  try {
+    const response = await fetch(`/post/${postId}/comment`, {
+      method:'POST',
+      headers:{'X-CSRFToken': getCSRF()},
+      body:fd
+    });
+    const data = await response.json();
+    if(data.id){
+      inp.value='';
+      const list = document.getElementById(`comments-list-${postId}`);
+      if(list){
+        const commentDiv = document.createElement('div');
+        commentDiv.className = 'comment-item';
+        commentDiv.innerHTML = `
+          <img src="${data.avatar}" class="avatar avatar-xs" alt="">
+          <div class="comment-content">
+            <strong>${data.username}</strong>
+            <p>${escapeHtml(data.content)}</p>
+            <small>${data.created_at}</small>
+          </div>
+        `;
+        list.appendChild(commentDiv);
+      }
+      const countSpan = document.getElementById(`comment-count-${postId}`);
+      if(countSpan) countSpan.textContent = parseInt(countSpan.textContent) + 1;
+      toast('Comment posted!','success');
+    } else {
+      toast(data.error || 'Could not post comment.', 'error');
+    }
+  } catch(err) {
+    toast('Could not post comment.', 'error');
+  }
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+async function likePost(postId){
+  try {
+    const response = await fetch(`/post/${postId}/like`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCSRF() }
+    });
+    const data = await response.json();
+    const btn = document.querySelector(`#post-${postId} .post-action:first-child`);
+    const countSpan = document.getElementById(`like-count-${postId}`);
+    if(btn){
+      if(data.liked){
+        btn.classList.add('liked');
+        btn.querySelector('svg').setAttribute('fill', 'currentColor');
+      } else {
+        btn.classList.remove('liked');
+        btn.querySelector('svg').setAttribute('fill', 'none');
+      }
+    }
+    if(countSpan) countSpan.textContent = data.count;
+  } catch(e) {
+    toast('Could not process like.', 'error');
+  }
+}
+
+async function followUser(username, btn){
+  try {
+    const response = await fetch(`/follow/${username}`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCSRF() }
+    });
+    const data = await response.json();
+    if(btn){
+      btn.textContent = data.following ? '✓ Following' : '+ Follow';
+      btn.classList.toggle('following', data.following);
+    }
+    toast(data.following ? `You are now following ${username}!` : `Unfollowed ${username}`, 'success');
+  } catch(e) {
+    toast('Could not update follow status.', 'error');
+  }
+}
+
+function sharePost(postId){
+  const url = `${window.location.origin}/post/${postId}`;
+  if(navigator.share){
+    navigator.share({ url, title: 'Check this post on Kildear' }).catch(()=>{});
+  } else {
+    navigator.clipboard.writeText(url).then(() => toast('Link copied to clipboard!', 'success'));
+  }
+}
+
+function confirmDeletePost(postId){
+  if(!confirm('Delete this post? This cannot be undone.')) return;
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = `/post/${postId}/delete`;
+  const csrf = document.createElement('input');
+  csrf.type = 'hidden';
+  csrf.name = 'csrf_token';
+  csrf.value = getCSRF();
+  form.appendChild(csrf);
+  document.body.appendChild(form);
+  form.submit();
+}
+
+function getCSRF() {
+  const m = document.querySelector('meta[name="csrf-token"]');
+  return m ? m.content : '';
+}
+
+function toast(msg, type) {
+  let container = document.getElementById('flashContainer');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'flashContainer';
+    container.className = 'flash-container';
+    document.body.appendChild(container);
+  }
+  const el = document.createElement('div');
+  el.className = `flash flash-${type}`;
+  el.innerHTML = `<i class="fa-solid fa-${type === 'success' ? 'circle-check' : 'circle-info'}"></i> ${msg}`;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
 }
 </script>
 {% endblock %}

@@ -6,7 +6,7 @@
   <meta name="description" content="Kildear — Connect. Create. Belong."/>
   <title>{% block title %}Kildear{% endblock %}</title>
 
-  <!-- ── Favicon (Иконка сайта) ─────────────────────────────────────────── -->
+  <!-- ── Favicon ─────────────────────────────────────────── -->
   <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
   <link rel="shortcut icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
   <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
@@ -518,22 +518,13 @@
     .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .hidden { display: none !important; }
     hr.divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
-
-    /* ── Data URL Images ─────────────────────────────────────────────── */
-    .data-url-img {
-      background-color: var(--surface2);
-      background-position: center;
-      background-size: cover;
-    }
   </style>
   {% block head %}{% endblock %}
 </head>
 <body>
 
-<!-- Sidebar overlay (mobile) -->
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
-<!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
 <nav class="sidebar" id="sidebar">
   <a href="{{ url_for('index') }}" class="sidebar-logo">
     <div class="logo-mark">K</div>
@@ -541,92 +532,87 @@
   </a>
 
   <span class="nav-section">Main</span>
-  <a href="{{ url_for('index') }}"
-     class="nav-item {% if request.endpoint == 'index' %}active{% endif %}">
+  <a href="{{ url_for('index') }}" class="nav-item {% if request.endpoint == 'index' %}active{% endif %}">
     <i class="fa-solid fa-house"></i> Home
   </a>
-  <a href="{{ url_for('video_feed') }}"
-     class="nav-item {% if request.endpoint == 'video_feed' %}active{% endif %}">
+  <a href="{{ url_for('video_feed') }}" class="nav-item {% if request.endpoint == 'video_feed' %}active{% endif %}">
     <i class="fa-solid fa-play-circle"></i> Videos
   </a>
-  <a href="{{ url_for('search') }}"
-     class="nav-item {% if request.endpoint == 'search' %}active{% endif %}">
+  <a href="{{ url_for('search') }}" class="nav-item {% if request.endpoint == 'search' %}active{% endif %}">
     <i class="fa-solid fa-magnifying-glass"></i> Search
   </a>
-
-  <!-- QR Code Scanner - НОВАЯ КНОПКА В НАВИГАЦИИ -->
-  <a href="{{ url_for('scan_qr_page') }}"
-     class="nav-item {% if request.endpoint == 'scan_qr_page' %}active{% endif %}">
+  <a href="{{ url_for('scan_qr_page') }}" class="nav-item {% if request.endpoint == 'scan_qr_page' %}active{% endif %}">
     <i class="fa-solid fa-qrcode"></i> Scan QR
   </a>
 
   <span class="nav-section">Social</span>
-  <a href="{{ url_for('chat_list') }}"
-     class="nav-item {% if 'chat' in request.endpoint %}active{% endif %}">
+  <a href="{{ url_for('chat_list') }}" class="nav-item {% if 'chat' in request.endpoint %}active{% endif %}">
     <i class="fa-solid fa-message"></i> Messages
     {% if unread_messages > 0 %}
       <span class="nav-badge">{{ unread_messages }}</span>
     {% endif %}
   </a>
-  <a href="{{ url_for('notifications') }}"
-     class="nav-item {% if request.endpoint == 'notifications' %}active{% endif %}">
+  <a href="{{ url_for('notifications') }}" class="nav-item {% if request.endpoint == 'notifications' %}active{% endif %}">
     <i class="fa-solid fa-bell"></i> Notifications
     {% if notif_count > 0 %}
       <span class="nav-badge">{{ notif_count }}</span>
     {% endif %}
   </a>
-  <a href="{{ url_for('groups') }}"
-     class="nav-item {% if 'group' in request.endpoint %}active{% endif %}">
+  <a href="{{ url_for('groups') }}" class="nav-item {% if 'group' in request.endpoint %}active{% endif %}">
     <i class="fa-solid fa-users"></i> Groups
   </a>
-  <a href="{{ url_for('channels') }}"
-     class="nav-item {% if 'channel' in request.endpoint %}active{% endif %}">
+  <a href="{{ url_for('channels') }}" class="nav-item {% if 'channel' in request.endpoint %}active{% endif %}">
     <i class="fa-solid fa-satellite-dish"></i> Channels
   </a>
 
-  <!-- АДМИН-ПАНЕЛЬ (видна только администраторам) -->
   {% if current_user.is_authenticated and current_user.is_admin %}
   <span class="nav-section">Administration</span>
-  <a href="{{ url_for('admin_dashboard') }}"
-     class="nav-item {% if 'admin' in request.endpoint %}active{% endif %}"
-     style="color: var(--primary); font-weight: 600;">
+  <a href="{{ url_for('admin_dashboard') }}" class="nav-item {% if 'admin' in request.endpoint %}active{% endif %}" style="color: var(--primary); font-weight: 600;">
     <i class="fa-solid fa-crown"></i> Admin Panel
     {% set pending_reports = stats.total_reports if stats else 0 %}
     {% if pending_reports > 0 %}
       <span class="nav-badge" style="background: var(--danger);">{{ pending_reports }}</span>
     {% endif %}
   </a>
-  <a href="{{ url_for('admin_users') }}"
-     class="nav-item {% if request.endpoint == 'admin_users' %}active{% endif %}">
+  <a href="{{ url_for('admin_users') }}" class="nav-item {% if request.endpoint == 'admin_users' %}active{% endif %}">
     <i class="fa-solid fa-users-gear"></i> Users
   </a>
-  <a href="{{ url_for('admin_reports') }}"
-     class="nav-item {% if request.endpoint == 'admin_reports' %}active{% endif %}">
+  <a href="{{ url_for('admin_reports') }}" class="nav-item {% if request.endpoint == 'admin_reports' %}active{% endif %}">
     <i class="fa-solid fa-flag"></i> Reports
   </a>
-  <a href="{{ url_for('admin_verification') }}"
-     class="nav-item {% if request.endpoint == 'admin_verification' %}active{% endif %}">
-    <i class="fa-solid fa-check-circle"></i> Verification
+  <a href="{{ url_for('admin_verification_requests') }}" class="nav-item {% if request.endpoint == 'admin_verification_requests' %}active{% endif %}">
+    <i class="fa-solid fa-circle-check"></i> Verification Reqs
+    {% if stats.pending_verification > 0 %}
+    <span class="nav-badge" style="background: var(--warning);">{{ stats.pending_verification }}</span>
+    {% endif %}
   </a>
-  <a href="{{ url_for('admin_banned') }}"
-     class="nav-item {% if request.endpoint == 'admin_banned' %}active{% endif %}">
+  <a href="{{ url_for('admin_applications') }}" class="nav-item {% if request.endpoint == 'admin_applications' %}active{% endif %}">
+    <i class="fa-solid fa-user-tie"></i> Staff Apps
+    {% if stats.pending_admin_apps > 0 %}
+    <span class="nav-badge" style="background: var(--warning);">{{ stats.pending_admin_apps }}</span>
+    {% endif %}
+  </a>
+  <a href="{{ url_for('admin_verification') }}" class="nav-item {% if request.endpoint == 'admin_verification' %}active{% endif %}">
+    <i class="fa-solid fa-check-double"></i> Verify Users
+  </a>
+  <a href="{{ url_for('admin_banned') }}" class="nav-item {% if request.endpoint == 'admin_banned' %}active{% endif %}">
     <i class="fa-solid fa-ban"></i> Banned
   </a>
-  <a href="{{ url_for('admin_logs') }}"
-     class="nav-item {% if request.endpoint == 'admin_logs' %}active{% endif %}">
+  <a href="{{ url_for('admin_logs') }}" class="nav-item {% if request.endpoint == 'admin_logs' %}active{% endif %}">
     <i class="fa-solid fa-history"></i> Logs
   </a>
   {% endif %}
 
   {% if current_user.is_authenticated %}
   <span class="nav-section">You</span>
-  <a href="{{ url_for('profile', username=current_user.username) }}"
-     class="nav-item {% if request.endpoint == 'profile' and request.view_args.get('username') == current_user.username %}active{% endif %}">
+  <a href="{{ url_for('profile', username=current_user.username) }}" class="nav-item {% if request.endpoint == 'profile' and request.view_args.get('username') == current_user.username %}active{% endif %}">
     <i class="fa-solid fa-user"></i> Profile
   </a>
-  <a href="{{ url_for('edit_profile') }}"
-     class="nav-item {% if request.endpoint == 'edit_profile' %}active{% endif %}">
+  <a href="{{ url_for('edit_profile') }}" class="nav-item {% if request.endpoint == 'edit_profile' %}active{% endif %}">
     <i class="fa-solid fa-pen-to-square"></i> Edit Profile
+  </a>
+  <a href="{{ url_for('settings_index') }}" class="nav-item {% if 'settings' in request.endpoint %}active{% endif %}">
+    <i class="fa-solid fa-gear"></i> Settings
   </a>
   <a href="{{ url_for('logout') }}" class="nav-item">
     <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
@@ -642,7 +628,6 @@
   {% endif %}
 </nav>
 
-<!-- ── Mobile topbar ─────────────────────────────────────────────────────── -->
 <header class="topbar">
   <button class="menu-toggle" onclick="openSidebar()"><i class="fa-solid fa-bars"></i></button>
   <div class="sidebar-logo" style="padding:0; border:none; margin:0;">
@@ -651,7 +636,6 @@
   </div>
 </header>
 
-<!-- ── Flash Messages ────────────────────────────────────────────────────── -->
 {% with messages = get_flashed_messages(with_categories=true) %}
 {% if messages %}
 <div class="flash-container" id="flashContainer">
@@ -667,25 +651,21 @@
 {% endif %}
 {% endwith %}
 
-<!-- ── Media Overlay ─────────────────────────────────────────────────────── -->
 <div class="media-overlay" id="mediaOverlay">
   <button class="media-overlay-close" onclick="closeMedia()"><i class="fa-solid fa-xmark"></i></button>
   <div id="mediaOverlayContent"></div>
 </div>
 
-<!-- ── App Shell ─────────────────────────────────────────────────────────── -->
 <div class="app-shell">
   <div class="main-content">
     {% block content %}{% endblock %}
   </div>
 </div>
 
-<!-- Socket.IO -->
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script src="{{ url_for('static', filename='main.js') }}"></script>
 {% block scripts %}{% endblock %}
 <script>
-  // Mobile sidebar
   function openSidebar()  {
     document.getElementById('sidebar').classList.add('open');
     document.getElementById('sidebarOverlay').classList.add('open');
@@ -695,7 +675,6 @@
     document.getElementById('sidebarOverlay').classList.remove('open');
   }
 
-  // Media lightbox
   function openMedia(src, type) {
     const c = document.getElementById('mediaOverlayContent');
     c.innerHTML = type === 'video'
@@ -714,7 +693,6 @@
     if (e.target === e.currentTarget) closeMedia();
   });
 
-  // Auto-remove flashes
   setTimeout(() => {
     document.querySelectorAll('.flash').forEach(f => f.remove());
   }, 5000);
