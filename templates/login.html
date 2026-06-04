@@ -221,6 +221,31 @@
     .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 10px 36px var(--primary-glow); }
     .btn-submit:active { transform: translateY(0); }
 
+    .btn-vk {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      padding: 12px;
+      background: var(--vk);
+      color: white;
+      border-radius: 12px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+      transition: all 0.2s;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-vk:hover {
+      background: #0066cc;
+      transform: translateY(-1px);
+    }
+    .btn-vk i {
+      font-size: 20px;
+    }
+
     .divider {
       display: flex; align-items: center; gap: 12px;
       margin: 20px 0;
@@ -302,8 +327,11 @@
         <button type="submit" class="btn-submit">Log In</button>
       </form>
 
-      <!-- VK ID OAuth 2.1 Button -->
-      <div id="vk-auth-button" style="margin-top: 16px;"></div>
+      <!-- VK Login Button (прямая ссылка на OAuth) -->
+      <a href="https://oauth.vk.com/authorize?client_id=54623675&redirect_uri=https%3A%2F%2Fkildear.onrender.com%2Flogin%2Fvk%2Fcallback&response_type=code&v=5.131&scope=email" 
+         class="btn-vk">
+        <i class="fa-brands fa-vk"></i> Войти через ВКонтакте
+      </a>
 
       <div class="divider">or</div>
 
@@ -324,53 +352,6 @@
         el.type = 'password';
         icon.className = 'fa-solid fa-eye';
       }
-    }
-  </script>
-
-  <!-- VK ID SDK -->
-  <script src="https://unpkg.com/@vkid/sdk@3.0.0/dist-sdk/umd/index.js"></script>
-  <script>
-    if (typeof VKIDSDK !== 'undefined') {
-      const VKID = VKIDSDK;
-
-      VKID.Config.init({
-        app: 54623675,
-        redirectUrl: 'https://kildear.onrender.com/login/vk/callback',
-        responseType: 'code',
-        scope: 'email'
-      });
-
-      const authButton = new VKID.AuthButton();
-      
-      authButton.render({
-        container: document.getElementById('vk-auth-button'),
-        scheme: VKID.Scheme.DARK,
-        lang: VKID.Languages.RUS
-      })
-      .on(VKID.WidgetEvents.ERROR, function(error) {
-        console.error('VK ID Error:', error);
-      })
-      .on(VKID.WidgetEvents.LOGIN_SUCCESS, function(payload) {
-        fetch('/login/vk/exchange', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: payload.code })
-        })
-        .then(function(response) { return response.json(); })
-        .then(function(data) {
-          if (data.success) {
-            window.location.href = '/';
-          } else {
-            alert('Ошибка входа: ' + data.error);
-          }
-        })
-        .catch(function(err) {
-          console.error('Fetch error:', err);
-          alert('Ошибка соединения с сервером');
-        });
-      });
-    } else {
-      console.log('VKID SDK loading...');
     }
   </script>
 </body>
