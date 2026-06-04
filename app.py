@@ -4717,6 +4717,26 @@ def settings_vk():
     return render_template("settings/vk.html", vk_connection=vk_connection)
 
 
+@app.route("/login/vk/callback")
+def login_vk_callback():
+    code = request.args.get("code")
+    if not code:
+        flash("Не получен код авторизации", "error")
+        return redirect(url_for("login"))
+
+    # Отправляем код на /login/vk/exchange
+    import requests
+    response = requests.post(
+        url_for("vk_exchange_code", _external=True),
+        json={"code": code}
+    )
+    data = response.json()
+    if data.get("success"):
+        return redirect(url_for("index"))
+    else:
+        flash(data.get("error", "Ошибка авторизации"), "error")
+        return redirect(url_for("login"))
+    
 @app.route("/settings/vk/disconnect", methods=["POST"])
 @login_required
 def disconnect_vk():
