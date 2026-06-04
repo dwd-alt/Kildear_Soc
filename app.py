@@ -4544,7 +4544,7 @@ def init_app():
 
 # ========== VK ID OAuth Configuration (OAuth 2.1) ==========
 VK_CLIENT_ID = "54623675"  # Ваш новый ID приложения
-VK_CLIENT_SECRET = "ecQEKwy2LEoX4Zgec6BC"  # Ваш защищённый ключ (замените на новый, если нужно)
+VK_CLIENT_SECRET = "3410Kv2UzDqdtXZeZisJ"  # Ваш защищённый ключ (замените на новый, если нужно)
 VK_REDIRECT_URI = "https://kildear.onrender.com/login/vk/callback"
 
 
@@ -4736,7 +4736,7 @@ def login_vk_callback():
     else:
         flash(data.get("error", "Ошибка авторизации"), "error")
         return redirect(url_for("login"))
-    
+
 @app.route("/settings/vk/disconnect", methods=["POST"])
 @login_required
 def disconnect_vk():
