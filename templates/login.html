@@ -42,17 +42,15 @@
         radial-gradient(ellipse 40% 40% at 60% 50%, rgba(0,212,255,0.05) 0%, transparent 60%);
       pointer-events: none;
     }
-    /* Animated grid */
     body::after {
       content: '';
       position: fixed; inset: 0;
       background-image:
-        repeating-linear-gradient(0deg,   transparent, transparent 49px, rgba(255,255,255,0.015) 49px, rgba(255,255,255,0.015) 50px),
-        repeating-linear-gradient(90deg,  transparent, transparent 49px, rgba(255,255,255,0.015) 49px, rgba(255,255,255,0.015) 50px);
+        repeating-linear-gradient(0deg, transparent, transparent 49px, rgba(255,255,255,0.015) 49px, rgba(255,255,255,0.015) 50px),
+        repeating-linear-gradient(90deg, transparent, transparent 49px, rgba(255,255,255,0.015) 49px, rgba(255,255,255,0.015) 50px);
       pointer-events: none;
     }
 
-    /* Floating orbs */
     .orb {
       position: fixed;
       border-radius: 50%;
@@ -66,10 +64,9 @@
     .orb-3 { width: 150px; height: 150px; background: var(--accent); bottom: 30%; left: 10%; animation-delay: 5s; }
     @keyframes float {
       0%, 100% { transform: translateY(0) scale(1); }
-      50%       { transform: translateY(-20px) scale(1.05); }
+      50% { transform: translateY(-20px) scale(1.05); }
     }
 
-    /* Auth card */
     .auth-wrapper {
       position: relative;
       z-index: 2;
@@ -78,7 +75,6 @@
       padding: 20px;
     }
 
-    /* Brand */
     .brand {
       text-align: center;
       margin-bottom: 28px;
@@ -111,7 +107,6 @@
       margin-top: 4px;
     }
 
-    /* Card */
     .auth-card {
       background: rgba(15,15,26,0.7);
       backdrop-filter: blur(24px);
@@ -135,13 +130,11 @@
       margin-bottom: 24px;
     }
 
-    /* Flash */
     .flash { padding: 12px 16px; border-radius: 10px; margin-bottom: 16px; font-size: 13.5px; display: flex; align-items: center; gap: 8px; }
-    .flash-error   { background: rgba(255,71,87,0.1);  border: 1px solid rgba(255,71,87,0.3);  color: #ff4757; }
+    .flash-error { background: rgba(255,71,87,0.1); border: 1px solid rgba(255,71,87,0.3); color: #ff4757; }
     .flash-success { background: rgba(34,211,160,0.1); border: 1px solid rgba(34,211,160,0.3); color: #22d3a0; }
-    .flash-info    { background: rgba(124,111,255,0.1);border: 1px solid rgba(124,111,255,0.3);color: var(--primary); }
+    .flash-info { background: rgba(124,111,255,0.1); border: 1px solid rgba(124,111,255,0.3); color: var(--primary); }
 
-    /* Form */
     .form-group { margin-bottom: 16px; }
     .form-label {
       display: block;
@@ -150,9 +143,7 @@
       color: var(--text-muted);
       margin-bottom: 7px;
     }
-    .input-wrap {
-      position: relative;
-    }
+    .input-wrap { position: relative; }
     .input-wrap i {
       position: absolute;
       left: 14px; top: 50%;
@@ -230,32 +221,6 @@
     .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 10px 36px var(--primary-glow); }
     .btn-submit:active { transform: translateY(0); }
 
-    /* VK Button */
-    .btn-vk {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      width: 100%;
-      padding: 12px;
-      background: var(--vk);
-      color: white;
-      border-radius: 12px;
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 14px;
-      transition: all 0.2s;
-      border: none;
-      cursor: pointer;
-    }
-    .btn-vk:hover {
-      background: #0066cc;
-      transform: translateY(-1px);
-    }
-    .btn-vk i {
-      font-size: 20px;
-    }
-
     .divider {
       display: flex; align-items: center; gap: 12px;
       margin: 20px 0;
@@ -272,10 +237,7 @@
       font-size: 13.5px;
       color: var(--text-muted);
     }
-    .auth-footer a {
-      color: var(--primary);
-      font-weight: 600;
-    }
+    .auth-footer a { color: var(--primary); font-weight: 600; }
     .auth-footer a:hover { text-decoration: underline; }
   </style>
 </head>
@@ -340,12 +302,8 @@
         <button type="submit" class="btn-submit">Log In</button>
       </form>
 
-      <!-- VK Login Button -->
-      <div style="margin-top: 16px;">
-        <a href="{{ url_for('login_vk') }}" class="btn-vk">
-          <i class="fa-brands fa-vk"></i> Войти через ВКонтакте
-        </a>
-      </div>
+      <!-- VK ID OAuth 2.1 Button -->
+      <div id="vk-auth-button" style="margin-top: 16px;"></div>
 
       <div class="divider">or</div>
 
@@ -366,6 +324,53 @@
         el.type = 'password';
         icon.className = 'fa-solid fa-eye';
       }
+    }
+  </script>
+
+  <!-- VK ID SDK -->
+  <script src="https://unpkg.com/@vkid/sdk@3.0.0/dist-sdk/umd/index.js"></script>
+  <script>
+    if (typeof VKIDSDK !== 'undefined') {
+      const VKID = VKIDSDK;
+
+      VKID.Config.init({
+        app: 54623675,
+        redirectUrl: 'https://kildear.onrender.com/login/vk/callback',
+        responseType: 'code',
+        scope: 'email'
+      });
+
+      const authButton = new VKID.AuthButton();
+      
+      authButton.render({
+        container: document.getElementById('vk-auth-button'),
+        scheme: VKID.Scheme.DARK,
+        lang: VKID.Languages.RUS
+      })
+      .on(VKID.WidgetEvents.ERROR, function(error) {
+        console.error('VK ID Error:', error);
+      })
+      .on(VKID.WidgetEvents.LOGIN_SUCCESS, function(payload) {
+        fetch('/login/vk/exchange', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: payload.code })
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+          if (data.success) {
+            window.location.href = '/';
+          } else {
+            alert('Ошибка входа: ' + data.error);
+          }
+        })
+        .catch(function(err) {
+          console.error('Fetch error:', err);
+          alert('Ошибка соединения с сервером');
+        });
+      });
+    } else {
+      console.log('VKID SDK loading...');
     }
   </script>
 </body>
