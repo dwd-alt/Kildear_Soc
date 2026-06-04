@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}VK Connection — Kildear{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 600px; margin: 0 auto;">
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fa-brands fa-vk"></i> Подключение ВКонтакте</h2>
+        </div>
+        <div class="card-body">
+            {% if vk_connection %}
+                <div class="alert alert-success">
+                    <i class="fa-solid fa-check-circle"></i>
+                    Аккаунт успешно подключен к ВКонтакте
+                </div>
+                <p><strong>VK ID:</strong> {{ vk_connection.vk_id }}</p>
+                <p><strong>Email:</strong> {{ vk_connection.vk_email or 'Не указан' }}</p>
+                <p><strong>Подключен:</strong> {{ vk_connection.created_at.strftime('%d.%m.%Y') }}</p>
+
+                <form method="POST" action="{{ url_for('disconnect_vk') }}" onsubmit="return confirm('Отключить аккаунт VK?')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fa-solid fa-unlink"></i> Отключить
+                    </button>
+                </form>
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fa-solid fa-info-circle"></i>
+                    Подключите аккаунт ВКонтакте для быстрого входа
+                </div>
+                <a href="{{ url_for('login_vk') }}" class="btn btn-vk">
+                    <i class="fa-brands fa-vk"></i> Подключить VK
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.btn-vk {
+    background: #0077ff;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+.btn-vk:hover {
+    background: #0066cc;
+    color: white;
+}
+.alert {
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+.alert-success {
+    background: rgba(34, 211, 160, 0.1);
+    border: 1px solid rgba(34, 211, 160, 0.3);
+    color: var(--success);
+}
+.alert-info {
+    background: rgba(124, 111, 255, 0.1);
+    border: 1px solid rgba(124, 111, 255, 0.3);
+    color: var(--primary);
+}
+</style>
+{% endblock %}
