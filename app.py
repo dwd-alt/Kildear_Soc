@@ -4546,9 +4546,9 @@ VK_CLIENT_ID = "54623675"
 VK_CLIENT_SECRET = "3410Kv2UzDqdtXZeZisJ"
 VK_REDIRECT_URI = "https://kildear.onrender.com/login/vk/callback"
 
-# ПРАВИЛЬНЫЕ эндпоинты VK ID
-VK_AUTH_URL = "https://id.vk.com/authorize"
-VK_TOKEN_URL = "https://id.vk.com/access_token"
+# ПРАВИЛЬНЫЕ эндпоинты классического VK OAuth
+VK_AUTH_URL = "https://oauth.vk.com/authorize"
+VK_TOKEN_URL = "https://oauth.vk.com/access_token"
 VK_USER_INFO_URL = "https://api.vk.com/method/users.get"
 
 
@@ -4561,39 +4561,37 @@ def settings_vk():
     vk_connection = UserVK.query.filter_by(user_id=current_user.id).first()
     return render_template("settings/vk.html", vk_connection=vk_connection)
 
+    @app.route("/login/vk")
+    def login_vk():
+        import secrets
+        from urllib.parse import quote
 
-@app.route("/login/vk")
-def login_vk():
-    import secrets
-    from urllib.parse import quote
+        state = secrets.token_urlsafe(32)
+        session['vk_oauth_state'] = state
 
-    state = secrets.token_urlsafe(32)
-    session['vk_oauth_state'] = state
+        auth_url = (
+            f"https://oauth.vk.com/authorize?"
+            f"client_id={VK_CLIENT_ID}&"
+            f"redirect_uri={quote(VK_REDIRECT_URI)}&"
+            f"response_type=code&"
+            f"state={state}&"
+            f"scope=email&"
+            f"v=5.131"
+        )
 
-    # ПРАВИЛЬНЫЙ URL для VK ID OAuth 2.1
-    auth_url = (
-        f"https://id.vk.com/oauth2/authorize?"  # <- ВАЖНО: /oauth2/authorize
-        f"client_id={VK_CLIENT_ID}&"
-        f"redirect_uri={quote(VK_REDIRECT_URI)}&"
-        f"response_type=code&"
-        f"state={state}&"
-        f"scope=email"
-        # v=5.131 НЕ НУЖЕН для VK ID OAuth 2.1
-    )
+        return redirect(auth_url)
 
     return redirect(auth_url)
 
 
 @app.route("/login/vk/callback")
 def login_vk_callback():
-    """Обработка callback от VK после авторизации (VK ID OAuth 2.1)"""
     import requests
 
     code = request.args.get("code")
     error = request.args.get("error")
     state = request.args.get("state")
 
-    # Проверяем CSRF state
     expected_state = session.pop('vk_oauth_state', None)
     if not expected_state or state != expected_state:
         flash("Ошибка безопасности при авторизации", "error")
@@ -4608,72 +4606,61 @@ def login_vk_callback():
         return redirect(url_for("login"))
 
     try:
-        # ПРАВИЛЬНЫЙ эндпоинт для VK ID OAuth 2.1
-        token_url = "https://id.vk.com/oauth2/token"  # <- ИСПРАВЛЕНО: /oauth2/token
+        token_url = "https://oauth.vk.com/access_token"
 
         params = {
             "client_id": VK_CLIENT_ID,
             "client_secret": VK_CLIENT_SECRET,
             "redirect_uri": VK_REDIRECT_URI,
             "code": code,
-            "grant_type": "authorization_code"
         }
 
-        response = requests.post(token_url, data=params)
+        response = requests.get(token_url, params=params)
         token_data = response.json()
 
         if "error" in token_data:
-            flash(f"Ошибка получения токена: {token_data.get('error_description', token_data)}", "error")
+            flash(f"Ошибка получения токена: {token_data.get('error_description', token_data.get('error'))}", "error")
             return redirect(url_for("login"))
 
         access_token = token_data.get("access_token")
-        user_id = token_data.get("user_id")  # В VK ID OAuth 2.1 user_id приходит сразу
+        vk_user_id = str(token_data.get("user_id", ""))
         email = token_data.get("email", "")
 
-        if not user_id:
-            flash("Не удалось получить ID пользователя", "error")
+        if not vk_user_id:
+            flash("Не удалось получить ID пользователя VK", "error")
             return redirect(url_for("login"))
 
-        # Для VK ID OAuth 2.1 НЕ НУЖНО отдельно запрашивать users.get,
-        # но оставим для получения аватарки (если нужно)
-        # Если хотите получить имя пользователя, можно использовать:
-        first_name = token_data.get("first_name", "")
-        last_name = token_data.get("last_name", "")
+        # Получаем данные пользователя через API VK
+        user_info_url = "https://api.vk.com/method/users.get"
+        user_info_params = {
+            "user_ids": vk_user_id,
+            "fields": "first_name,last_name,photo_max",
+            "access_token": access_token,
+            "v": "5.131"
+        }
+        user_response = requests.get(user_info_url, params=user_info_params)
+        user_data = user_response.json()
 
-        # Если данные не пришли в токене, запрашиваем отдельно
-        if not first_name and not last_name:
-            user_info_url = "https://api.vk.com/method/users.get"
-            user_info_params = {
-                "user_ids": user_id,
-                "fields": "first_name,last_name,photo_max",
-                "access_token": access_token,
-                "v": "5.131"
-            }
-            user_response = requests.get(user_info_url, params=user_info_params)
-            user_data = user_response.json()
+        first_name = ""
+        last_name = ""
+        vk_avatar = ""
 
-            if "response" in user_data and user_data["response"]:
-                vk_user = user_data["response"][0]
-                first_name = vk_user.get("first_name", "")
-                last_name = vk_user.get("last_name", "")
-                vk_avatar = vk_user.get("photo_max", "")
-            else:
-                vk_avatar = ""
-        else:
-            vk_avatar = ""
+        if "response" in user_data and user_data["response"]:
+            vk_user = user_data["response"][0]
+            first_name = vk_user.get("first_name", "")
+            last_name = vk_user.get("last_name", "")
+            vk_avatar = vk_user.get("photo_max", "")
 
-        display_name = f"{first_name} {last_name}".strip() if first_name or last_name else f"user_{user_id}"
-        vk_id = str(user_id)
+        display_name = f"{first_name} {last_name}".strip() or f"user_{vk_user_id}"
 
         # Проверяем существующую связь
-        vk_connection = UserVK.query.filter_by(vk_id=vk_id).first()
+        vk_connection = UserVK.query.filter_by(vk_id=vk_user_id).first()
 
         if vk_connection:
             user = vk_connection.user
             if user.is_banned:
                 flash("Пользователь заблокирован", "error")
                 return redirect(url_for("login"))
-
             login_user(user, remember=True)
             flash("Успешный вход через ВКонтакте!", "success")
             return redirect(url_for("index"))
@@ -4684,10 +4671,9 @@ def login_vk_callback():
             existing_user = User.query.filter_by(email=email).first()
 
         if existing_user:
-            # Связываем существующий аккаунт с VK
             vk_conn = UserVK(
                 user_id=existing_user.id,
-                vk_id=vk_id,
+                vk_id=vk_user_id,
                 vk_access_token=access_token,
                 vk_email=email
             )
@@ -4698,9 +4684,8 @@ def login_vk_callback():
             return redirect(url_for("index"))
 
         # Создаём нового пользователя
-        import secrets
-        base_username = display_name.lower().replace(" ", "_") if display_name else f"user_{vk_id}"
-        username = base_username[:30]
+        base_username = display_name.lower().replace(" ", "_")[:30]
+        username = base_username
         counter = 1
         while User.query.filter_by(username=username).first():
             username = f"{base_username[:25]}_{counter}"
@@ -4708,23 +4693,22 @@ def login_vk_callback():
 
         new_user = User(
             username=username,
-            email=email or f"{vk_id}@vk.user",
-            display_name=display_name[:60] if display_name else username,
+            email=email or f"vk_{vk_user_id}@vk.user",
+            display_name=display_name[:60],
             bio="",
             preset_avatar=1,
             is_verified=False,
             is_banned=False
         )
-        random_password = secrets.token_urlsafe(12)
-        new_user.set_password(random_password)
+        import secrets as _secrets
+        new_user.set_password(_secrets.token_urlsafe(12))
 
         db.session.add(new_user)
         db.session.flush()
 
-        # Создаём связь с VK
         vk_conn = UserVK(
             user_id=new_user.id,
-            vk_id=vk_id,
+            vk_id=vk_user_id,
             vk_access_token=access_token,
             vk_email=email
         )
@@ -4734,20 +4718,22 @@ def login_vk_callback():
         if vk_avatar:
             try:
                 import urllib.request
-                from PIL import Image
-                import io
+                from io import BytesIO as _BytesIO
 
                 avatar_response = urllib.request.urlopen(vk_avatar)
-                img = Image.open(io.BytesIO(avatar_response.read()))
+                img = Image.open(_BytesIO(avatar_response.read()))
                 img = img.resize((200, 200), Image.Resampling.LANCZOS)
 
-                avatar_filename = f"vk_avatar_{new_user.id}_{uuid.uuid4().hex}.png"
-                avatar_path = os.path.join(app.config['UPLOAD_FOLDER'], 'custom_avatars', avatar_filename)
-                os.makedirs(os.path.dirname(avatar_path), exist_ok=True)
-                img.save(avatar_path, "PNG")
+                avatar_filename = f"vk_{new_user.id}_{uuid.uuid4().hex}.png"
+                avatar_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'custom_avatars')
+                os.makedirs(avatar_dir, exist_ok=True)
+                img.save(os.path.join(avatar_dir, avatar_filename), "PNG")
 
                 new_user.can_upload_custom_avatar = True
-                new_user.custom_avatar = f"/static/uploads/custom_avatars/{avatar_filename}"
+                if is_render:
+                    new_user.custom_avatar = f"/uploads/custom_avatars/{avatar_filename}"
+                else:
+                    new_user.custom_avatar = f"/static/uploads/custom_avatars/{avatar_filename}"
             except Exception as e:
                 logger.error(f"Failed to load VK avatar: {e}")
 
@@ -4758,9 +4744,9 @@ def login_vk_callback():
 
     except Exception as e:
         logger.error(f"VK callback error: {e}")
+        db.session.rollback()
         flash("Произошла ошибка при авторизации", "error")
         return redirect(url_for("login"))
-
 
 @app.route("/settings/vk/disconnect", methods=["POST"])
 @login_required
