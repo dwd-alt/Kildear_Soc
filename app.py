@@ -4564,23 +4564,21 @@ def settings_vk():
 
 @app.route("/login/vk")
 def login_vk():
-    """Начало авторизации через VK ID"""
     import secrets
+    from urllib.parse import quote
 
-    # Генерируем state для защиты от CSRF
     state = secrets.token_urlsafe(32)
     session['vk_oauth_state'] = state
 
-    # ПРАВИЛЬНЫЙ URL для авторизации VK ID
-    from urllib.parse import quote
-
+    # ПРАВИЛЬНЫЙ URL для VK ID OAuth 2.1
     auth_url = (
-        f"https://id.vk.com/authorize?"
+        f"https://id.vk.com/oauth2/authorize?"  # <- ВАЖНО: /oauth2/authorize
         f"client_id={VK_CLIENT_ID}&"
         f"redirect_uri={quote(VK_REDIRECT_URI)}&"
         f"response_type=code&"
         f"state={state}&"
         f"scope=email"
+        # v=5.131 НЕ НУЖЕН для VK ID OAuth 2.1
     )
 
     return redirect(auth_url)
@@ -4588,7 +4586,7 @@ def login_vk():
 
 @app.route("/login/vk/callback")
 def login_vk_callback():
-    """Обработка callback от VK после авторизации"""
+    """Обработка callback от VK после авторизации (VK ID OAuth 2.1)"""
     import requests
 
     code = request.args.get("code")
@@ -4610,8 +4608,9 @@ def login_vk_callback():
         return redirect(url_for("login"))
 
     try:
-        # ПРАВИЛЬНЫЙ эндпоинт для получения токена
-        token_url = "https://id.vk.com/access_token"
+        # ПРАВИЛЬНЫЙ эндпоинт для VK ID OAuth 2.1
+        token_url = "https://id.vk.com/oauth2/token"  # <- ИСПРАВЛЕНО: /oauth2/token
+
         params = {
             "client_id": VK_CLIENT_ID,
             "client_secret": VK_CLIENT_SECRET,
@@ -4624,38 +4623,46 @@ def login_vk_callback():
         token_data = response.json()
 
         if "error" in token_data:
-            flash(f"Ошибка получения токена: {token_data}", "error")
+            flash(f"Ошибка получения токена: {token_data.get('error_description', token_data)}", "error")
             return redirect(url_for("login"))
 
         access_token = token_data.get("access_token")
-        user_id = token_data.get("user_id")
+        user_id = token_data.get("user_id")  # В VK ID OAuth 2.1 user_id приходит сразу
         email = token_data.get("email", "")
 
         if not user_id:
             flash("Не удалось получить ID пользователя", "error")
             return redirect(url_for("login"))
 
-        # Получаем информацию о пользователе через API VK
-        user_info_url = "https://api.vk.com/method/users.get"
-        user_info_params = {
-            "user_ids": user_id,
-            "fields": "first_name,last_name,photo_max",
-            "access_token": access_token,
-            "v": "5.131"
-        }
+        # Для VK ID OAuth 2.1 НЕ НУЖНО отдельно запрашивать users.get,
+        # но оставим для получения аватарки (если нужно)
+        # Если хотите получить имя пользователя, можно использовать:
+        first_name = token_data.get("first_name", "")
+        last_name = token_data.get("last_name", "")
 
-        user_response = requests.get(user_info_url, params=user_info_params)
-        user_data = user_response.json()
+        # Если данные не пришли в токене, запрашиваем отдельно
+        if not first_name and not last_name:
+            user_info_url = "https://api.vk.com/method/users.get"
+            user_info_params = {
+                "user_ids": user_id,
+                "fields": "first_name,last_name,photo_max",
+                "access_token": access_token,
+                "v": "5.131"
+            }
+            user_response = requests.get(user_info_url, params=user_info_params)
+            user_data = user_response.json()
 
-        if "response" not in user_data or not user_data["response"]:
-            flash("Не удалось получить информацию о пользователе", "error")
-            return redirect(url_for("login"))
+            if "response" in user_data and user_data["response"]:
+                vk_user = user_data["response"][0]
+                first_name = vk_user.get("first_name", "")
+                last_name = vk_user.get("last_name", "")
+                vk_avatar = vk_user.get("photo_max", "")
+            else:
+                vk_avatar = ""
+        else:
+            vk_avatar = ""
 
-        vk_user = user_data["response"][0]
-        first_name = vk_user.get("first_name", "")
-        last_name = vk_user.get("last_name", "")
-        display_name = f"{first_name} {last_name}".strip()
-        vk_avatar = vk_user.get("photo_max", "")
+        display_name = f"{first_name} {last_name}".strip() if first_name or last_name else f"user_{user_id}"
         vk_id = str(user_id)
 
         # Проверяем существующую связь
@@ -4723,7 +4730,7 @@ def login_vk_callback():
         )
         db.session.add(vk_conn)
 
-        # Загружаем аватарку из VK
+        # Загружаем аватарку из VK если есть
         if vk_avatar:
             try:
                 import urllib.request
