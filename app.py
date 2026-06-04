@@ -4719,23 +4719,45 @@ def settings_vk():
 
 @app.route("/login/vk/callback")
 def login_vk_callback():
+    """Обработка callback от VK после авторизации"""
+    import requests
+
     code = request.args.get("code")
+    error = request.args.get("error")
+
+    if error:
+        flash(f"Ошибка авторизации ВК: {error}", "error")
+        return redirect(url_for("login"))
+
     if not code:
         flash("Не получен код авторизации", "error")
         return redirect(url_for("login"))
 
-    # Отправляем код на /login/vk/exchange
-    import requests
-    response = requests.post(
-        url_for("vk_exchange_code", _external=True),
-        json={"code": code}
-    )
-    data = response.json()
-    if data.get("success"):
-        return redirect(url_for("index"))
-    else:
-        flash(data.get("error", "Ошибка авторизации"), "error")
+    try:
+        # Отправляем код на обмен
+        response = requests.post(
+            url_for("vk_exchange_code", _external=True),
+            json={"code": code},
+            timeout=10
+        )
+        data = response.json()
+
+        if data.get("success"):
+            flash("Успешный вход через ВКонтакте!", "success")
+            return redirect(url_for("index"))
+        else:
+            flash(data.get("error", "Ошибка авторизации"), "error")
+            return redirect(url_for("login"))
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"VK callback error: {e}")
+        flash("Ошибка связи с сервером авторизации", "error")
         return redirect(url_for("login"))
+    except Exception as e:
+        logger.error(f"VK callback error: {e}")
+        flash("Произошла ошибка при авторизации", "error")
+        return redirect(url_for("login"))
+
 
 @app.route("/settings/vk/disconnect", methods=["POST"])
 @login_required
