@@ -4703,15 +4703,7 @@ def vk_exchange_code():
         return jsonify({"success": False, "error": str(e)})
 
 
-# ========== VK Connection Model ==========
-class UserVK(db.Model):
-    """Связь пользователя с VK аккаунтом"""
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    vk_id = db.Column(db.String(50), nullable=False, unique=True)
-    vk_access_token = db.Column(db.String(500), nullable=True)
-    vk_email = db.Column(db.String(120), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 
     user = db.relationship("User", backref=db.backref("vk_connection", uselist=False))
 
