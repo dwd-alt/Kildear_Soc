@@ -4561,8 +4561,8 @@ def settings_vk():
     vk_connection = UserVK.query.filter_by(user_id=current_user.id).first()
     return render_template("settings/vk.html", vk_connection=vk_connection)
 
-    @app.route("/login/vk")
-    def login_vk():
+@app.route("/login/vk")
+def login_vk():
         import secrets
         from urllib.parse import quote
 
@@ -4580,8 +4580,6 @@ def settings_vk():
         )
 
         return redirect(auth_url)
-
-    return redirect(auth_url)
 
 
 @app.route("/login/vk/callback")
