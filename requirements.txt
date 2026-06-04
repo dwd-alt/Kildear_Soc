@@ -7,6 +7,7 @@ Flask-SocketIO==5.3.6
 Pillow==10.1.0
 qrcode==7.4.2
 eventlet==0.33.3
-python-engineio==4.7.1
-python-socketio==5.10.0
 requests==2.31.0
+# Убираем фиксацию версий engineio и socketio, чтобы pip сам подобрал совместимые
+python-engineio>=4.8.0
+python-socketio>=5.10.0
