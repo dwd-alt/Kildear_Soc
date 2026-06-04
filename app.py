@@ -4121,64 +4121,6 @@ def generate_user_qrcode(user_id):
         return jsonify({
             "success": False,
             "error": f"Failed to generate QR code: {str(e)}"
-        }), 500@app.route("/user/<int:user_id>/qrcode")
-@login_required
-def generate_user_qrcode(user_id):
-    """Generate QR code for user (any user) with error handling"""
-    user = User.query.get_or_404(user_id)
-
-    if current_user.is_blocked(user):
-        return jsonify({"error": "Cannot view blocked user's QR code"}), 403
-
-    if user.is_banned:
-        return jsonify({"error": "User is banned"}), 403
-
-    # Формируем ссылку на профиль
-    if request.host.startswith(('127.0.0.1', 'localhost')):
-        base_url = f"{request.scheme}://{request.host}"
-    else:
-        base_url = f"{request.scheme}://{request.host}"
-    qr_data = f"{base_url}/u/{user.username}"
-
-    # Генерация QR-кода с обработкой ошибок
-    try:
-        import qrcode
-        from PIL import Image
-        from io import BytesIO
-
-        qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
-            box_size=10,
-            border=4,
-        )
-        qr.add_data(qr_data)
-        qr.make(fit=True)
-        img = qr.make_image(fill_color="black", back_color="white")
-
-        buffered = BytesIO()
-        img.save(buffered, format="PNG")
-        img_base64 = base64.b64encode(buffered.getvalue()).decode()
-
-        return jsonify({
-            "success": True,
-            "qr_code": f"data:image/png;base64,{img_base64}",
-            "data": qr_data,
-            "username": user.username,
-            "display_name": user.display_name or user.username,
-            "profile_url": qr_data
-        })
-    except ImportError as e:
-        app.logger.error(f"QR code import error: {e}")
-        return jsonify({
-            "success": False,
-            "error": "QR code library not available. Please install: pip install qrcode[pil]"
-        }), 500
-    except Exception as e:
-        app.logger.error(f"QR generation error: {e}")
-        return jsonify({
-            "success": False,
-            "error": f"Failed to generate QR code: {str(e)}"
         }), 500
 
 
@@ -4561,25 +4503,26 @@ def settings_vk():
     vk_connection = UserVK.query.filter_by(user_id=current_user.id).first()
     return render_template("settings/vk.html", vk_connection=vk_connection)
 
+
 @app.route("/login/vk")
 def login_vk():
-        import secrets
-        from urllib.parse import quote
+    import secrets  # ← 4 пробела (один таб/отступ)
+    from urllib.parse import quote
 
-        state = secrets.token_urlsafe(32)
-        session['vk_oauth_state'] = state
+    state = secrets.token_urlsafe(32)
+    session['vk_oauth_state'] = state
 
-        auth_url = (
-            f"https://oauth.vk.com/authorize?"
-            f"client_id={VK_CLIENT_ID}&"
-            f"redirect_uri={quote(VK_REDIRECT_URI)}&"
-            f"response_type=code&"
-            f"state={state}&"
-            f"scope=email&"
-            f"v=5.131"
-        )
+    auth_url = (
+        f"https://oauth.vk.com/authorize?"
+        f"client_id={VK_CLIENT_ID}&"
+        f"redirect_uri={quote(VK_REDIRECT_URI)}&"
+        f"response_type=code&"
+        f"state={state}&"
+        f"scope=email&"
+        f"v=5.131"
+    )
 
-        return redirect(auth_url)
+    return redirect(auth_url)
 
 
 @app.route("/login/vk/callback")
