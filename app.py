@@ -647,7 +647,15 @@ class Report(db.Model):
     reported_user = db.relationship("User", foreign_keys=[reported_user_id])
     reviewer = db.relationship("User", foreign_keys=[reviewed_by])
 
+class UserVK(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    vk_id = db.Column(db.String(50), nullable=False, unique=True)
+    vk_access_token = db.Column(db.String(500), nullable=True)
+    vk_email = db.Column(db.String(120), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    user = db.relationship("User", backref=db.backref("vk_connection", uselist=False))
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
@@ -4534,85 +4542,55 @@ def init_app():
             logger.error(f"❌ Ошибка при инициализации: {e}")
 
 
-# ========== VK ID OAuth Configuration ==========
-# Данные из вашего приложения VK
-VK_CLIENT_ID = "54623380"  # Ваш ID приложения
-VK_CLIENT_SECRET = "ecQEKwy2LEoX4Zgec6BC"  # Ваш защищённый ключ
+# ========== VK ID OAuth Configuration (OAuth 2.1) ==========
+VK_CLIENT_ID = "54623675"  # Ваш новый ID приложения
+VK_CLIENT_SECRET = "ecQEKwy2LEoX4Zgec6BC"  # Ваш защищённый ключ (замените на новый, если нужно)
 VK_REDIRECT_URI = "https://kildear.onrender.com/login/vk/callback"
 
 
-# ========== VK ID OAuth Routes ==========
-@app.route("/login/vk")
-def login_vk():
-    """Redirect to VK ID authorization page"""
-    from urllib.parse import urlencode
+# ========== VK ID OAuth 2.1 Route ==========
+@app.route("/login/vk/exchange", methods=["POST"])
+def vk_exchange_code():
+    """Обмен кода VK ID на токен (OAuth 2.1)"""
+    import requests
+    import secrets
 
-    params = {
-        "client_id": VK_CLIENT_ID,
-        "redirect_uri": VK_REDIRECT_URI,
-        "response_type": "code",
-        "v": "5.131",
-        "scope": "email"  # Запрашиваем email пользователя
-    }
-
-    auth_url = "https://oauth.vk.com/authorize?" + urlencode(params)
-    return redirect(auth_url)
-
-
-@app.route("/login/vk/callback")
-def login_vk_callback():
-    """Handle VK ID callback"""
-
-    code = request.args.get("code")
-    error = request.args.get("error")
-
-    if error:
-        flash(f"Ошибка авторизации ВК: {error}", "error")
-        return redirect(url_for("login"))
+    data = request.get_json()
+    code = data.get('code')
 
     if not code:
-        flash("Не получен код авторизации", "error")
-        return redirect(url_for("login"))
+        return jsonify({"success": False, "error": "No code provided"})
 
     try:
-        # Получаем access token
-        token_url = "https://oauth.vk.com/access_token"
-        token_params = {
+        # Новый URL для обмена кода на токен (OAuth 2.1)
+        token_url = "https://id.vk.com/oauth2/auth"
+
+        params = {
             "client_id": VK_CLIENT_ID,
             "client_secret": VK_CLIENT_SECRET,
             "redirect_uri": VK_REDIRECT_URI,
-            "code": code
+            "code": code,
+            "grant_type": "authorization_code"
         }
 
-        response = requests.get(token_url, params=token_params)
-        data = response.json()
+        response = requests.post(token_url, data=params)
+        token_data = response.json()
 
-        if "error" in data:
-            flash(f"Ошибка получения токена: {data.get('error_description', 'Unknown error')}", "error")
-            return redirect(url_for("login"))
+        if "error" in token_data:
+            logger.error(f"Token error: {token_data}")
+            return jsonify({"success": False, "error": token_data.get("error_description", "Unknown error")})
 
-        vk_id = str(data.get("user_id"))
-        access_token = data.get("access_token")
-        email = data.get("email", "")
+        # Получаем access_token и user_id
+        access_token = token_data.get("access_token")
+        user_id = token_data.get("user_id")
 
-        # Проверяем, есть ли уже связь с VK
-        vk_connection = UserVK.query.filter_by(vk_id=vk_id).first()
+        if not user_id:
+            return jsonify({"success": False, "error": "No user_id in response"})
 
-        if vk_connection:
-            # Вход существующего пользователя
-            user = vk_connection.user
-            if user.is_banned:
-                flash("Ваш аккаунт заблокирован", "error")
-                return redirect(url_for("login"))
-
-            login_user(user, remember=True)
-            flash(f"Добро пожаловать, {user.display_name or user.username}! 👋", "success")
-            return redirect(url_for("index"))
-
-        # Получаем данные пользователя из VK
+        # Получаем информацию о пользователе
         user_info_url = "https://api.vk.com/method/users.get"
         user_info_params = {
-            "user_ids": vk_id,
+            "user_ids": user_id,
             "fields": "first_name,last_name,photo_max",
             "access_token": access_token,
             "v": "5.131"
@@ -4621,103 +4599,108 @@ def login_vk_callback():
         user_response = requests.get(user_info_url, params=user_info_params)
         user_data = user_response.json()
 
-        if "response" in user_data and user_data["response"]:
-            vk_user = user_data["response"][0]
-            first_name = vk_user.get("first_name", "")
-            last_name = vk_user.get("last_name", "")
-            display_name = f"{first_name} {last_name}".strip()
-            vk_avatar = vk_user.get("photo_max", "")
+        if "response" not in user_data or not user_data["response"]:
+            return jsonify({"success": False, "error": "Failed to get user info"})
 
-            # Проверяем, существует ли пользователь с таким email
-            existing_user = None
-            if email:
-                existing_user = User.query.filter_by(email=email).first()
+        vk_user = user_data["response"][0]
+        first_name = vk_user.get("first_name", "")
+        last_name = vk_user.get("last_name", "")
+        display_name = f"{first_name} {last_name}".strip()
+        vk_avatar = vk_user.get("photo_max", "")
+        vk_id = str(user_id)
 
-            if existing_user:
-                # Связываем существующий аккаунт с VK
-                vk_conn = UserVK(
-                    user_id=existing_user.id,
-                    vk_id=vk_id,
-                    vk_access_token=access_token,
-                    vk_email=email
-                )
-                db.session.add(vk_conn)
-                db.session.commit()
+        # Проверяем, есть ли уже связь с VK
+        vk_connection = UserVK.query.filter_by(vk_id=vk_id).first()
 
-                login_user(existing_user, remember=True)
-                flash(
-                    f"Аккаунт связан с VK! Добро пожаловать, {existing_user.display_name or existing_user.username}! 👋",
-                    "success")
-                return redirect(url_for("index"))
+        if vk_connection:
+            user = vk_connection.user
+            if user.is_banned:
+                return jsonify({"success": False, "error": "User is banned"})
 
-            # Создаем нового пользователя
-            base_username = display_name.lower().replace(" ", "_") if display_name else f"user_{vk_id}"
-            username = base_username[:30]
-            counter = 1
-            while User.query.filter_by(username=username).first():
-                username = f"{base_username[:25]}_{counter}"
-                counter += 1
+            login_user(user, remember=True)
+            return jsonify({"success": True})
 
-            # Создаем пользователя
-            new_user = User(
-                username=username,
-                email=email or f"{vk_id}@vk.user",
-                display_name=display_name[:60] if display_name else username,
-                bio=f"Привет! Я из ВКонтакте. Моё имя {first_name} {last_name}",
-                preset_avatar=1,
-                is_verified=False,
-                is_banned=False
-            )
-            # Генерируем случайный пароль
-            random_password = secrets.token_urlsafe(12)
-            new_user.set_password(random_password)
+        # Проверяем, есть ли пользователь с таким email
+        email = token_data.get("email", "")
+        existing_user = None
+        if email:
+            existing_user = User.query.filter_by(email=email).first()
 
-            db.session.add(new_user)
-            db.session.flush()
-
-            # Создаем связь с VK
+        if existing_user:
+            # Связываем существующий аккаунт с VK
             vk_conn = UserVK(
-                user_id=new_user.id,
+                user_id=existing_user.id,
                 vk_id=vk_id,
                 vk_access_token=access_token,
                 vk_email=email
             )
             db.session.add(vk_conn)
-
-            # Загружаем аватарку из VK если есть
-            if vk_avatar:
-                try:
-                    import urllib.request
-                    from PIL import Image
-                    import io
-
-                    avatar_response = urllib.request.urlopen(vk_avatar)
-                    img = Image.open(io.BytesIO(avatar_response.read()))
-                    img = img.resize((200, 200), Image.Resampling.LANCZOS)
-
-                    avatar_filename = f"vk_avatar_{new_user.id}_{uuid.uuid4().hex}.png"
-                    avatar_path = os.path.join(app.config['UPLOAD_FOLDER'], 'custom_avatars', avatar_filename)
-                    os.makedirs(os.path.dirname(avatar_path), exist_ok=True)
-                    img.save(avatar_path, "PNG")
-
-                    new_user.can_upload_custom_avatar = True
-                    new_user.custom_avatar = f"/static/uploads/custom_avatars/{avatar_filename}"
-                except Exception as e:
-                    logger.error(f"Failed to load VK avatar: {e}")
-
             db.session.commit()
 
-            login_user(new_user, remember=True)
-            flash(f"Добро пожаловать в Kildear, {display_name}! 🎉 Аккаунт создан через VK", "success")
-            return redirect(url_for("index"))
+            login_user(existing_user, remember=True)
+            return jsonify({"success": True})
 
-        flash("Не удалось получить данные из VK", "error")
-        return redirect(url_for("login"))
+        # Создаём нового пользователя
+        base_username = display_name.lower().replace(" ", "_") if display_name else f"user_{vk_id}"
+        username = base_username[:30]
+        counter = 1
+        while User.query.filter_by(username=username).first():
+            username = f"{base_username[:25]}_{counter}"
+            counter += 1
+
+        new_user = User(
+            username=username,
+            email=email or f"{vk_id}@vk.user",
+            display_name=display_name[:60] if display_name else username,
+            bio=f"Пользователь из ВКонтакте",
+            preset_avatar=1,
+            is_verified=False,
+            is_banned=False
+        )
+        random_password = secrets.token_urlsafe(12)
+        new_user.set_password(random_password)
+
+        db.session.add(new_user)
+        db.session.flush()
+
+        # Создаём связь с VK
+        vk_conn = UserVK(
+            user_id=new_user.id,
+            vk_id=vk_id,
+            vk_access_token=access_token,
+            vk_email=email
+        )
+        db.session.add(vk_conn)
+
+        # Загружаем аватарку из VK
+        if vk_avatar:
+            try:
+                import urllib.request
+                from PIL import Image
+                import io
+
+                avatar_response = urllib.request.urlopen(vk_avatar)
+                img = Image.open(io.BytesIO(avatar_response.read()))
+                img = img.resize((200, 200), Image.Resampling.LANCZOS)
+
+                avatar_filename = f"vk_avatar_{new_user.id}_{uuid.uuid4().hex}.png"
+                avatar_path = os.path.join(app.config['UPLOAD_FOLDER'], 'custom_avatars', avatar_filename)
+                os.makedirs(os.path.dirname(avatar_path), exist_ok=True)
+                img.save(avatar_path, "PNG")
+
+                new_user.can_upload_custom_avatar = True
+                new_user.custom_avatar = f"/static/uploads/custom_avatars/{avatar_filename}"
+            except Exception as e:
+                logger.error(f"Failed to load VK avatar: {e}")
+
+        db.session.commit()
+
+        login_user(new_user, remember=True)
+        return jsonify({"success": True})
 
     except Exception as e:
-        logger.error(f"VK auth error: {e}")
-        flash(f"Ошибка авторизации через VK: {str(e)}", "error")
-        return redirect(url_for("login"))
+        logger.error(f"VK exchange error: {e}")
+        return jsonify({"success": False, "error": str(e)})
 
 
 # ========== VK Connection Model ==========
