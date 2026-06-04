@@ -11,7 +11,7 @@
         <p style="color: var(--text-muted);">Start a community around your interests</p>
     </div>
 
-    <form method="POST" enctype="multipart/form-data" style="background: var(--card); padding: 30px; border-radius: var(--radius-lg);">
+    <form method="POST" style="background: var(--card); padding: 30px; border-radius: var(--radius-lg);">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <div class="form-group" style="margin-bottom: 20px;">
@@ -29,14 +29,18 @@
         </div>
 
         <div class="form-group" style="margin-bottom: 20px;">
-            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Group Avatar</label>
-            <div class="upload-area" onclick="document.getElementById('avatar-input').click()"
-                 style="border: 2px dashed var(--border); border-radius: var(--radius); padding: 20px; text-align: center; cursor: pointer;">
-                <i class="fa-solid fa-cloud-upload-alt" style="font-size: 24px; color: var(--primary); margin-bottom: 10px;"></i>
-                <p>Click to upload group avatar</p>
-                <small style="color: var(--text-muted);">PNG, JPG, GIF up to 5MB</small>
-                <input type="file" id="avatar-input" name="avatar" accept="image/*" style="display: none;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Group Avatar (Admin Approved)</label>
+            <div class="avatar-selection-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 10px;">
+                {% for num, url in preset_group_avatars.items() %}
+                <label class="avatar-option" style="cursor: pointer; text-align: center;">
+                    <input type="radio" name="preset_avatar" value="{{ num }}" {% if num == 1 %}checked{% endif %} style="display: none;">
+                    <img src="{{ url }}" class="preset-avatar-img" data-num="{{ num }}"
+                         style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid transparent; transition: all 0.2s; cursor: pointer;">
+                    <div style="font-size: 12px; margin-top: 5px; color: var(--text-muted);">#{{ num }}</div>
+                </label>
+                {% endfor %}
             </div>
+            <small style="color: var(--text-muted); display: block; margin-top: 10px;">✅ Only admin-approved avatars are available</small>
         </div>
 
         <div class="form-group" style="margin-bottom: 20px;">
@@ -55,4 +59,34 @@
         </div>
     </form>
 </div>
+
+<style>
+.avatar-option {
+    transition: transform 0.2s;
+}
+.avatar-option:hover {
+    transform: scale(1.05);
+}
+.preset-avatar-img.selected {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+}
+</style>
+
+<script>
+document.querySelectorAll('.avatar-option').forEach(option => {
+    const radio = option.querySelector('input[type="radio"]');
+    const img = option.querySelector('.preset-avatar-img');
+
+    if (radio.checked) {
+        img.classList.add('selected');
+    }
+
+    option.addEventListener('click', function(e) {
+        document.querySelectorAll('.preset-avatar-img').forEach(i => i.classList.remove('selected'));
+        radio.checked = true;
+        img.classList.add('selected');
+    });
+});
+</script>
 {% endblock %}

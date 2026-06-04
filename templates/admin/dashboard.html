@@ -63,6 +63,15 @@
         <div class="stat-value">{{ stats.new_users_today }}</div>
         <div class="stat-label">Новых сегодня</div>
     </div>
+
+    <div class="stat-card">
+        <div class="stat-icon">
+            <i class="fa-solid fa-bullhorn"></i>
+        </div>
+        <div class="stat-value">{{ stats.active_banners }}</div>
+        <div class="stat-label">Активных баннеров</div>
+        <a href="{{ url_for('admin_banners') }}" class="stat-link">Управлять →</a>
+    </div>
 </div>
 
 <!-- Recent Users -->
@@ -190,12 +199,12 @@
                 <td>
                     <a href="{{ url_for('admin_applications') }}" class="admin-btn admin-btn-primary btn-sm">Review</a>
                 </td>
-             </tr>
+              </tr>
             {% else %}
             <tr><td colspan="6" style="text-align: center;">Нет заявок на должности</td></tr>
             {% endfor %}
         </tbody>
-    </table>
+     </table>
 </div>
 
 <!-- Pending Reports -->
@@ -241,14 +250,14 @@
                         <i class="fa-solid fa-eye"></i>
                     </a>
                 </td>
-             </tr>
+            </tr>
             {% else %}
             <tr>
                 <td colspan="7" style="text-align: center; color: #7f8c8d;">Нет новых жалоб</td>
-             </tr>
+            </tr>
             {% endfor %}
         </tbody>
-    </table>
+     </table>
 </div>
 
 <!-- Recent Logins -->
@@ -287,10 +296,10 @@
                     {% endif %}
                 </td>
                 <td>{{ login.created_at|timeago }}</td>
-             </tr>
+            </tr>
             {% endfor %}
         </tbody>
-    </table>
+     </table>
 </div>
 
 <style>

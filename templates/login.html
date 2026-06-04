@@ -16,6 +16,7 @@
       --secondary: #ff6b9d; --accent: #00d4ff;
       --text: #e4e4f0; --text-muted: #7070a0; --text-dim: #4a4a70;
       --danger: #ff4757; --success: #22d3a0;
+      --vk: #0077ff;
       --font-head: 'Syne', sans-serif; --font-body: 'DM Sans', sans-serif;
       --radius: 16px; --radius-sm: 10px; --shadow: 0 24px 64px rgba(0,0,0,0.6);
     }
@@ -229,6 +230,32 @@
     .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 10px 36px var(--primary-glow); }
     .btn-submit:active { transform: translateY(0); }
 
+    /* VK Button */
+    .btn-vk {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      padding: 12px;
+      background: var(--vk);
+      color: white;
+      border-radius: 12px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+      transition: all 0.2s;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-vk:hover {
+      background: #0066cc;
+      transform: translateY(-1px);
+    }
+    .btn-vk i {
+      font-size: 20px;
+    }
+
     .divider {
       display: flex; align-items: center; gap: 12px;
       margin: 20px 0;
@@ -312,6 +339,13 @@
 
         <button type="submit" class="btn-submit">Log In</button>
       </form>
+
+      <!-- VK Login Button -->
+      <div style="margin-top: 16px;">
+        <a href="{{ url_for('login_vk') }}" class="btn-vk">
+          <i class="fa-brands fa-vk"></i> Войти через ВКонтакте
+        </a>
+      </div>
 
       <div class="divider">or</div>
 

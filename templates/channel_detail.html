@@ -6,21 +6,11 @@
 <div class="channel-page" style="max-width: 800px; margin: 0 auto; padding: 20px;">
     <!-- Channel Header -->
     <div class="channel-header" style="background: var(--card); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 20px;">
-        {% if channel.cover %}
-        <div class="channel-cover" style="height: 200px; background-image: url('{{ channel.cover }}'); background-size: cover; background-position: center;"></div>
-        {% else %}
         <div class="channel-cover" style="height: 200px; background: linear-gradient(135deg, var(--primary), var(--secondary));"></div>
-        {% endif %}
 
         <div class="channel-info" style="padding: 20px; position: relative;">
             <div class="channel-avatar" style="position: absolute; top: -50px; left: 20px;">
-                {% if channel.avatar %}
-                <img src="{{ channel.avatar }}" class="avatar avatar-xl" style="border: 4px solid var(--surface);">
-                {% else %}
-                <div class="avatar avatar-xl" style="background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; border: 4px solid var(--surface);">
-                    {{ channel.name[0].upper() }}
-                </div>
-                {% endif %}
+                <img src="{{ channel.avatar_url }}" class="avatar avatar-xl" style="border: 4px solid var(--surface); width: 100px; height: 100px; border-radius: 50%; object-fit: cover;">
             </div>
 
             <div style="margin-left: 120px;">
@@ -48,8 +38,8 @@
                         </button>
                     {% endif %}
 
-                    {% if is_own %}
-                    <a href="#" class="btn btn-outline">
+                    {% if is_own or current_user.is_admin %}
+                    <a href="{{ url_for('edit_channel', slug=channel.slug) }}" class="btn btn-outline">
                         <i class="fa-regular fa-pen-to-square"></i> Edit Channel
                     </a>
                     {% endif %}
@@ -66,7 +56,7 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
                 <textarea name="content" placeholder="Share something with your subscribers..."
-                          style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--input-bg); color: var(--text); resize: vertical;"
+                          style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: rgba(255,255,255,0.04); color: var(--text); resize: vertical;"
                           rows="3"></textarea>
 
                 <div style="display: flex; gap: 10px; margin-top: 10px;">
@@ -86,7 +76,7 @@
             {% for post in posts %}
             <div class="post-card" style="background: var(--card); border-radius: var(--radius-lg); padding: 20px; margin-bottom: 15px;">
                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-                    <img src="{{ channel.avatar or '/static/default_channel.png' }}" class="avatar avatar-sm" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                    <img src="{{ channel.avatar_url }}" class="avatar avatar-sm" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
                     <div>
                         <div style="font-weight: 600;">{{ channel.name }}</div>
                         <div style="font-size: 12px; color: var(--text-muted);">{{ post.created_at|timeago }}</div>
@@ -101,7 +91,7 @@
                     {% if post.media_type == 'video' %}
                     <video src="{{ post.media_url }}" controls style="max-width: 100%; border-radius: var(--radius);"></video>
                     {% else %}
-                    <img src="{{ post.media_url }}" style="max-width: 100%; border-radius: var(--radius);">
+                    <img src="{{ post.media_url }}" style="max-width: 100%; border-radius: var(--radius); cursor: pointer;" onclick="openMedia(this.src, 'image')">
                     {% endif %}
                 {% endif %}
 
