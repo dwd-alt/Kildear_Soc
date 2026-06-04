@@ -4536,7 +4536,7 @@ def init_app():
 
 # ========== VK ID OAuth Configuration ==========
 # Данные из вашего приложения VK
-VK_CLIENT_ID = "54623675"  # Ваш ID приложения
+VK_CLIENT_ID = "54623380"  # Ваш ID приложения
 VK_CLIENT_SECRET = "ecQEKwy2LEoX4Zgec6BC"  # Ваш защищённый ключ
 VK_REDIRECT_URI = "https://kildear.onrender.com/login/vk/callback"
 
