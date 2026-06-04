@@ -4536,7 +4536,7 @@ def init_app():
 
 # ========== VK ID OAuth Configuration ==========
 # Данные из вашего приложения VK
-VK_CLIENT_ID = "54623380"  # Ваш ID приложения
+VK_CLIENT_ID = "54623675"  # Ваш ID приложения
 VK_CLIENT_SECRET = "ecQEKwy2LEoX4Zgec6BC"  # Ваш защищённый ключ
 VK_REDIRECT_URI = "https://kildear.onrender.com/login/vk/callback"
 
@@ -4791,4 +4791,3 @@ if __name__ == "__main__":
         socketio.run(app, host="0.0.0.0", port=port)
     else:
         socketio.run(app, debug=True, host="0.0.0.0", port=port, allow_unsafe_werkzeug=True)
-
