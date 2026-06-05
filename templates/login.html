@@ -1,27 +1,45 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Log In — Kildear</title>
+  <title>Вход — Kildear</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <style>
-    :root {
-      --bg: #07070f; --surface: #0f0f1a; --card: rgba(255,255,255,0.04);
-      --border: rgba(255,255,255,0.08); --border-hover: rgba(255,255,255,0.16);
-      --primary: #7c6fff; --primary-glow: rgba(124,111,255,0.25);
-      --secondary: #ff6b9d; --accent: #00d4ff;
-      --text: #e4e4f0; --text-muted: #7070a0; --text-dim: #4a4a70;
-      --danger: #ff4757; --success: #22d3a0;
-      --vk: #0077ff;
-      --font-head: 'Syne', sans-serif; --font-body: 'DM Sans', sans-serif;
-      --radius: 16px; --radius-sm: 10px; --shadow: 0 24px 64px rgba(0,0,0,0.6);
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
     }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
+
+    :root {
+      --bg: #07070f;
+      --surface: #0f0f1a;
+      --card: rgba(255,255,255,0.04);
+      --border: rgba(255,255,255,0.08);
+      --border-hover: rgba(255,255,255,0.16);
+      --primary: #7c6fff;
+      --primary-glow: rgba(124,111,255,0.25);
+      --secondary: #ff6b9d;
+      --accent: #00d4ff;
+      --text: #e4e4f0;
+      --text-muted: #7070a0;
+      --text-dim: #4a4a70;
+      --danger: #ff4757;
+      --success: #22d3a0;
+      --google: #4285f4;
+      --yandex: #fc3f1d;
+      --vk: #0077ff;
+      --font-head: 'Syne', sans-serif;
+      --font-body: 'DM Sans', sans-serif;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --shadow: 0 24px 64px rgba(0,0,0,0.6);
+    }
+
     body {
       font-family: var(--font-body);
       background: var(--bg);
@@ -30,24 +48,16 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      -webkit-font-smoothing: antialiased;
-      overflow: hidden;
+      position: relative;
+      overflow-x: hidden;
     }
+
     body::before {
       content: '';
-      position: fixed; inset: 0;
-      background:
-        radial-gradient(ellipse 70% 60% at 15% 0%, rgba(124,111,255,0.18) 0%, transparent 65%),
-        radial-gradient(ellipse 50% 50% at 85% 100%, rgba(255,107,157,0.12) 0%, transparent 60%),
-        radial-gradient(ellipse 40% 40% at 60% 50%, rgba(0,212,255,0.05) 0%, transparent 60%);
-      pointer-events: none;
-    }
-    body::after {
-      content: '';
-      position: fixed; inset: 0;
-      background-image:
-        repeating-linear-gradient(0deg, transparent, transparent 49px, rgba(255,255,255,0.015) 49px, rgba(255,255,255,0.015) 50px),
-        repeating-linear-gradient(90deg, transparent, transparent 49px, rgba(255,255,255,0.015) 49px, rgba(255,255,255,0.015) 50px);
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 20% -10%, rgba(124,111,255,0.12) 0%, transparent 60%),
+                  radial-gradient(ellipse 60% 50% at 80% 100%, rgba(255,107,157,0.08) 0%, transparent 60%);
       pointer-events: none;
     }
 
@@ -59,9 +69,10 @@
       pointer-events: none;
       animation: float 8s ease-in-out infinite;
     }
-    .orb-1 { width: 300px; height: 300px; background: var(--primary); top: -80px; left: -80px; animation-delay: 0s; }
+    .orb-1 { width: 300px; height: 300px; background: var(--primary); top: -80px; left: -80px; }
     .orb-2 { width: 200px; height: 200px; background: var(--secondary); bottom: -60px; right: -60px; animation-delay: 3s; }
     .orb-3 { width: 150px; height: 150px; background: var(--accent); bottom: 30%; left: 10%; animation-delay: 5s; }
+
     @keyframes float {
       0%, 100% { transform: translateY(0) scale(1); }
       50% { transform: translateY(-20px) scale(1.05); }
@@ -71,7 +82,7 @@
       position: relative;
       z-index: 2;
       width: 100%;
-      max-width: 420px;
+      max-width: 440px;
       padding: 20px;
     }
 
@@ -83,7 +94,8 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 52px; height: 52px;
+      width: 52px;
+      height: 52px;
       background: linear-gradient(135deg, var(--primary), var(--secondary));
       border-radius: 16px;
       font-family: var(--font-head);
@@ -113,10 +125,8 @@
       border: 1px solid var(--border);
       border-radius: 24px;
       padding: 32px;
-      box-shadow: var(--shadow), 0 0 80px rgba(124,111,255,0.06);
-      transition: border-color 0.3s;
+      box-shadow: var(--shadow);
     }
-    .auth-card:hover { border-color: var(--border-hover); }
 
     .auth-title {
       font-family: var(--font-head);
@@ -130,28 +140,53 @@
       margin-bottom: 24px;
     }
 
-    .flash { padding: 12px 16px; border-radius: 10px; margin-bottom: 16px; font-size: 13.5px; display: flex; align-items: center; gap: 8px; }
-    .flash-error { background: rgba(255,71,87,0.1); border: 1px solid rgba(255,71,87,0.3); color: #ff4757; }
-    .flash-success { background: rgba(34,211,160,0.1); border: 1px solid rgba(34,211,160,0.3); color: #22d3a0; }
-    .flash-info { background: rgba(124,111,255,0.1); border: 1px solid rgba(124,111,255,0.3); color: var(--primary); }
+    .flash-message {
+      padding: 12px 16px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      font-size: 13.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .flash-error {
+      background: rgba(255,71,87,0.1);
+      border: 1px solid rgba(255,71,87,0.3);
+      color: var(--danger);
+    }
+    .flash-success {
+      background: rgba(34,211,160,0.1);
+      border: 1px solid rgba(34,211,160,0.3);
+      color: var(--success);
+    }
+    .flash-info {
+      background: rgba(124,111,255,0.1);
+      border: 1px solid rgba(124,111,255,0.3);
+      color: var(--primary);
+    }
 
-    .form-group { margin-bottom: 16px; }
+    .form-group {
+      margin-bottom: 16px;
+    }
     .form-label {
       display: block;
-      font-size: 11px; font-weight: 600;
-      letter-spacing: 0.8px; text-transform: uppercase;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
       color: var(--text-muted);
       margin-bottom: 7px;
     }
-    .input-wrap { position: relative; }
+    .input-wrap {
+      position: relative;
+    }
     .input-wrap i {
       position: absolute;
-      left: 14px; top: 50%;
+      left: 14px;
+      top: 50%;
       transform: translateY(-50%);
       color: var(--text-dim);
       font-size: 14px;
-      pointer-events: none;
-      transition: color 0.2s;
     }
     .form-control {
       width: 100%;
@@ -170,30 +205,46 @@
       background: rgba(124,111,255,0.07);
       box-shadow: 0 0 0 3px rgba(124,111,255,0.2);
     }
-    .form-control:focus + i, .input-wrap:focus-within i { color: var(--primary); }
-    .form-control::placeholder { color: var(--text-dim); }
-
+    .form-control:focus + i {
+      color: var(--primary);
+    }
     .toggle-pw {
       position: absolute;
-      right: 13px; top: 50%;
+      right: 13px;
+      top: 50%;
       transform: translateY(-50%);
-      background: none; border: none;
-      color: var(--text-dim); cursor: pointer;
-      font-size: 14px; padding: 2px;
-      transition: color 0.2s;
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
     }
-    .toggle-pw:hover { color: var(--text-muted); }
 
     .form-options {
-      display: flex; align-items: center;
+      display: flex;
+      align-items: center;
       justify-content: space-between;
       margin-bottom: 20px;
       font-size: 13px;
     }
-    .remember { display: flex; align-items: center; gap: 7px; cursor: pointer; color: var(--text-muted); }
-    .remember input[type=checkbox] { accent-color: var(--primary); width: 14px; height: 14px; cursor: pointer; }
-    .forgot { color: var(--primary); font-weight: 500; }
-    .forgot:hover { text-decoration: underline; }
+    .remember {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+      color: var(--text-muted);
+    }
+    .remember input {
+      accent-color: var(--primary);
+      width: 14px;
+      height: 14px;
+    }
+    .forgot {
+      color: var(--primary);
+      text-decoration: none;
+    }
+    .forgot:hover {
+      text-decoration: underline;
+    }
 
     .btn-submit {
       width: 100%;
@@ -205,55 +256,78 @@
       font-family: var(--font-head);
       font-size: 15px;
       font-weight: 700;
-      letter-spacing: 0.3px;
       cursor: pointer;
       transition: all 0.25s;
       box-shadow: 0 6px 24px var(--primary-glow);
-      position: relative;
-      overflow: hidden;
     }
-    .btn-submit::after {
-      content: '';
-      position: absolute; inset: 0;
-      background: linear-gradient(rgba(255,255,255,0.08), transparent);
-      pointer-events: none;
+    .btn-submit:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 36px var(--primary-glow);
     }
-    .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 10px 36px var(--primary-glow); }
-    .btn-submit:active { transform: translateY(0); }
 
-    .btn-vk {
+    .social-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .social-btn {
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 12px;
       width: 100%;
       padding: 12px;
-      background: var(--vk);
-      color: white;
       border-radius: 12px;
-      text-decoration: none;
       font-weight: 600;
       font-size: 14px;
+      text-decoration: none;
       transition: all 0.2s;
-      border: none;
       cursor: pointer;
-      margin-top: 16px;
+      border: none;
+    }
+    .social-btn i, .social-btn svg {
+      font-size: 20px;
+    }
+    .btn-google {
+      background: #fff;
+      color: #333;
+      border: 1px solid #ddd;
+    }
+    .btn-google:hover {
+      background: #f1f1f1;
+      transform: translateY(-1px);
+    }
+    .btn-yandex {
+      background: var(--yandex);
+      color: #fff;
+    }
+    .btn-yandex:hover {
+      background: #e63510;
+      transform: translateY(-1px);
+    }
+    .btn-vk {
+      background: var(--vk);
+      color: #fff;
     }
     .btn-vk:hover {
       background: #0066cc;
       transform: translateY(-1px);
     }
-    .btn-vk i {
-      font-size: 20px;
-    }
 
     .divider {
-      display: flex; align-items: center; gap: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
       margin: 20px 0;
-      font-size: 12px; color: var(--text-dim);
+      font-size: 12px;
+      color: var(--text-dim);
     }
-    .divider::before, .divider::after {
-      content: ''; flex: 1; height: 1px;
+    .divider::before,
+    .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
       background: var(--border);
     }
 
@@ -263,8 +337,31 @@
       font-size: 13.5px;
       color: var(--text-muted);
     }
-    .auth-footer a { color: var(--primary); font-weight: 600; }
-    .auth-footer a:hover { text-decoration: underline; }
+    .auth-footer a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .auth-footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* Отладочная ссылка */
+    .debug-link {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: 12px;
+    }
+    .debug-link a {
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+    .debug-link a:hover {
+      color: var(--primary);
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
@@ -280,39 +377,30 @@
     </div>
 
     <div class="auth-card">
-      <div class="auth-title">Welcome back</div>
-      <div class="auth-sub">Log in to continue to Kildear</div>
+      <div class="auth-title">Добро пожаловать</div>
+      <div class="auth-sub">Войдите, чтобы продолжить</div>
 
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% for cat, msg in messages %}
-          <div class="flash flash-{{ cat }}">
-            {% if cat == 'error' %}<i class="fa-solid fa-circle-xmark"></i>
-            {% else %}<i class="fa-solid fa-circle-info"></i>{% endif %}
-            {{ msg }}
-          </div>
-        {% endfor %}
-      {% endwith %}
+      <div id="flashContainer"></div>
 
-      <form method="POST" action="{{ url_for('login') }}" autocomplete="on">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <form id="loginForm">
+        <input type="hidden" name="csrf_token" id="csrf_token" value="{{ csrf_token() }}">
 
         <div class="form-group">
-          <label class="form-label" for="identifier">Username or Email</label>
+          <label class="form-label" for="identifier">Email или имя пользователя</label>
           <div class="input-wrap">
             <input class="form-control" type="text" id="identifier" name="identifier"
-                   placeholder="you@example.com or @username"
-                   autocomplete="username" required/>
+                   placeholder="example@mail.com или @username" required>
             <i class="fa-solid fa-user"></i>
           </div>
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="password">Password</label>
+          <label class="form-label" for="password">Пароль</label>
           <div class="input-wrap">
             <input class="form-control" type="password" id="password" name="password"
-                   placeholder="••••••••" autocomplete="current-password" required/>
+                   placeholder="••••••••" required>
             <i class="fa-solid fa-lock"></i>
-            <button type="button" class="toggle-pw" onclick="togglePw('password', this)">
+            <button type="button" class="toggle-pw" onclick="togglePassword()">
               <i class="fa-solid fa-eye"></i>
             </button>
           </div>
@@ -320,40 +408,104 @@
 
         <div class="form-options">
           <label class="remember">
-            <input type="checkbox" name="remember" value="1"/> Remember me
+            <input type="checkbox" name="remember" value="1"> Запомнить меня
           </label>
-          <a href="#" class="forgot">Forgot password?</a>
+          <a href="#" class="forgot">Забыли пароль?</a>
         </div>
 
-        <button type="submit" class="btn-submit">Log In</button>
+        <button type="submit" class="btn-submit">Войти</button>
       </form>
 
-      <!-- VK ID OAuth 2.1 Button -->
-      <a href="https://id.vk.com/oauth2/authorize?client_id=54623675&redirect_uri=https%3A%2F%2Fkildear.onrender.com%2Flogin%2Fvk%2Fcallback&response_type=code&scope=email" 
-         class="btn-vk">
-        <i class="fa-brands fa-vk"></i> Войти через ВКонтакте
-      </a>
+      <div class="social-buttons">
+        <a href="{{ url_for('login_google') }}" class="social-btn btn-google">
+          <i class="fa-brands fa-google"></i> Продолжить с Google
+        </a>
+        <a href="{{ url_for('login_yandex') }}" class="social-btn btn-yandex">
+          <i class="fa-brands fa-yandex"></i> Продолжить с Яндекс
+        </a>
+        <!-- ИСПРАВЛЕННАЯ КНОПКА VK с дополнительными атрибутами -->
+        <a href="{{ url_for('login_vk') }}"
+           class="social-btn btn-vk"
+           target="_self"
+           rel="noopener noreferrer">
+          <i class="fa-brands fa-vk"></i> Продолжить с VK
+        </a>
+      </div>
 
-      <div class="divider">or</div>
+      <div class="divider">или</div>
 
       <div class="auth-footer">
-        Don't have an account? <a href="{{ url_for('register') }}">Create one →</a>
+        Нет аккаунта? <a href="{{ url_for('register') }}">Создать →</a>
+      </div>
+
+      <!-- Отладочная ссылка - временно, для проверки -->
+      <div class="debug-link">
+        🔧 <a href="{{ url_for('login_vk') }}" target="_self">Прямая ссылка VK (для отладки)</a>
       </div>
     </div>
   </div>
 
   <script>
-    function togglePw(id, btn) {
-      const el = document.getElementById(id);
-      const icon = btn.querySelector('i');
-      if (el.type === 'password') {
-        el.type = 'text';
+    function getCSRF() {
+      return document.getElementById('csrf_token')?.value || '';
+    }
+
+    function showFlash(message, type) {
+      const container = document.getElementById('flashContainer');
+      const flash = document.createElement('div');
+      flash.className = `flash-message flash-${type}`;
+      const icon = type === 'error' ? 'fa-circle-xmark' : 'fa-circle-info';
+      flash.innerHTML = `<i class="fa-solid ${icon}"></i> ${message}`;
+      container.appendChild(flash);
+      setTimeout(() => flash.remove(), 5000);
+    }
+
+    function togglePassword() {
+      const input = document.getElementById('password');
+      const icon = document.querySelector('.toggle-pw i');
+      if (input.type === 'password') {
+        input.type = 'text';
         icon.className = 'fa-solid fa-eye-slash';
       } else {
-        el.type = 'password';
+        input.type = 'password';
         icon.className = 'fa-solid fa-eye';
       }
     }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const formData = new FormData(e.target);
+      const data = {
+        identifier: formData.get('identifier'),
+        password: formData.get('password'),
+        remember: formData.get('remember') === '1'
+      };
+
+      try {
+        const response = await fetch('/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRF()
+          },
+          body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          showFlash(result.message, 'success');
+          setTimeout(() => {
+            window.location.href = result.redirect || '/';
+          }, 1000);
+        } else {
+          showFlash(result.error || 'Ошибка входа', 'error');
+        }
+      } catch (error) {
+        showFlash('Ошибка соединения', 'error');
+      }
+    });
   </script>
 </body>
 </html>
