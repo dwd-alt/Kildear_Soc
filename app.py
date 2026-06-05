@@ -1536,12 +1536,12 @@ def login_vk_callback():
             return redirect(url_for("login"))
 
         # Получаем информацию о пользователе
-        user_info_url = "https://api.vk.com/method/users.get"
+        # Это правильный endpoint для VK ID!
+        # Получаем информацию о пользователе
+        user_info_url = "https://id.vk.ru/oauth2/user_info"
         user_info_params = {
-            "user_ids": vk_user_id,
-            "fields": "first_name,last_name,photo_max",
             "access_token": access_token,
-            "v": "5.131"
+            "client_id": VK_CLIENT_ID
         }
         user_response = requests.get(user_info_url, params=user_info_params)
         user_data = user_response.json()
@@ -1550,11 +1550,12 @@ def login_vk_callback():
         last_name = ""
         vk_avatar = ""
 
-        if "response" in user_data and user_data["response"]:
-            vk_user = user_data["response"][0]
+        # ✅ ПРАВИЛЬНО: VK ID API возвращает данные в поле "user"
+        if "user" in user_data:
+            vk_user = user_data["user"]
             first_name = vk_user.get("first_name", "")
             last_name = vk_user.get("last_name", "")
-            vk_avatar = vk_user.get("photo_max", "")
+            vk_avatar = vk_user.get("avatar", "")
 
         display_name = f"{first_name} {last_name}".strip() or f"user_{vk_user_id}"
 
