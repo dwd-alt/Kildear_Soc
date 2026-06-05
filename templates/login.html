@@ -30,13 +30,10 @@
       --text-dim: #4a4a70;
       --danger: #ff4757;
       --success: #22d3a0;
-      --google: #4285f4;
       --yandex: #fc3f1d;
       --vk: #0077ff;
       --font-head: 'Syne', sans-serif;
       --font-body: 'DM Sans', sans-serif;
-      --radius: 16px;
-      --radius-sm: 10px;
       --shadow: 0 24px 64px rgba(0,0,0,0.6);
     }
 
@@ -205,9 +202,7 @@
       background: rgba(124,111,255,0.07);
       box-shadow: 0 0 0 3px rgba(124,111,255,0.2);
     }
-    .form-control:focus + i {
-      color: var(--primary);
-    }
+
     .toggle-pw {
       position: absolute;
       right: 13px;
@@ -283,20 +278,6 @@
       font-size: 14px;
       text-decoration: none;
       transition: all 0.2s;
-      cursor: pointer;
-      border: none;
-    }
-    .social-btn i, .social-btn svg {
-      font-size: 20px;
-    }
-    .btn-google {
-      background: #fff;
-      color: #333;
-      border: 1px solid #ddd;
-    }
-    .btn-google:hover {
-      background: #f1f1f1;
-      transform: translateY(-1px);
     }
     .btn-yandex {
       background: var(--yandex);
@@ -345,23 +326,6 @@
     .auth-footer a:hover {
       text-decoration: underline;
     }
-
-    /* Отладочная ссылка */
-    .debug-link {
-      margin-top: 16px;
-      padding-top: 12px;
-      border-top: 1px solid var(--border);
-      text-align: center;
-      font-size: 12px;
-    }
-    .debug-link a {
-      color: var(--text-muted);
-      text-decoration: none;
-    }
-    .debug-link a:hover {
-      color: var(--primary);
-      text-decoration: underline;
-    }
   </style>
 </head>
 <body>
@@ -380,16 +344,15 @@
       <div class="auth-title">Добро пожаловать</div>
       <div class="auth-sub">Войдите, чтобы продолжить</div>
 
-      <div id="flashContainer"></div>
-
-      <form id="loginForm">
-        <input type="hidden" name="csrf_token" id="csrf_token" value="{{ csrf_token() }}">
+      <!-- Обычная HTML-форма, которая работает без JS проблем -->
+      <form method="POST" action="{{ url_for('login') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <div class="form-group">
           <label class="form-label" for="identifier">Email или имя пользователя</label>
           <div class="input-wrap">
             <input class="form-control" type="text" id="identifier" name="identifier"
-                   placeholder="example@mail.com или @username" required>
+                   placeholder="example@mail.com или username" required>
             <i class="fa-solid fa-user"></i>
           </div>
         </div>
@@ -416,47 +379,24 @@
         <button type="submit" class="btn-submit">Войти</button>
       </form>
 
+      <div class="divider">или</div>
+
       <div class="social-buttons">
         <a href="{{ url_for('login_yandex') }}" class="social-btn btn-yandex">
           <i class="fa-brands fa-yandex"></i> Продолжить с Яндекс
         </a>
-        <!-- ИСПРАВЛЕННАЯ КНОПКА VK с дополнительными атрибутами -->
-        <a href="{{ url_for('login_vk') }}"
-           class="social-btn btn-vk"
-           target="_self"
-           rel="noopener noreferrer">
+        <a href="{{ url_for('login_vk') }}" class="social-btn btn-vk">
           <i class="fa-brands fa-vk"></i> Продолжить с VK
         </a>
       </div>
 
-      <div class="divider">или</div>
-
       <div class="auth-footer">
         Нет аккаунта? <a href="{{ url_for('register') }}">Создать →</a>
-      </div>
-
-      <!-- Отладочная ссылка - временно, для проверки -->
-      <div class="debug-link">
-        🔧 <a href="{{ url_for('login_vk') }}" target="_self">Прямая ссылка VK (для отладки)</a>
       </div>
     </div>
   </div>
 
   <script>
-    function getCSRF() {
-      return document.getElementById('csrf_token')?.value || '';
-    }
-
-    function showFlash(message, type) {
-      const container = document.getElementById('flashContainer');
-      const flash = document.createElement('div');
-      flash.className = `flash-message flash-${type}`;
-      const icon = type === 'error' ? 'fa-circle-xmark' : 'fa-circle-info';
-      flash.innerHTML = `<i class="fa-solid ${icon}"></i> ${message}`;
-      container.appendChild(flash);
-      setTimeout(() => flash.remove(), 5000);
-    }
-
     function togglePassword() {
       const input = document.getElementById('password');
       const icon = document.querySelector('.toggle-pw i');
@@ -468,41 +408,6 @@
         icon.className = 'fa-solid fa-eye';
       }
     }
-
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      const formData = new FormData(e.target);
-      const data = {
-        identifier: formData.get('identifier'),
-        password: formData.get('password'),
-        remember: formData.get('remember') === '1'
-      };
-
-      try {
-        const response = await fetch('/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCSRF()
-          },
-          body: JSON.stringify(data)
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-          showFlash(result.message, 'success');
-          setTimeout(() => {
-            window.location.href = result.redirect || '/';
-          }, 1000);
-        } else {
-          showFlash(result.error || 'Ошибка входа', 'error');
-        }
-      } catch (error) {
-        showFlash('Ошибка соединения', 'error');
-      }
-    });
   </script>
 </body>
 </html>
