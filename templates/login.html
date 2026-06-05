@@ -260,7 +260,6 @@
       box-shadow: 0 10px 36px var(--primary-glow);
     }
 
-    /* Новые стили для чекбокса согласия и кнопки политики */
     .terms-check {
       margin-bottom: 20px;
     }
@@ -290,28 +289,6 @@
     }
     .policy-link:hover {
       text-decoration: underline;
-    }
-    .btn-policy {
-      background: transparent;
-      border: 1px solid var(--border);
-      border-radius: 40px;
-      padding: 8px 16px;
-      color: var(--text-muted);
-      font-size: 12px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 20px;
-      width: auto;
-      justify-content: center;
-    }
-    .btn-policy:hover {
-      border-color: var(--primary);
-      color: var(--primary);
-      background: rgba(124,111,255,0.1);
     }
 
     .social-buttons {
@@ -398,8 +375,9 @@
       <div class="auth-title">Добро пожаловать</div>
       <div class="auth-sub">Войдите, чтобы продолжить</div>
 
-      <!-- Форма входа -->
+      <!-- ФОРМА ВХОДА С ПРАВИЛЬНЫМ CSRF -->
       <form method="POST" action="{{ url_for('login') }}">
+        <!-- ГЛАВНОЕ: скрытое поле с CSRF-токеном -->
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <div class="form-group">
@@ -430,10 +408,9 @@
           <a href="#" class="forgot">Забыли пароль?</a>
         </div>
 
-        <!-- Блок для политики и согласия -->
         <div class="terms-check">
           <label class="checkbox-label">
-            <input type="checkbox" required> Я принимаю
+            <input type="checkbox" required> Я принимаю 
             <button type="button" class="policy-link" onclick="window.open('https://kildear-polit.onrender.com', '_blank')">
               политику конфиденциальности
             </button>
