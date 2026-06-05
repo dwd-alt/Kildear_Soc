@@ -1350,7 +1350,8 @@ def login_yandex():
     if not YANDEX_CLIENT_ID or not YANDEX_CLIENT_SECRET:
         flash("Яндекс авторизация временно недоступна", "error")
         return redirect(url_for("login"))
-    redirect_uri = url_for("yandex_callback", _external=True)
+    # Жестко указываем правильный URL
+    redirect_uri = "https://kildear.onrender.com/login/yandex/callback"
     return oauth.yandex.authorize_redirect(redirect_uri)
 
 
