@@ -241,6 +241,39 @@
       text-decoration: underline;
     }
 
+    /* Блок согласия с политикой */
+    .consent-box {
+      margin: 16px 0 20px 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      background: rgba(124,111,255,0.05);
+      padding: 10px 12px;
+      border-radius: 12px;
+      border-left: 2px solid var(--primary);
+    }
+    .consent-box input {
+      margin-top: 2px;
+      accent-color: var(--primary);
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+    .consent-box label {
+      line-height: 1.4;
+      cursor: pointer;
+    }
+    .consent-box a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .consent-box a:hover {
+      text-decoration: underline;
+    }
+
     .btn-submit {
       width: 100%;
       padding: 13px;
@@ -258,6 +291,11 @@
     .btn-submit:hover {
       transform: translateY(-2px);
       box-shadow: 0 10px 36px var(--primary-glow);
+    }
+    .btn-submit:disabled {
+      opacity: 0.6;
+      transform: none;
+      cursor: not-allowed;
     }
 
     .social-buttons {
@@ -344,8 +382,8 @@
       <div class="auth-title">Добро пожаловать</div>
       <div class="auth-sub">Войдите, чтобы продолжить</div>
 
-      <!-- Обычная HTML-форма, которая работает без JS проблем -->
-      <form method="POST" action="{{ url_for('login') }}">
+      <!-- Обычная HTML-форма -->
+      <form method="POST" action="{{ url_for('login') }}" id="loginForm">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <div class="form-group">
@@ -376,7 +414,15 @@
           <a href="#" class="forgot">Забыли пароль?</a>
         </div>
 
-        <button type="submit" class="btn-submit">Войти</button>
+        <!-- НОВЫЙ БЛОК: согласие с политикой конфиденциальности -->
+        <div class="consent-box">
+          <input type="checkbox" id="privacyConsent" name="privacy_consent" value="1" required>
+          <label for="privacyConsent">
+            Я принимаю <a href="https://kildear-polit.onrender.com/" target="_blank">Политику конфиденциальности</a> и соглашаюсь на обработку моих данных
+          </label>
+        </div>
+
+        <button type="submit" class="btn-submit" id="submitBtn">Войти</button>
       </form>
 
       <div class="divider">или</div>
@@ -408,6 +454,17 @@
         icon.className = 'fa-solid fa-eye';
       }
     }
+
+    // Блокировка кнопки входа, пока не принята политика
+    const consentCheckbox = document.getElementById('privacyConsent');
+    const submitBtn = document.getElementById('submitBtn');
+
+    function updateSubmitButton() {
+      submitBtn.disabled = !consentCheckbox.checked;
+    }
+
+    consentCheckbox.addEventListener('change', updateSubmitButton);
+    updateSubmitButton(); // начальное состояние
   </script>
 </body>
 </html>
