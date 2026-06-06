@@ -245,14 +245,14 @@ def safe_path_join(base_dir: str, *paths: str) -> str:
         if clean_path in ('', '.', '..'):
             raise ValueError("Invalid path component")
         cleaned_paths.append(clean_path)
-    
+
     full_path = os.path.join(base_dir, *cleaned_paths)
     real_base = os.path.realpath(base_dir)
     real_path = os.path.realpath(full_path)
-    
+
     if not real_path.startswith(real_base):
         raise ValueError("Path traversal detected")
-    
+
     return full_path
 
 
@@ -260,25 +260,25 @@ def safe_validate_email(email: str) -> bool:
     """Безопасная валидация email без ReDoS уязвимостей"""
     if not email or len(email) > 254:
         return False
-    
+
     if '@' not in email:
         return False
-    
+
     local, domain = email.rsplit('@', 1)
-    
+
     if len(local) > 64 or len(domain) > 255:
         return False
-    
+
     allowed = string.ascii_letters + string.digits + "._-"
-    
+
     for char in local:
         if char not in allowed:
             return False
-    
+
     for char in domain:
         if char not in allowed + '.':
             return False
-    
+
     return '.' in domain and '..' not in domain
 
 
@@ -286,7 +286,7 @@ def safe_validate_username(username: str) -> bool:
     """Безопасная валидация username"""
     if not username or len(username) > 40 or len(username) < 3:
         return False
-    
+
     allowed = string.ascii_letters + string.digits + "_"
     return all(c in allowed for c in username)
 
@@ -302,15 +302,15 @@ def is_safe_url(target: str) -> bool:
     """Проверка, безопасен ли URL для перенаправления"""
     if not target:
         return False
-    
+
     if target.startswith('/') and not target.startswith('//'):
         return True
-    
+
     ref_url = urlparse(request.host_url)
     test_url = urlparse(urljoin(request.host_url, target))
-    
+
     return test_url.scheme in ('http', 'https') and \
-           ref_url.netloc == test_url.netloc
+        ref_url.netloc == test_url.netloc
 
 
 def mask_sensitive_data(data: Any, show_chars: int = 3) -> str:
@@ -400,7 +400,7 @@ def save_custom_file(file: FileStorage, subfolder: str) -> Optional[str]:
         safe_filename = sanitize_filename(file.filename)
         if not safe_filename:
             return None
-        
+
         ext = safe_filename.rsplit('.', 1)[1].lower() if '.' in safe_filename else ''
         if ext not in ALLOWED_IMAGE:
             return None
@@ -413,12 +413,12 @@ def save_custom_file(file: FileStorage, subfolder: str) -> Optional[str]:
             img = img.resize((1200, 400), Image.Resampling.LANCZOS)
 
         new_filename = f"{uuid.uuid4().hex}.{ext}"
-        
+
         try:
             upload_path = safe_path_join(app.config['UPLOAD_FOLDER'], subfolder)
         except ValueError:
             return None
-        
+
         os.makedirs(upload_path, exist_ok=True)
         file_path = os.path.join(upload_path, new_filename)
 
@@ -437,30 +437,55 @@ def save_file(file: FileStorage, subfolder: str) -> Optional[str]:
     """Безопасное сохранение файла (медиа для постов)"""
     if not file or not file.filename:
         return None
+
+    # БЕЛЫЙ СПИСОК для subfolder
+    ALLOWED_SUBFOLDERS = {'images', 'videos', 'chat_images'}
+    if subfolder not in ALLOWED_SUBFOLDERS:
+        logger.warning(f"Invalid subfolder: {subfolder}")
+        return None
+
+    # ПРОВЕРКА РАЗМЕРА
+    file.seek(0, os.SEEK_END)
+    file_size = file.tell()
+    file.seek(0)
+
+    MAX_SIZE = 50 * 1024 * 1024  # 50 MB
+    if file_size > MAX_SIZE:
+        logger.warning(f"File too large: {file_size}")
+        return None
+
     try:
         safe_filename = sanitize_filename(file.filename)
         if not safe_filename:
             return None
-        
+
         ext = safe_filename.rsplit('.', 1)[1].lower() if '.' in safe_filename else ''
         if not ext or ext not in ALLOWED_VIDEO:
             return None
-        
+
         new_filename = f"{uuid.uuid4().hex}.{ext}"
-        
-        try:
-            upload_path = safe_path_join(app.config['UPLOAD_FOLDER'], subfolder)
-        except ValueError:
+
+        # БЕЗОПАСНЫЙ путь через realpath
+        upload_base = os.path.realpath(app.config['UPLOAD_FOLDER'])
+        upload_path = os.path.realpath(os.path.join(upload_base, subfolder))
+
+        if not upload_path.startswith(upload_base):
+            logger.error(f"Path traversal: {upload_path}")
             return None
-        
+
         os.makedirs(upload_path, exist_ok=True)
         file_path = os.path.join(upload_path, new_filename)
+
+        if not os.path.realpath(file_path).startswith(upload_base):
+            return None
+
         file.save(file_path)
-        
+
         if is_render:
             return f"/uploads/{subfolder}/{new_filename}"
         else:
             return f"/static/uploads/{subfolder}/{new_filename}"
+
     except Exception as e:
         logger.error(f"Error saving file: {e}")
         return None
@@ -668,7 +693,7 @@ blocks = db.Table(
 class InfoBanner(db.Model):
     """Информационный баннер для показа пользователям"""
     __tablename__ = 'info_banner'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text, nullable=False)
@@ -684,7 +709,7 @@ class InfoBanner(db.Model):
 
 class User(UserMixin, db.Model):
     __tablename__ = 'user'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(40), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
@@ -735,7 +760,8 @@ class User(UserMixin, db.Model):
     posts = db.relationship("Post", backref="author", lazy="dynamic", foreign_keys="Post.user_id")
     sent_msgs = db.relationship("Message", backref="sender", lazy="dynamic", foreign_keys="Message.sender_id")
     recv_msgs = db.relationship("Message", backref="receiver", lazy="dynamic", foreign_keys="Message.receiver_id")
-    notifications = db.relationship("Notification", backref="recipient", lazy="dynamic", foreign_keys="Notification.user_id")
+    notifications = db.relationship("Notification", backref="recipient", lazy="dynamic",
+                                    foreign_keys="Notification.user_id")
     comments = db.relationship("Comment", backref="author", lazy="dynamic")
     owned_groups = db.relationship("Group", backref="owner", lazy="dynamic")
     owned_channels = db.relationship("Channel", backref="owner", lazy="dynamic")
@@ -857,7 +883,7 @@ class User(UserMixin, db.Model):
 
 class UserGoogle(db.Model):
     __tablename__ = 'user_google'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     google_id = db.Column(db.String(100), nullable=False, unique=True)
@@ -869,7 +895,7 @@ class UserGoogle(db.Model):
 
 class UserYandex(db.Model):
     __tablename__ = 'user_yandex'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     yandex_id = db.Column(db.String(100), nullable=False, unique=True)
@@ -882,7 +908,7 @@ class UserYandex(db.Model):
 
 class UserVK(db.Model):
     __tablename__ = 'user_vk'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     vk_id = db.Column(db.String(50), nullable=False, unique=True)
@@ -895,7 +921,7 @@ class UserVK(db.Model):
 
 class VerificationRequest(db.Model):
     __tablename__ = 'verification_request'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     reason = db.Column(db.String(500), nullable=False)
@@ -911,7 +937,7 @@ class VerificationRequest(db.Model):
 
 class AdminApplication(db.Model):
     __tablename__ = 'admin_application'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     position = db.Column(db.String(20), nullable=False)
@@ -930,7 +956,7 @@ class AdminApplication(db.Model):
 
 class PostExpiration(db.Model):
     __tablename__ = 'post_expiration'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False)
@@ -941,7 +967,7 @@ class PostExpiration(db.Model):
 
 class GroupPostExpiration(db.Model):
     __tablename__ = 'group_post_expiration'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     post_id = db.Column(db.Integer, db.ForeignKey("group_post.id"), nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False)
@@ -952,7 +978,7 @@ class GroupPostExpiration(db.Model):
 
 class ChannelPostExpiration(db.Model):
     __tablename__ = 'channel_post_expiration'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     post_id = db.Column(db.Integer, db.ForeignKey("channel_post.id"), nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False)
@@ -963,7 +989,7 @@ class ChannelPostExpiration(db.Model):
 
 class UserSettings(db.Model):
     __tablename__ = 'user_settings'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, unique=True)
 
@@ -1028,7 +1054,7 @@ class UserSettings(db.Model):
 
 class LoginHistory(db.Model):
     __tablename__ = 'login_history'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     ip_address = db.Column(db.String(45), nullable=False)
@@ -1040,7 +1066,7 @@ class LoginHistory(db.Model):
 
 class VoiceMessage(db.Model):
     __tablename__ = 'voice_message'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     sender_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     receiver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
@@ -1063,7 +1089,7 @@ class VoiceMessage(db.Model):
 
 class Call(db.Model):
     __tablename__ = 'call'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     caller_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     callee_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
@@ -1079,7 +1105,7 @@ class Call(db.Model):
 
 class Report(db.Model):
     __tablename__ = 'report'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     reporter_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     reported_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
@@ -1099,7 +1125,7 @@ class Report(db.Model):
 
 class Post(db.Model):
     __tablename__ = 'post'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     content = db.Column(db.Text, default="")
@@ -1127,7 +1153,7 @@ class Post(db.Model):
 
 class Comment(db.Model):
     __tablename__ = 'comment'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
@@ -1137,7 +1163,7 @@ class Comment(db.Model):
 
 class Message(db.Model):
     __tablename__ = 'message'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     sender_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     receiver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
@@ -1153,7 +1179,7 @@ class Message(db.Model):
 
 class Group(db.Model):
     __tablename__ = 'group'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     slug = db.Column(db.String(120), unique=True, nullable=False)
@@ -1186,7 +1212,7 @@ class Group(db.Model):
 
 class GroupPost(db.Model):
     __tablename__ = 'group_post'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     group_id = db.Column(db.Integer, db.ForeignKey("group.id"), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
@@ -1201,7 +1227,7 @@ class GroupPost(db.Model):
 
 class Channel(db.Model):
     __tablename__ = 'channel'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     slug = db.Column(db.String(120), unique=True, nullable=False)
@@ -1234,7 +1260,7 @@ class Channel(db.Model):
 
 class ChannelPost(db.Model):
     __tablename__ = 'channel_post'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     channel_id = db.Column(db.Integer, db.ForeignKey("channel.id"), nullable=False)
     content = db.Column(db.Text, default="")
@@ -1248,7 +1274,7 @@ class ChannelPost(db.Model):
 
 class Notification(db.Model):
     __tablename__ = 'notification'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     from_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
@@ -1265,7 +1291,7 @@ class Notification(db.Model):
 
 class UserAchievement(db.Model):
     __tablename__ = 'user_achievement'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     achievement_type = db.Column(db.String(50), nullable=False)
@@ -1424,6 +1450,7 @@ def admin_required(f):
         if not current_user.is_authenticated or not current_user.is_admin:
             abort(403)
         return f(*args, **kwargs)
+
     return decorated_function
 
 
@@ -1807,9 +1834,9 @@ def search_by_qr():
     data = request.get_json()
     if not data:
         return jsonify({"error": "No data provided"}), 400
-    
+
     qr_data = data.get("qr_data", "").strip()
-    
+
     if len(qr_data) > 200:
         return jsonify({"error": "QR data too long"}), 400
 
@@ -2188,35 +2215,68 @@ def apply_admin():
 @app.route("/profile/upload-avatar", methods=["POST"])
 @login_required
 def upload_custom_avatar():
-    if not current_user.can_upload_custom_avatar:
-        return jsonify(
-            {"error": "У вас недостаточно подписчиков для загрузки своей аватарки. Нужно 1000 подписчиков."}), 403
+    try:
+        # Проверка прав
+        if not current_user.can_upload_custom_avatar:
+            return jsonify({
+                "error": "У вас недостаточно подписчиков для загрузки своей аватарки. Нужно 1000 подписчиков."
+            }), 403
 
-    if 'avatar' not in request.files:
-        return jsonify({"error": "Файл не выбран"}), 400
+        # Проверка наличия файла
+        if 'avatar' not in request.files:
+            return jsonify({"error": "Файл не выбран"}), 400
 
-    file = request.files['avatar']
-    if file.filename == '':
-        return jsonify({"error": "Файл не выбран"}), 400
+        file = request.files['avatar']
+        if file.filename == '':
+            return jsonify({"error": "Файл не выбран"}), 400
 
-    avatar_url = save_custom_file(file, "custom_avatars")
-    if not avatar_url:
-        return jsonify({"error": "Неверный формат файла. Поддерживаются: PNG, JPG, JPEG, GIF, WEBP"}), 400
+        # ПРОВЕРКА РАЗМЕРА ФАЙЛА (ДОБАВИТЬ)
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        file.seek(0)
 
-    if current_user.custom_avatar and current_user.custom_avatar.startswith('/static/uploads/custom_avatars/'):
-        try:
-            old_path = safe_path_join(app.config['UPLOAD_FOLDER'], 'custom_avatars',
-                                      os.path.basename(current_user.custom_avatar.split('/')[-1]))
-            if os.path.exists(old_path):
-                os.remove(old_path)
-        except:
-            pass
+        MAX_AVATAR_SIZE = 5 * 1024 * 1024  # 5 MB
+        if file_size > MAX_AVATAR_SIZE:
+            return jsonify({"error": "Файл слишком большой. Максимум 5 MB"}), 400
 
-    current_user.custom_avatar = avatar_url
-    db.session.commit()
+        # Сохранение файла
+        avatar_url = save_custom_file(file, "custom_avatars")
+        if not avatar_url:
+            return jsonify({
+                "error": "Неверный формат файла. Поддерживаются: PNG, JPG, JPEG, GIF, WEBP"
+            }), 400
 
-    flash("Аватарка успешно обновлена!", "success")
-    return redirect(url_for("profile", username=current_user.username))
+        # Удаление старого файла (ИСПРАВЛЕНО)
+        if current_user.custom_avatar and current_user.custom_avatar.startswith('/static/uploads/custom_avatars/'):
+            try:
+                # Извлекаем имя файла из URL
+                old_filename = current_user.custom_avatar.split('/')[-1]
+                old_path = safe_path_join(app.config['UPLOAD_FOLDER'], 'custom_avatars', old_filename)
+                if os.path.exists(old_path):
+                    os.remove(old_path)
+                    logger.info(f"Deleted old avatar for user {current_user.id}: {old_filename}")
+            except Exception as e:
+                # Логируем ошибку, но не прерываем выполнение
+                logger.error(f"Failed to delete old avatar for user {current_user.id}: {e}")
+
+        # Сохраняем новый avatar
+        current_user.custom_avatar = avatar_url
+        db.session.commit()
+
+        flash("Аватарка успешно обновлена!", "success")
+        return redirect(url_for("profile", username=current_user.username))
+
+    except ValueError as e:
+        # Ошибка валидации
+        logger.error(f"Validation error in avatar upload: {e}")
+        flash("Ошибка при загрузке аватарки", "error")
+        return redirect(url_for("profile", username=current_user.username))
+
+    except Exception as e:
+        # Все остальные ошибки - логируем, но пользователю показываем общее сообщение
+        logger.error(f"Unexpected error in avatar upload for user {current_user.id}: {e}", exc_info=True)
+        flash("Произошла ошибка при загрузке аватарки. Попробуйте позже.", "error")
+        return redirect(url_for("profile", username=current_user.username))
 
 
 @app.route("/profile/upload-cover", methods=["POST"])
@@ -2781,6 +2841,10 @@ def settings_chats():
         try:
             data = request.get_json()
 
+            if not data:
+                return jsonify({"success": False, "error": "No data provided"}), 400
+
+            # Валидация цвета
             if 'enter_to_send' in data:
                 settings.enter_to_send = bool(data['enter_to_send'])
             if 'show_typing' in data:
@@ -2788,19 +2852,24 @@ def settings_chats():
             if 'show_read_receipts' in data:
                 settings.show_read_receipts = bool(data['show_read_receipts'])
             if 'bubble_color_own' in data:
-                settings.bubble_color_own = data['bubble_color_own'][:7]
+                color = data['bubble_color_own']
+                if re.match(r'^#[0-9a-fA-F]{6}$', color):
+                    settings.bubble_color_own = color[:7]
             if 'bubble_color_other' in data:
-                settings.bubble_color_other = data['bubble_color_other'][:7]
+                color = data['bubble_color_other']
+                if re.match(r'^#[0-9a-fA-F]{6}$', color):
+                    settings.bubble_color_other = color[:7]
             if 'chat_background' in data:
-                settings.chat_background = data['chat_background'][:200]
+                settings.chat_background = str(data['chat_background'])[:200]
 
             db.session.commit()
             return jsonify({"success": True, "message": "Chat settings updated"})
 
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Error updating chat settings: {e}")
-            return jsonify({"success": False, "error": str(e)}), 500
+            # ИСПРАВЛЕНО: убран str(e) из ответа, добавлен exc_info=True
+            logger.error(f"Error updating chat settings: {e}", exc_info=True)
+            return jsonify({"success": False, "error": "Failed to update chat settings"}), 500
 
     return render_template("settings/chats.html", settings=settings)
 
@@ -2871,6 +2940,9 @@ def settings_sound():
         try:
             data = request.get_json()
 
+            if not data:
+                return jsonify({"success": False, "error": "No data provided"}), 400
+
             if 'camera_enabled' in data:
                 settings.camera_enabled = bool(data['camera_enabled'])
             if 'mic_enabled' in data:
@@ -2881,8 +2953,10 @@ def settings_sound():
 
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Error updating sound settings: {e}")
-            return jsonify({"success": False, "error": str(e)}), 500
+            # ИСПРАВЛЕНО: добавлен exc_info=True
+            logger.error(f"Error updating sound settings: {e}", exc_info=True)
+            # ИСПРАВЛЕНО: убран str(e) из ответа
+            return jsonify({"success": False, "error": "Failed to update sound settings"}), 500
 
     return render_template("settings/sound.html", settings=settings)
 
@@ -2896,6 +2970,10 @@ def settings_battery():
         try:
             data = request.get_json()
 
+            # ДОБАВЛЕНО: проверка на пустые данные
+            if not data:
+                return jsonify({"success": False, "error": "No data provided"}), 400
+
             if 'battery_saver_mode' in data:
                 settings.battery_saver_mode = bool(data['battery_saver_mode'])
                 session['battery_saver_mode'] = settings.battery_saver_mode
@@ -2904,15 +2982,20 @@ def settings_battery():
             if 'animations_enabled' in data:
                 settings.animations_enabled = bool(data['animations_enabled'])
             if 'animation_speed' in data:
-                settings.animation_speed = data['animation_speed']
+                # ДОБАВЛЕНО: валидация значения
+                speed = data['animation_speed']
+                if speed in ['slow', 'normal', 'fast']:
+                    settings.animation_speed = speed
 
             db.session.commit()
             return jsonify({"success": True, "message": "Battery settings updated"})
 
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Error updating battery settings: {e}")
-            return jsonify({"success": False, "error": str(e)}), 500
+            # ИСПРАВЛЕНО: добавлен exc_info=True
+            logger.error(f"Error updating battery settings: {e}", exc_info=True)
+            # ИСПРАВЛЕНО: убран str(e) из ответа
+            return jsonify({"success": False, "error": "Failed to update battery settings"}), 500
 
     return render_template("settings/battery.html", settings=settings)
 
@@ -2926,24 +3009,45 @@ def settings_language():
         try:
             data = request.get_json()
 
+            # ДОБАВЛЕНО: проверка на пустые данные
+            if not data:
+                return jsonify({"success": False, "error": "No data provided"}), 400
+
             if 'language' in data:
-                settings.language = data['language']
-                session['language'] = settings.language
+                lang = data['language']
+                # ДОБАВЛЕНО: белый список допустимых языков
+                allowed_langs = ['ru', 'en', 'kk', 'uz', 'de', 'fr', 'es', 'zh']
+                if lang in allowed_langs:
+                    settings.language = lang
+                    session['language'] = settings.language
             if 'default_scale' in data:
-                settings.default_scale = int(data['default_scale'])
-                session['default_scale'] = settings.default_scale
+                try:
+                    scale = int(data['default_scale'])
+                    # ДОБАВЛЕНО: ограничение значений (50% - 200%)
+                    settings.default_scale = max(50, min(200, scale))
+                    session['default_scale'] = settings.default_scale
+                except (ValueError, TypeError):
+                    pass
             if 'font_size' in data:
-                settings.font_size = data['font_size']
+                size = data['font_size']
+                # ДОБАВЛЕНО: белый список размеров
+                if size in ['small', 'medium', 'large', 'xlarge']:
+                    settings.font_size = size
             if 'chat_font_size' in data:
-                settings.chat_font_size = data['chat_font_size']
+                size = data['chat_font_size']
+                # ДОБАВЛЕНО: белый список размеров
+                if size in ['small', 'medium', 'large', 'xlarge']:
+                    settings.chat_font_size = size
 
             db.session.commit()
             return jsonify({"success": True, "message": "Language settings updated"})
 
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Error updating language settings: {e}")
-            return jsonify({"success": False, "error": str(e)}), 500
+            # ИСПРАВЛЕНО: добавлен exc_info=True
+            logger.error(f"Error updating language settings: {e}", exc_info=True)
+            # ИСПРАВЛЕНО: убран str(e) из ответа
+            return jsonify({"success": False, "error": "Failed to update language settings"}), 500
 
     return render_template("settings/language.html", settings=settings)
 
@@ -3075,11 +3179,11 @@ def send_voice_message():
 
         audio_file.seek(0)
         audio_data = audio_file.read()
-        
+
         # Limit audio file size (10 MB)
         if len(audio_data) > 10 * 1024 * 1024:
             return jsonify({"error": "Audio file too large"}), 400
-            
+
         base64_data = base64.b64encode(audio_data).decode('utf-8')
 
         duration = request.form.get("duration", 0, type=int)
@@ -3478,7 +3582,8 @@ def register():
                 return render_template("register.html")
 
             if not safe_validate_username(username):
-                flash("Имя пользователя должно быть 3-40 символов и содержать только буквы, цифры и подчеркивания", "error")
+                flash("Имя пользователя должно быть 3-40 символов и содержать только буквы, цифры и подчеркивания",
+                      "error")
                 return render_template("register.html")
 
             if not safe_validate_email(email):
@@ -3564,10 +3669,12 @@ def login():
             user.check_and_update_permissions()
 
             login_success = True
-            flash(f"С возвращением, {user.username}! 👋", "success")
+            # ИСПРАВЛЕНО: убираем username из flash сообщения
+            flash(f"С возвращением! 👋", "success")  # <- Убрал {user.username}
         else:
             track_failure(ip)
-            flash("Неверные учетные данные.", "error")
+            # ИСПРАВЛЕНО: общее сообщение об ошибке
+            flash("Неверный логин или пароль.", "error")  # <- Убрал конкретику
 
         try:
             login_history = LoginHistory(
@@ -3640,57 +3747,77 @@ def index():
 @login_required
 @limiter.limit("30 per hour")
 def create_post():
-    content = escape_html(request.form.get("content", "").strip())
-    media_file = request.files.get("media")
-    media_url = ""
-    media_type = "text"
+    try:
+        content = escape_html(request.form.get("content", "").strip())
+        media_file = request.files.get("media")
+        media_url = ""
+        media_type = "text"
 
-    if media_file and media_file.filename:
-        try:
-            safe_filename = sanitize_filename(media_file.filename)
-            if not safe_filename:
-                flash("Недопустимое имя файла", "error")
-                return redirect(url_for("index"))
-            
-            ext = safe_filename.rsplit(".", 1)[-1].lower() if '.' in safe_filename else ''
+        # ДОБАВИТЬ: проверка размера файла
+        if media_file and media_file.filename:
+            # Проверяем размер файла
+            media_file.seek(0, os.SEEK_END)
+            file_size = media_file.tell()
+            media_file.seek(0)
 
-            if ext in ALLOWED_VIDEO:
-                media_url = save_file(media_file, "videos") or ""
-                media_type = "video"
-            elif ext in ALLOWED_IMAGE:
-                media_url = save_file(media_file, "images") or ""
-                media_type = "image" if media_url else "text"
-            else:
-                flash(f"Неподдерживаемый тип файла", "error")
+            MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
+            if file_size > MAX_FILE_SIZE:
+                flash("Файл слишком большой. Максимум 50 MB", "error")
                 return redirect(url_for("index"))
-        except Exception as e:
-            logger.error(f"Ошибка при сохранении файла: {e}")
-            flash("Ошибка при загрузке файла", "error")
+
+        if media_file and media_file.filename:
+            try:
+                safe_filename = sanitize_filename(media_file.filename)
+                if not safe_filename:
+                    flash("Недопустимое имя файла", "error")
+                    return redirect(url_for("index"))
+
+                ext = safe_filename.rsplit(".", 1)[-1].lower() if '.' in safe_filename else ''
+
+                if ext in ALLOWED_VIDEO:
+                    media_url = save_file(media_file, "videos") or ""
+                    media_type = "video"
+                elif ext in ALLOWED_IMAGE:
+                    media_url = save_file(media_file, "images") or ""
+                    media_type = "image" if media_url else "text"
+                else:
+                    flash("Неподдерживаемый тип файла", "error")
+                    return redirect(url_for("index"))
+            except Exception as e:
+                # УЖЕ ИСПРАВЛЕНО: нет str(e) в flash
+                logger.error(f"Error saving file in create_post: {e}", exc_info=True)
+                flash("Ошибка при загрузке файла", "error")
+                return redirect(url_for("index"))
+
+        if not content and not media_url:
+            flash("Пост не может быть пустым.", "error")
             return redirect(url_for("index"))
 
-    if not content and not media_url:
-        flash("Пост не может быть пустым.", "error")
+        post = Post(
+            user_id=current_user.id,
+            content=content,
+            media_url=media_url or "",
+            media_type=media_type
+        )
+
+        db.session.add(post)
+        db.session.commit()
+
+        follower_count = current_user.follower_count
+        hours = get_post_lifetime_hours(follower_count)
+        if hours:
+            schedule_post_expiration(post.id, 'post', follower_count)
+            flash(f"Пост опубликован! Он будет автоматически удалён через {hours} часов.", "info")
+        else:
+            flash("Пост опубликован!", "success")
+
         return redirect(url_for("index"))
 
-    post = Post(
-        user_id=current_user.id,
-        content=content,
-        media_url=media_url or "",
-        media_type=media_type
-    )
-
-    db.session.add(post)
-    db.session.commit()
-
-    follower_count = current_user.follower_count
-    hours = get_post_lifetime_hours(follower_count)
-    if hours:
-        schedule_post_expiration(post.id, 'post', follower_count)
-        flash(f"Пост опубликован! Он будет автоматически удалён через {hours} часов.", "info")
-    else:
-        flash("Пост опубликован!", "success")
-
-    return redirect(url_for("index"))
+    except Exception as e:
+        # ДОБАВЛЕНО: общий обработчик неожиданных ошибок
+        logger.error(f"Unexpected error in create_post for user {current_user.id}: {e}", exc_info=True)
+        flash("Не удалось опубликовать пост. Попробуйте позже.", "error")
+        return redirect(url_for("index"))
 
 
 @app.route("/post/<int:post_id>")
@@ -3814,7 +3941,7 @@ def delete_post(post_id):
 def profile(username):
     if not safe_validate_username(username):
         abort(404)
-    
+
     user = User.query.filter(func.lower(User.username) == username.lower()).first_or_404()
 
     is_blocked = current_user.is_blocked(user) if user.id != current_user.id else False
@@ -3891,21 +4018,32 @@ def edit_profile():
                         flash("Password changed successfully!", "success")
                     else:
                         flash("New password must be at least 8 characters", "error")
+                        # Важно: возвращаемся, чтобы не сохранять другие изменения
+                        return redirect(url_for("edit_profile"))
                 else:
                     flash("Current password is incorrect", "error")
+                    return redirect(url_for("edit_profile"))
 
             db.session.commit()
             flash("Profile updated successfully!", "success")
+            return redirect(url_for("profile", username=current_user.username))
+
+        except ValueError as e:
+            # Ошибка валидации
+            db.session.rollback()
+            logger.warning(f"Validation error in edit_profile: {e}")
+            flash("Invalid data provided. Please check your input.", "error")
+            return redirect(url_for("edit_profile"))
 
         except Exception as e:
+            # Все остальные ошибки
             db.session.rollback()
-            logger.error(f"Error updating profile: {e}")
-            flash(f"Error updating profile", "error")
-
-        return redirect(url_for("profile", username=current_user.username))
+            # УЖЕ ИСПРАВЛЕНО: нет str(e) в flash
+            logger.error(f"Error updating profile for user {current_user.id}: {e}", exc_info=True)
+            flash("Failed to update profile. Please try again.", "error")
+            return redirect(url_for("edit_profile"))
 
     permissions = current_user.check_and_update_permissions()
-
     return render_template("edit_profile.html", permissions=permissions)
 
 
@@ -3914,7 +4052,7 @@ def edit_profile():
 def follow(username):
     if not safe_validate_username(username):
         return jsonify({"error": "Invalid username"}), 400
-    
+
     user = User.query.filter(func.lower(User.username) == username.lower()).first_or_404()
 
     if user.id == current_user.id:
@@ -4120,7 +4258,7 @@ def chat(username):
     try:
         if not safe_validate_username(username):
             abort(404)
-        
+
         partner = User.query.filter(
             func.lower(User.username) == username.lower()).first_or_404()
 
@@ -4205,7 +4343,7 @@ def send_message(username):
     try:
         if not safe_validate_username(username):
             return jsonify({"error": "Invalid username"}), 400
-        
+
         partner = User.query.filter(
             func.lower(User.username) == username.lower()).first_or_404()
 
@@ -5127,29 +5265,79 @@ def server_error(e):
 
 @app.route("/static/uploads/<path:filename>")
 def uploaded_file(filename):
+    """Максимально безопасная отдача загруженных файлов"""
+
+    # Белый список разрешенных расширений
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'mp4', 'webm', 'mp3', 'wav', 'ogg'}
+
+    # 1. Очищаем имя файла
     safe_filename = os.path.basename(filename)
-    return send_from_directory(app.config["UPLOAD_FOLDER"], safe_filename)
+
+    # 2. Базовые проверки
+    if not safe_filename or len(safe_filename) > 255:
+        abort(404)
+
+    # 3. Проверка на path traversal (многоуровневая)
+    dangerous_patterns = ['..', './', '.\\', '%2e', '%2E', '\\', '//', ':']
+    for pattern in dangerous_patterns:
+        if pattern in safe_filename.lower():
+            abort(404)
+
+    # 4. Проверка на допустимые символы
+    if not re.match(r'^[a-zA-Z0-9_.-]+$', safe_filename):
+        abort(404)
+
+    # 5. Проверка расширения файла
+    ext = safe_filename.rsplit('.', 1)[-1].lower() if '.' in safe_filename else ''
+    if ext not in ALLOWED_EXTENSIONS:
+        abort(404)
+
+    # 6. Получаем реальные пути
+    upload_folder = os.path.realpath(app.config['UPLOAD_FOLDER'])
+    file_path = os.path.realpath(os.path.join(upload_folder, safe_filename))
+
+    # 7. Проверка, что файл внутри upload_folder
+    if not file_path.startswith(upload_folder):
+        abort(404)
+
+    # 8. Проверка существования
+    if not os.path.isfile(file_path):
+        abort(404)
+
+    # 9. Проверка размера файла (опционально)
+    file_size = os.path.getsize(file_path)
+    if file_size > 100 * 1024 * 1024:  # 100 MB
+        abort(404)
+
+    # 10. Отдаем файл с правильными заголовками
+    response = send_from_directory(upload_folder, safe_filename)
+
+    # Добавляем security headers
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Content-Security-Policy'] = "default-src 'none'"
+
+    return response
 
 
 @app.route("/uploads/<path:subfolder>/<path:filename>")
 def serve_upload(subfolder, filename):
     if subfolder not in UPLOAD_SUBFOLDERS:
         abort(404)
-    
+
     safe_filename = os.path.basename(filename)
     safe_subfolder = os.path.basename(subfolder)
-    
+
     if safe_subfolder not in UPLOAD_SUBFOLDERS:
         abort(404)
-    
+
     try:
         file_path = safe_path_join(app.config['UPLOAD_FOLDER'], safe_subfolder, safe_filename)
     except ValueError:
         abort(404)
-    
+
     if not os.path.exists(file_path):
         abort(404)
-    
+
     return send_from_directory(
         os.path.join(app.config['UPLOAD_FOLDER'], safe_subfolder),
         safe_filename
