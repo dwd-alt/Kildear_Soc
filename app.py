@@ -1,8 +1,6 @@
 """
-Kildear Social Network — Complete Version with Fixed QR Code
-Full-featured backend with admin panel, voice messages, calls, and enhanced security
-Added: Google & Yandex OAuth authentication
-Fixed: QR code generation
+Kildear Social Network — Полная версия с исправленными ошибками безопасности
+Исправлены: XSS, Path Traversal, ReDoS, Open Redirect, логирование sensitive data
 """
 
 import os
@@ -13,15 +11,21 @@ import base64
 import logging
 import platform
 import json
-from io import BytesIO
-import requests
 import secrets
+import string
+import hashlib
+import hmac
+from io import BytesIO
 from datetime import datetime, timedelta
 from collections import defaultdict
 from functools import wraps
+from urllib.parse import urlparse, urljoin
+from typing import Optional, Dict, Any, List
 
+import requests
 from flask import (Flask, render_template, request, redirect, url_for,
-                   flash, jsonify, abort, session, send_from_directory)
+                   flash, jsonify, abort, session, send_from_directory,
+                   make_response, Response)
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (LoginManager, UserMixin, login_user, logout_user,
                          login_required, current_user)
@@ -30,10 +34,12 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.datastructures import FileStorage
 from sqlalchemy import or_, func, and_, text
 from PIL import Image
 import qrcode
 from authlib.integrations.flask_client import OAuth
+from markupsafe import escape
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -77,13 +83,10 @@ ALLOWED_VIDEO = {"mp4", "webm", "mov", "avi", "mkv"}
 ALLOWED_AUDIO = {"mp3", "wav", "ogg", "m4a"}
 
 # OAuth Configuration
-# Google OAuth
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
-# Yandex OAuth
 YANDEX_CLIENT_ID = os.environ.get('YANDEX_CLIENT_ID', '')
 YANDEX_CLIENT_SECRET = os.environ.get('YANDEX_CLIENT_SECRET', '')
-# VK OAuth
 VK_CLIENT_ID = os.environ.get('VK_CLIENT_ID', '54623675')
 VK_CLIENT_SECRET = os.environ.get('VK_CLIENT_SECRET', '3410Kv2UzDqdtXZeZisJ')
 
@@ -91,7 +94,7 @@ VK_CLIENT_SECRET = os.environ.get('VK_CLIENT_SECRET', '3410Kv2UzDqdtXZeZisJ')
 BASE_URL = os.environ.get('BASE_URL', 'https://kildear.onrender.com' if is_render else 'http://localhost:5000')
 
 # Preset avatars for users (1-10)
-PRESET_AVATARS = {
+PRESET_AVATARS: Dict[int, str] = {
     1: '/static/avatars/preset/1av.png',
     2: '/static/avatars/preset/2av.png',
     3: '/static/avatars/preset/3av.png',
@@ -105,7 +108,7 @@ PRESET_AVATARS = {
 }
 
 # Preset covers for users (1-5)
-PRESET_COVERS = {
+PRESET_COVERS: Dict[int, str] = {
     1: '/static/covers/preset/1cover.jpg',
     2: '/static/covers/preset/2cover.jpg',
     3: '/static/covers/preset/3cover.jpg',
@@ -114,7 +117,7 @@ PRESET_COVERS = {
 }
 
 # Preset avatars for groups
-PRESET_GROUP_AVATARS = {
+PRESET_GROUP_AVATARS: Dict[int, str] = {
     1: '/static/group_avatars/preset/1.png',
     2: '/static/group_avatars/preset/2.png',
     3: '/static/group_avatars/preset/3.png',
@@ -126,7 +129,7 @@ PRESET_GROUP_AVATARS = {
 }
 
 # Preset avatars for channels
-PRESET_CHANNEL_AVATARS = {
+PRESET_CHANNEL_AVATARS: Dict[int, str] = {
     1: '/static/channel_avatars/preset/1.png',
     2: '/static/channel_avatars/preset/2.png',
     3: '/static/channel_avatars/preset/3.png',
@@ -136,7 +139,7 @@ PRESET_CHANNEL_AVATARS = {
 }
 
 app.config.update(
-    SECRET_KEY=os.environ.get("SECRET_KEY", os.urandom(48).hex()),
+    SECRET_KEY=os.environ.get("SECRET_KEY", secrets.token_hex(32)),
     SQLALCHEMY_DATABASE_URI=SQLALCHEMY_DATABASE_URI,
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     SQLALCHEMY_ENGINE_OPTIONS={
@@ -221,49 +224,410 @@ if YANDEX_CLIENT_ID and YANDEX_CLIENT_SECRET:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  Template Filters
+#  БЕЗОПАСНЫЕ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 # ──────────────────────────────────────────────────────────────────────────────
-@app.template_filter('timeago')
-def timeago_filter(date):
-    if not date:
-        return 'recently'
-    now = datetime.utcnow()
-    diff = now - date
-    if diff.days > 365:
-        return f"{diff.days // 365}y ago"
-    elif diff.days > 30:
-        return f"{diff.days // 30}mo ago"
-    elif diff.days > 0:
-        return f"{diff.days}d ago"
-    elif diff.seconds > 3600:
-        return f"{diff.seconds // 3600}h ago"
-    elif diff.seconds > 60:
-        return f"{diff.seconds // 60}m ago"
+
+def escape_html(text: Any) -> str:
+    """Безопасное экранирование HTML"""
+    if text is None:
+        return ""
+    return escape(str(text))
+
+
+def safe_path_join(base_dir: str, *paths: str) -> str:
+    """Безопасное объединение путей с защитой от path traversal"""
+    cleaned_paths = []
+    for path in paths:
+        if not path:
+            continue
+        # Удаляем только basename для предотвращения traversal
+        clean_path = os.path.basename(str(path))
+        if clean_path in ('', '.', '..'):
+            raise ValueError("Invalid path component")
+        cleaned_paths.append(clean_path)
+    
+    full_path = os.path.join(base_dir, *cleaned_paths)
+    real_base = os.path.realpath(base_dir)
+    real_path = os.path.realpath(full_path)
+    
+    if not real_path.startswith(real_base):
+        raise ValueError("Path traversal detected")
+    
+    return full_path
+
+
+def safe_validate_email(email: str) -> bool:
+    """Безопасная валидация email без ReDoS уязвимостей"""
+    if not email or len(email) > 254:
+        return False
+    
+    if '@' not in email:
+        return False
+    
+    local, domain = email.rsplit('@', 1)
+    
+    if len(local) > 64 or len(domain) > 255:
+        return False
+    
+    allowed = string.ascii_letters + string.digits + "._-"
+    
+    for char in local:
+        if char not in allowed:
+            return False
+    
+    for char in domain:
+        if char not in allowed + '.':
+            return False
+    
+    return '.' in domain and '..' not in domain
+
+
+def safe_validate_username(username: str) -> bool:
+    """Безопасная валидация username"""
+    if not username or len(username) > 40 or len(username) < 3:
+        return False
+    
+    allowed = string.ascii_letters + string.digits + "_"
+    return all(c in allowed for c in username)
+
+
+def safe_validate_password(password: str) -> bool:
+    """Валидация пароля"""
+    if not password or len(password) < 8:
+        return False
+    return True
+
+
+def is_safe_url(target: str) -> bool:
+    """Проверка, безопасен ли URL для перенаправления"""
+    if not target:
+        return False
+    
+    if target.startswith('/') and not target.startswith('//'):
+        return True
+    
+    ref_url = urlparse(request.host_url)
+    test_url = urlparse(urljoin(request.host_url, target))
+    
+    return test_url.scheme in ('http', 'https') and \
+           ref_url.netloc == test_url.netloc
+
+
+def mask_sensitive_data(data: Any, show_chars: int = 3) -> str:
+    """Маскирование чувствительных данных для логов"""
+    if not data:
+        return "***"
+    data_str = str(data)
+    if len(data_str) <= show_chars * 2:
+        return "*" * len(data_str)
+    return data_str[:show_chars] + "****" + data_str[-show_chars:]
+
+
+def sanitize_filename(filename: str) -> Optional[str]:
+    """Очистка имени файла от опасных символов"""
+    if not filename:
+        return None
+    # Оставляем только безопасные символы
+    name, ext = os.path.splitext(filename)
+    safe_name = re.sub(r'[^a-zA-Z0-9_.-]', '', name)
+    safe_ext = re.sub(r'[^a-zA-Z0-9.]', '', ext)
+    if not safe_name:
+        safe_name = str(uuid.uuid4().hex)[:16]
+    result = f"{safe_name}{safe_ext}"[:255]
+    return result if result else None
+
+
+def get_post_lifetime_hours(follower_count: int) -> Optional[int]:
+    """Получение времени жизни поста в зависимости от количества подписчиков"""
+    if follower_count >= 5000:
+        return 24
+    elif follower_count >= 3000:
+        return 18
+    elif follower_count >= 2000:
+        return 12
+    elif follower_count >= 1000:
+        return 6
+    elif follower_count >= 500:
+        return 3
     else:
-        return "just now"
+        return None
 
 
-@app.template_filter('format_date')
-def format_date_filter(date, format='%b %d, %Y'):
-    return date.strftime(format) if date else ''
+def schedule_post_expiration(post_id: int, post_type: str = 'post', follower_count: int = 0) -> Optional[datetime]:
+    """Планирование автоматического удаления поста"""
+    hours = get_post_lifetime_hours(follower_count)
+    if hours is None:
+        return None
+
+    expires_at = datetime.utcnow() + timedelta(hours=hours)
+
+    if post_type == 'post':
+        expiration = PostExpiration(post_id=post_id, expires_at=expires_at)
+    elif post_type == 'group_post':
+        expiration = GroupPostExpiration(post_id=post_id, expires_at=expires_at)
+    elif post_type == 'channel_post':
+        expiration = ChannelPostExpiration(post_id=post_id, expires_at=expires_at)
+    else:
+        return None
+
+    db.session.add(expiration)
+    db.session.commit()
+    return expires_at
 
 
-@app.template_filter('format_time')
-def format_time_filter(date, format='%H:%M'):
-    return date.strftime(format) if date else ''
+def cleanup_expired_posts() -> None:
+    """Очистка истекших постов"""
+    now = datetime.utcnow()
+
+    expired_posts = PostExpiration.query.filter(
+        PostExpiration.expires_at <= now,
+        PostExpiration.is_deleted == False
+    ).all()
+
+    for exp in expired_posts:
+        if exp.post:
+            db.session.delete(exp.post)
+        exp.is_deleted = True
+
+    db.session.commit()
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-#  Декоратор для проверки прав администратора
-# ──────────────────────────────────────────────────────────────────────────────
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated or not current_user.is_admin:
-            abort(403)
-        return f(*args, **kwargs)
+def save_custom_file(file: FileStorage, subfolder: str) -> Optional[str]:
+    """Безопасное сохранение кастомного файла (аватар/обложка)"""
+    if not file or not file.filename:
+        return None
+    try:
+        safe_filename = sanitize_filename(file.filename)
+        if not safe_filename:
+            return None
+        
+        ext = safe_filename.rsplit('.', 1)[1].lower() if '.' in safe_filename else ''
+        if ext not in ALLOWED_IMAGE:
+            return None
 
-    return decorated_function
+        img = Image.open(file)
+
+        if subfolder == 'custom_avatars':
+            img = img.resize((200, 200), Image.Resampling.LANCZOS)
+        elif subfolder == 'custom_covers':
+            img = img.resize((1200, 400), Image.Resampling.LANCZOS)
+
+        new_filename = f"{uuid.uuid4().hex}.{ext}"
+        
+        try:
+            upload_path = safe_path_join(app.config['UPLOAD_FOLDER'], subfolder)
+        except ValueError:
+            return None
+        
+        os.makedirs(upload_path, exist_ok=True)
+        file_path = os.path.join(upload_path, new_filename)
+
+        img.save(file_path, optimize=True, quality=85)
+
+        if is_render:
+            return f"/uploads/{subfolder}/{new_filename}"
+        else:
+            return f"/static/uploads/{subfolder}/{new_filename}"
+    except Exception as e:
+        logger.error(f"Error saving custom file: {e}")
+        return None
+
+
+def save_file(file: FileStorage, subfolder: str) -> Optional[str]:
+    """Безопасное сохранение файла (медиа для постов)"""
+    if not file or not file.filename:
+        return None
+    try:
+        safe_filename = sanitize_filename(file.filename)
+        if not safe_filename:
+            return None
+        
+        ext = safe_filename.rsplit('.', 1)[1].lower() if '.' in safe_filename else ''
+        if not ext or ext not in ALLOWED_VIDEO:
+            return None
+        
+        new_filename = f"{uuid.uuid4().hex}.{ext}"
+        
+        try:
+            upload_path = safe_path_join(app.config['UPLOAD_FOLDER'], subfolder)
+        except ValueError:
+            return None
+        
+        os.makedirs(upload_path, exist_ok=True)
+        file_path = os.path.join(upload_path, new_filename)
+        file.save(file_path)
+        
+        if is_render:
+            return f"/uploads/{subfolder}/{new_filename}"
+        else:
+            return f"/static/uploads/{subfolder}/{new_filename}"
+    except Exception as e:
+        logger.error(f"Error saving file: {e}")
+        return None
+
+
+def ensure_upload_folders() -> None:
+    """Создание всех необходимых папок для загрузок"""
+    for folder in UPLOAD_SUBFOLDERS:
+        folder_path = os.path.join(app.config['UPLOAD_FOLDER'], folder)
+        try:
+            os.makedirs(folder_path, exist_ok=True)
+        except Exception as e:
+            logger.error(f"Failed to create folder {folder_path}: {e}")
+
+    preset_folders = [
+        ('static', 'avatars', 'preset'),
+        ('static', 'covers', 'preset'),
+        ('static', 'group_avatars', 'preset'),
+        ('static', 'channel_avatars', 'preset'),
+    ]
+
+    for *parts, last in preset_folders:
+        folder_path = os.path.join(*parts, last)
+        try:
+            os.makedirs(folder_path, exist_ok=True)
+        except Exception as e:
+            logger.error(f"Failed to create preset folder {folder_path}: {e}")
+
+
+def get_client_ip() -> str:
+    """Получение IP адреса клиента"""
+    if request.headers.get('X-Forwarded-For'):
+        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
+    return request.remote_addr or '0.0.0.0'
+
+
+def track_failure(ip: str) -> None:
+    """Отслеживание неудачных попыток для защиты от брутфорса"""
+    now = time.time()
+    fails = [t for t in _fail_log[ip] if now - t < 300]
+    fails.append(now)
+    _fail_log[ip] = fails
+    if len(fails) >= 20:
+        _blocked_ips.add(ip)
+
+
+def notification_link(notif) -> str:
+    """Генерация ссылки для уведомления"""
+    if notif.type in ['like', 'comment', 'mention']:
+        if notif.post_id:
+            return url_for('view_post', post_id=notif.post_id)
+    elif notif.type == 'follow':
+        if notif.from_user:
+            return url_for('profile', username=notif.from_user.username)
+    elif notif.type in ['missed_call', 'incoming_call', 'voice_message']:
+        if notif.from_user:
+            return url_for('chat', username=notif.from_user.username)
+    return '#'
+
+
+def notification_icon(notif) -> str:
+    """Иконка для уведомления"""
+    icons = {
+        'like': '❤️',
+        'comment': '💬',
+        'follow': '👤',
+        'mention': '@',
+        'group_post': '👥',
+        'channel_post': '📢',
+        'missed_call': '📞',
+        'incoming_call': '📞',
+        'voice_message': '🎤',
+        'message': '💬'
+    }
+    return icons.get(notif.type, '🔔')
+
+
+def notification_text(notif) -> str:
+    """Текст уведомления"""
+    if notif.text:
+        return notif.text
+    if notif.type == 'like':
+        return f"{notif.from_user.username} liked your post"
+    elif notif.type == 'comment':
+        return f"{notif.from_user.username} commented on your post"
+    elif notif.type == 'follow':
+        return f"{notif.from_user.username} started following you"
+    elif notif.type == 'mention':
+        return f"{notif.from_user.username} mentioned you in a post"
+    elif notif.type == 'group_post':
+        return f"New post in group"
+    elif notif.type == 'channel_post':
+        return f"New post in channel"
+    elif notif.type == 'missed_call':
+        return f"Missed call from {notif.from_user.username}"
+    elif notif.type == 'voice_message':
+        return f"Voice message from {notif.from_user.username}"
+    elif notif.type == 'message':
+        return f"New message from {notif.from_user.username}"
+    return "New notification"
+
+
+def create_user_from_oauth(email: str, username: str, display_name: str, avatar_url: str = None):
+    """Create a new user from OAuth data"""
+    # Ensure username is unique
+    base_username = re.sub(r'[^a-zA-Z0-9_]', '_', username.lower())[:30]
+    final_username = base_username
+    counter = 1
+    while User.query.filter_by(username=final_username).first():
+        final_username = f"{base_username[:25]}_{counter}"
+        counter += 1
+
+    # Ensure email is unique or generate one
+    if not email:
+        email = f"{final_username}@oauth.user"
+    else:
+        existing = User.query.filter_by(email=email).first()
+        if existing:
+            email = f"{final_username}_{uuid.uuid4().hex[:8]}@oauth.user"
+
+    new_user = User(
+        username=final_username,
+        email=email,
+        display_name=display_name[:60] if display_name else final_username,
+        bio="",
+        preset_avatar=1,
+        is_verified=False,
+        is_banned=False
+    )
+    new_user.set_password(secrets.token_urlsafe(16))
+
+    db.session.add(new_user)
+    db.session.flush()
+
+    # Download avatar if provided
+    if avatar_url:
+        try:
+            response = requests.get(avatar_url, timeout=10)
+            if response.status_code == 200:
+                img = Image.open(BytesIO(response.content))
+                img = img.resize((200, 200), Image.Resampling.LANCZOS)
+
+                avatar_filename = f"oauth_{new_user.id}_{uuid.uuid4().hex}.png"
+                avatar_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'custom_avatars')
+                os.makedirs(avatar_dir, exist_ok=True)
+                img.save(os.path.join(avatar_dir, avatar_filename), "PNG")
+
+                new_user.can_upload_custom_avatar = True
+                if is_render:
+                    new_user.custom_avatar = f"/uploads/custom_avatars/{avatar_filename}"
+                else:
+                    new_user.custom_avatar = f"/static/uploads/custom_avatars/{avatar_filename}"
+        except Exception as e:
+            logger.error(f"Failed to download avatar from OAuth: {e}")
+
+    db.session.commit()
+    return new_user
+
+
+def generate_pkce_pair() -> tuple:
+    """Генерирует пару code_verifier и code_challenge для PKCE (RFC 7636)"""
+    code_verifier = secrets.token_urlsafe(64)
+    code_challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(code_verifier.encode()).digest()
+    ).decode().rstrip('=')
+
+    return code_verifier, code_challenge
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -303,6 +667,8 @@ blocks = db.Table(
 
 class InfoBanner(db.Model):
     """Информационный баннер для показа пользователям"""
+    __tablename__ = 'info_banner'
+    
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text, nullable=False)
@@ -317,10 +683,12 @@ class InfoBanner(db.Model):
 
 
 class User(UserMixin, db.Model):
+    __tablename__ = 'user'
+    
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(40), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(256), nullable=True)  # nullable for OAuth users
+    password_hash = db.Column(db.String(256), nullable=True)
     display_name = db.Column(db.String(60), default="")
     bio = db.Column(db.String(500), default="")
 
@@ -347,6 +715,7 @@ class User(UserMixin, db.Model):
     two_factor_enabled = db.Column(db.Boolean, default=False)
     two_factor_secret = db.Column(db.String(32), nullable=True)
 
+    # Relationships
     following = db.relationship(
         "User", secondary=follows,
         primaryjoin=follows.c.follower_id == id,
@@ -366,19 +735,18 @@ class User(UserMixin, db.Model):
     posts = db.relationship("Post", backref="author", lazy="dynamic", foreign_keys="Post.user_id")
     sent_msgs = db.relationship("Message", backref="sender", lazy="dynamic", foreign_keys="Message.sender_id")
     recv_msgs = db.relationship("Message", backref="receiver", lazy="dynamic", foreign_keys="Message.receiver_id")
-    notifications = db.relationship("Notification", backref="recipient", lazy="dynamic",
-                                    foreign_keys="Notification.user_id")
+    notifications = db.relationship("Notification", backref="recipient", lazy="dynamic", foreign_keys="Notification.user_id")
     comments = db.relationship("Comment", backref="author", lazy="dynamic")
     owned_groups = db.relationship("Group", backref="owner", lazy="dynamic")
     owned_channels = db.relationship("Channel", backref="owner", lazy="dynamic")
     login_history = db.relationship("LoginHistory", backref="user", lazy="dynamic")
 
     @property
-    def follower_count(self):
+    def follower_count(self) -> int:
         return self.followers.count()
 
     @property
-    def avatar_url(self):
+    def avatar_url(self) -> str:
         if self.custom_avatar and self.can_upload_custom_avatar:
             return self.custom_avatar
         if self.preset_avatar and self.preset_avatar in PRESET_AVATARS:
@@ -386,20 +754,20 @@ class User(UserMixin, db.Model):
         return PRESET_AVATARS[1]
 
     @property
-    def cover_url(self):
+    def cover_url(self) -> Optional[str]:
         if self.custom_cover and self.can_upload_custom_cover:
             return self.custom_cover
         if self.preset_cover and self.preset_cover in PRESET_COVERS:
             return PRESET_COVERS[self.preset_cover]
         return None
 
-    def set_preset_avatar(self, avatar_num):
+    def set_preset_avatar(self, avatar_num: int) -> bool:
         if 1 <= avatar_num <= 10:
             self.preset_avatar = avatar_num
             return True
         return False
 
-    def set_preset_cover(self, cover_num):
+    def set_preset_cover(self, cover_num: Optional[int]) -> bool:
         if cover_num is None:
             self.preset_cover = None
             return True
@@ -408,25 +776,25 @@ class User(UserMixin, db.Model):
             return True
         return False
 
-    def check_and_update_permissions(self):
+    def check_and_update_permissions(self) -> Dict[str, bool]:
         follower_count = self.follower_count
 
         if follower_count >= 1000 and not self.can_upload_custom_avatar:
             self.can_upload_custom_avatar = True
             db.session.commit()
-            logger.info(f"User {self.username} gained custom avatar permission")
+            logger.info(f"User {mask_sensitive_data(self.username)} gained custom avatar permission")
 
         if follower_count >= 5000 and not self.can_upload_custom_cover:
             self.can_upload_custom_cover = True
             db.session.commit()
-            logger.info(f"User {self.username} gained custom cover permission")
+            logger.info(f"User {mask_sensitive_data(self.username)} gained custom cover permission")
 
         return {
             'can_upload_custom_avatar': self.can_upload_custom_avatar,
             'can_upload_custom_cover': self.can_upload_custom_cover
         }
 
-    def get_post_lifetime_hours(self):
+    def get_post_lifetime_hours(self) -> Optional[int]:
         count = self.follower_count
         if count >= 5000:
             return 24
@@ -441,8 +809,8 @@ class User(UserMixin, db.Model):
         else:
             return None
 
-    def set_password(self, pw: str):
-        if pw:
+    def set_password(self, pw: str) -> None:
+        if pw and safe_validate_password(pw):
             self.password_hash = generate_password_hash(pw)
 
     def check_password(self, pw: str) -> bool:
@@ -450,30 +818,30 @@ class User(UserMixin, db.Model):
             return False
         return check_password_hash(self.password_hash, pw)
 
-    def is_following(self, user):
+    def is_following(self, user) -> bool:
         return self.following.filter(follows.c.followed_id == user.id).count() > 0
 
-    def is_blocked(self, user):
+    def is_blocked(self, user) -> bool:
         return self.blocked_users.filter(blocks.c.blocked_id == user.id).count() > 0
 
-    def block(self, user):
+    def block(self, user) -> bool:
         if not self.is_blocked(user):
             self.blocked_users.append(user)
             return True
         return False
 
-    def unblock(self, user):
+    def unblock(self, user) -> bool:
         if self.is_blocked(user):
             self.blocked_users.remove(user)
             return True
         return False
 
     @property
-    def following_count(self):
+    def following_count(self) -> int:
         return self.following.count()
 
     @property
-    def post_count(self):
+    def post_count(self) -> int:
         return self.posts.count()
 
     def get_settings(self):
@@ -487,8 +855,9 @@ class User(UserMixin, db.Model):
         return self._settings_cache
 
 
-# OAuth connections models
 class UserGoogle(db.Model):
+    __tablename__ = 'user_google'
+    
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     google_id = db.Column(db.String(100), nullable=False, unique=True)
@@ -499,6 +868,8 @@ class UserGoogle(db.Model):
 
 
 class UserYandex(db.Model):
+    __tablename__ = 'user_yandex'
+    
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     yandex_id = db.Column(db.String(100), nullable=False, unique=True)
@@ -510,6 +881,8 @@ class UserYandex(db.Model):
 
 
 class UserVK(db.Model):
+    __tablename__ = 'user_vk'
+    
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     vk_id = db.Column(db.String(50), nullable=False, unique=True)
@@ -521,6 +894,8 @@ class UserVK(db.Model):
 
 
 class VerificationRequest(db.Model):
+    __tablename__ = 'verification_request'
+    
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     reason = db.Column(db.String(500), nullable=False)
@@ -535,6 +910,8 @@ class VerificationRequest(db.Model):
 
 
 class AdminApplication(db.Model):
+    __tablename__ = 'admin_application'
+    
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     position = db.Column(db.String(20), nullable=False)
@@ -552,6 +929,8 @@ class AdminApplication(db.Model):
 
 
 class PostExpiration(db.Model):
+    __tablename__ = 'post_expiration'
+    
     id = db.Column(db.Integer, primary_key=True)
     post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False)
@@ -561,6 +940,8 @@ class PostExpiration(db.Model):
 
 
 class GroupPostExpiration(db.Model):
+    __tablename__ = 'group_post_expiration'
+    
     id = db.Column(db.Integer, primary_key=True)
     post_id = db.Column(db.Integer, db.ForeignKey("group_post.id"), nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False)
@@ -570,6 +951,8 @@ class GroupPostExpiration(db.Model):
 
 
 class ChannelPostExpiration(db.Model):
+    __tablename__ = 'channel_post_expiration'
+    
     id = db.Column(db.Integer, primary_key=True)
     post_id = db.Column(db.Integer, db.ForeignKey("channel_post.id"), nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False)
@@ -579,6 +962,8 @@ class ChannelPostExpiration(db.Model):
 
 
 class UserSettings(db.Model):
+    __tablename__ = 'user_settings'
+    
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, unique=True)
 
@@ -642,6 +1027,8 @@ class UserSettings(db.Model):
 
 
 class LoginHistory(db.Model):
+    __tablename__ = 'login_history'
+    
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     ip_address = db.Column(db.String(45), nullable=False)
@@ -652,6 +1039,8 @@ class LoginHistory(db.Model):
 
 
 class VoiceMessage(db.Model):
+    __tablename__ = 'voice_message'
+    
     id = db.Column(db.Integer, primary_key=True)
     sender_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     receiver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
@@ -663,7 +1052,7 @@ class VoiceMessage(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     @property
-    def audio_url_data(self):
+    def audio_url_data(self) -> str:
         if self.audio_data:
             return f"data:{self.audio_mime};base64,{self.audio_data}"
         return self.audio_url
@@ -673,6 +1062,8 @@ class VoiceMessage(db.Model):
 
 
 class Call(db.Model):
+    __tablename__ = 'call'
+    
     id = db.Column(db.Integer, primary_key=True)
     caller_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     callee_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
@@ -687,6 +1078,8 @@ class Call(db.Model):
 
 
 class Report(db.Model):
+    __tablename__ = 'report'
+    
     id = db.Column(db.Integer, primary_key=True)
     reporter_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     reported_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
@@ -705,6 +1098,8 @@ class Report(db.Model):
 
 
 class Post(db.Model):
+    __tablename__ = 'post'
+    
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     content = db.Column(db.Text, default="")
@@ -719,11 +1114,11 @@ class Post(db.Model):
     expiration = db.relationship("PostExpiration", backref="post_rel", uselist=False, cascade="all,delete")
 
     @property
-    def like_count(self):
+    def like_count(self) -> int:
         return self.liked_by.count()
 
     @property
-    def comment_count(self):
+    def comment_count(self) -> int:
         return self.comments.count()
 
     def is_liked_by(self, user) -> bool:
@@ -731,6 +1126,8 @@ class Post(db.Model):
 
 
 class Comment(db.Model):
+    __tablename__ = 'comment'
+    
     id = db.Column(db.Integer, primary_key=True)
     post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
@@ -739,6 +1136,8 @@ class Comment(db.Model):
 
 
 class Message(db.Model):
+    __tablename__ = 'message'
+    
     id = db.Column(db.Integer, primary_key=True)
     sender_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     receiver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
@@ -753,6 +1152,8 @@ class Message(db.Model):
 
 
 class Group(db.Model):
+    __tablename__ = 'group'
+    
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     slug = db.Column(db.String(120), unique=True, nullable=False)
@@ -767,16 +1168,16 @@ class Group(db.Model):
     posts = db.relationship("GroupPost", backref="group", lazy="dynamic", cascade="all,delete")
 
     @property
-    def member_count(self):
+    def member_count(self) -> int:
         return self.members.count()
 
     @property
-    def avatar_url(self):
+    def avatar_url(self) -> str:
         if self.preset_avatar and self.preset_avatar in PRESET_GROUP_AVATARS:
             return PRESET_GROUP_AVATARS[self.preset_avatar]
         return PRESET_GROUP_AVATARS[1]
 
-    def set_preset_avatar(self, avatar_num):
+    def set_preset_avatar(self, avatar_num: int) -> bool:
         if avatar_num in PRESET_GROUP_AVATARS:
             self.preset_avatar = avatar_num
             return True
@@ -784,6 +1185,8 @@ class Group(db.Model):
 
 
 class GroupPost(db.Model):
+    __tablename__ = 'group_post'
+    
     id = db.Column(db.Integer, primary_key=True)
     group_id = db.Column(db.Integer, db.ForeignKey("group.id"), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
@@ -797,6 +1200,8 @@ class GroupPost(db.Model):
 
 
 class Channel(db.Model):
+    __tablename__ = 'channel'
+    
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     slug = db.Column(db.String(120), unique=True, nullable=False)
@@ -811,16 +1216,16 @@ class Channel(db.Model):
     posts = db.relationship("ChannelPost", backref="channel", lazy="dynamic", cascade="all,delete")
 
     @property
-    def sub_count(self):
+    def sub_count(self) -> int:
         return self.subscribers.count()
 
     @property
-    def avatar_url(self):
+    def avatar_url(self) -> str:
         if self.preset_avatar and self.preset_avatar in PRESET_CHANNEL_AVATARS:
             return PRESET_CHANNEL_AVATARS[self.preset_avatar]
         return PRESET_CHANNEL_AVATARS[1]
 
-    def set_preset_avatar(self, avatar_num):
+    def set_preset_avatar(self, avatar_num: int) -> bool:
         if avatar_num in PRESET_CHANNEL_AVATARS:
             self.preset_avatar = avatar_num
             return True
@@ -828,6 +1233,8 @@ class Channel(db.Model):
 
 
 class ChannelPost(db.Model):
+    __tablename__ = 'channel_post'
+    
     id = db.Column(db.Integer, primary_key=True)
     channel_id = db.Column(db.Integer, db.ForeignKey("channel.id"), nullable=False)
     content = db.Column(db.Text, default="")
@@ -840,6 +1247,8 @@ class ChannelPost(db.Model):
 
 
 class Notification(db.Model):
+    __tablename__ = 'notification'
+    
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     from_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
@@ -854,306 +1263,63 @@ class Notification(db.Model):
     call = db.relationship("Call", foreign_keys=[call_id])
 
 
+class UserAchievement(db.Model):
+    __tablename__ = 'user_achievement'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    achievement_type = db.Column(db.String(50), nullable=False)
+    achieved_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship("User", backref="achievements")
+
+
 # ──────────────────────────────────────────────────────────────────────────────
-#  Helper Functions
+#  Template Filters
 # ──────────────────────────────────────────────────────────────────────────────
 
-def get_post_lifetime_hours(follower_count):
-    if follower_count >= 5000:
-        return 24
-    elif follower_count >= 3000:
-        return 18
-    elif follower_count >= 2000:
-        return 12
-    elif follower_count >= 1000:
-        return 6
-    elif follower_count >= 500:
-        return 3
-    else:
-        return None
-
-
-def schedule_post_expiration(post_id, post_type='post', follower_count=0):
-    hours = get_post_lifetime_hours(follower_count)
-    if hours is None:
-        return None
-
-    expires_at = datetime.utcnow() + timedelta(hours=hours)
-
-    if post_type == 'post':
-        expiration = PostExpiration(post_id=post_id, expires_at=expires_at)
-    elif post_type == 'group_post':
-        expiration = GroupPostExpiration(post_id=post_id, expires_at=expires_at)
-    elif post_type == 'channel_post':
-        expiration = ChannelPostExpiration(post_id=post_id, expires_at=expires_at)
-    else:
-        return None
-
-    db.session.add(expiration)
-    db.session.commit()
-    return expires_at
-
-
-def cleanup_expired_posts():
+@app.template_filter('timeago')
+def timeago_filter(date):
+    if not date:
+        return 'recently'
     now = datetime.utcnow()
-
-    expired_posts = PostExpiration.query.filter(
-        PostExpiration.expires_at <= now,
-        PostExpiration.is_deleted == False
-    ).all()
-
-    for exp in expired_posts:
-        if exp.post:
-            db.session.delete(exp.post)
-        exp.is_deleted = True
-
-    expired_group_posts = GroupPostExpiration.query.filter(
-        GroupPostExpiration.expires_at <= now,
-        GroupPostExpiration.is_deleted == False
-    ).all()
-
-    for exp in expired_group_posts:
-        if exp.post:
-            db.session.delete(exp.post)
-        exp.is_deleted = True
-
-    expired_channel_posts = ChannelPostExpiration.query.filter(
-        ChannelPostExpiration.expires_at <= now,
-        ChannelPostExpiration.is_deleted == False
-    ).all()
-
-    for exp in expired_channel_posts:
-        if exp.post:
-            db.session.delete(exp.post)
-        exp.is_deleted = True
-
-    db.session.commit()
-
-    if expired_posts or expired_group_posts or expired_channel_posts:
-        logger.info(
-            f"Cleaned up {len(expired_posts)} posts, {len(expired_group_posts)} group posts, {len(expired_channel_posts)} channel posts")
+    diff = now - date
+    if diff.days > 365:
+        return f"{diff.days // 365}y ago"
+    elif diff.days > 30:
+        return f"{diff.days // 30}mo ago"
+    elif diff.days > 0:
+        return f"{diff.days}d ago"
+    elif diff.seconds > 3600:
+        return f"{diff.seconds // 3600}h ago"
+    elif diff.seconds > 60:
+        return f"{diff.seconds // 60}m ago"
+    else:
+        return "just now"
 
 
-def save_custom_file(file, subfolder: str):
-    if not file or not file.filename:
-        return None
-    try:
-        ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
-        if ext not in ALLOWED_IMAGE:
-            return None
-
-        img = Image.open(file)
-
-        if subfolder == 'custom_avatars':
-            img = img.resize((200, 200), Image.Resampling.LANCZOS)
-        elif subfolder == 'custom_covers':
-            img = img.resize((1200, 400), Image.Resampling.LANCZOS)
-
-        filename = f"{uuid.uuid4().hex}.{ext}"
-        upload_path = os.path.join(app.config['UPLOAD_FOLDER'], subfolder)
-        os.makedirs(upload_path, exist_ok=True)
-        file_path = os.path.join(upload_path, filename)
-
-        img.save(file_path, optimize=True, quality=85)
-
-        if is_render:
-            return f"/uploads/{subfolder}/{filename}"
-        else:
-            return f"/static/uploads/{subfolder}/{filename}"
-    except Exception as e:
-        logger.error(f"Error saving custom file: {e}")
-        return None
+@app.template_filter('format_date')
+def format_date_filter(date, format='%b %d, %Y'):
+    return date.strftime(format) if date else ''
 
 
-def notification_link(notif):
-    if notif.type in ['like', 'comment', 'mention']:
-        if notif.post_id:
-            return url_for('view_post', post_id=notif.post_id)
-    elif notif.type == 'follow':
-        if notif.from_user:
-            return url_for('profile', username=notif.from_user.username)
-    elif notif.type in ['missed_call', 'incoming_call', 'voice_message']:
-        if notif.from_user:
-            return url_for('chat', username=notif.from_user.username)
-    return '#'
+@app.template_filter('format_time')
+def format_time_filter(date, format='%H:%M'):
+    return date.strftime(format) if date else ''
 
 
-def notification_icon(notif):
-    icons = {
-        'like': '❤️',
-        'comment': '💬',
-        'follow': '👤',
-        'mention': '@',
-        'group_post': '👥',
-        'channel_post': '📢',
-        'missed_call': '📞',
-        'incoming_call': '📞',
-        'voice_message': '🎤',
-        'message': '💬'
-    }
-    return icons.get(notif.type, '🔔')
-
-
-def notification_text(notif):
-    if notif.text:
-        return notif.text
-    if notif.type == 'like':
-        return f"{notif.from_user.username} liked your post"
-    elif notif.type == 'comment':
-        return f"{notif.from_user.username} commented on your post"
-    elif notif.type == 'follow':
-        return f"{notif.from_user.username} started following you"
-    elif notif.type == 'mention':
-        return f"{notif.from_user.username} mentioned you in a post"
-    elif notif.type == 'group_post':
-        return f"New post in group"
-    elif notif.type == 'channel_post':
-        return f"New post in channel"
-    elif notif.type == 'missed_call':
-        return f"Missed call from {notif.from_user.username}"
-    elif notif.type == 'voice_message':
-        return f"Voice message from {notif.from_user.username}"
-    elif notif.type == 'message':
-        return f"New message from {notif.from_user.username}"
-    return "New notification"
-
-
-def ensure_upload_folders():
-    for folder in UPLOAD_SUBFOLDERS:
-        folder_path = os.path.join(app.config['UPLOAD_FOLDER'], folder)
-        try:
-            os.makedirs(folder_path, exist_ok=True)
-        except Exception as e:
-            logger.error(f"Failed to create folder {folder_path}: {e}")
-
-    preset_folders = [
-        ('static', 'avatars', 'preset'),
-        ('static', 'covers', 'preset'),
-        ('static', 'group_avatars', 'preset'),
-        ('static', 'channel_avatars', 'preset'),
-    ]
-
-    for *parts, last in preset_folders:
-        folder_path = os.path.join(*parts, last)
-        try:
-            os.makedirs(folder_path, exist_ok=True)
-            logger.info(f"✅ Preset folder ready: {folder_path}")
-        except Exception as e:
-            logger.error(f"Failed to create preset folder {folder_path}: {e}")
-
-
-def save_file(file, subfolder: str):
-    if not file or not file.filename:
-        return None
-    try:
-        ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
-        if not ext or ext not in ALLOWED_VIDEO:
-            return None
-        filename = f"{uuid.uuid4().hex}.{ext}"
-        upload_path = os.path.join(app.config['UPLOAD_FOLDER'], subfolder)
-        os.makedirs(upload_path, exist_ok=True)
-        file_path = os.path.join(upload_path, filename)
-        file.save(file_path)
-        if is_render:
-            return f"/uploads/{subfolder}/{filename}"
-        else:
-            return f"/static/uploads/{subfolder}/{filename}"
-    except Exception as e:
-        logger.error(f"Error saving file: {e}")
-        return None
-
-
-@app.route('/uploads/<path:subfolder>/<path:filename>')
-def serve_upload(subfolder, filename):
-    if subfolder not in UPLOAD_SUBFOLDERS:
-        abort(404)
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], subfolder, filename)
-    if not os.path.exists(file_path):
-        abort(404)
-    return send_from_directory(
-        os.path.join(app.config['UPLOAD_FOLDER'], subfolder),
-        filename
-    )
-
-
-@app.route("/admin/banners/<int:banner_id>/data")
-@login_required
-@admin_required
-def get_banner_data(banner_id):
-    banner = InfoBanner.query.get_or_404(banner_id)
-    return jsonify({
-        "title": banner.title,
-        "content": banner.content,
-        "banner_type": banner.banner_type
-    })
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-#  DDoS Protection
-# ──────────────────────────────────────────────────────────────────────────────
-_req_log: dict = defaultdict(list)
-_blocked_ips: set = set()
-_fail_log: dict = defaultdict(list)
-
-
-def get_client_ip():
-    if request.headers.get('X-Forwarded-For'):
-        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
-    return request.remote_addr or '0.0.0.0'
-
-
-@app.before_request
-def ddos_shield():
-    ip = get_client_ip()
-    if ip in _blocked_ips:
-        abort(429)
-    now = time.time()
-    window = [t for t in _req_log[ip] if now - t < 10]
-    window.append(now)
-    _req_log[ip] = window
-    if len(window) > 200:
-        _blocked_ips.add(ip)
-        app.logger.warning(f"[DDoS] Blocked IP: {ip}")
-        abort(429)
-    if request.content_length and request.content_length > app.config["MAX_CONTENT_LENGTH"]:
-        abort(413)
-
-
-@app.after_request
-def security_headers(response):
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["X-XSS-Protection"] = "1; mode=block"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-
-    csp = [
-        "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' https://cdn.socket.io https://cdnjs.cloudflare.com https://unpkg.com https://accounts.google.com https://oauth.vk.com https://login.yandex.ru",
-        "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com",
-        "font-src 'self' https://cdnjs.cloudflare.com",
-        "img-src 'self' data: blob: https:",
-        "media-src 'self' blob:",
-        "connect-src 'self' wss: ws:",
-        "frame-ancestors 'none'",
-        "frame-src https://oauth.vk.com https://accounts.google.com https://login.yandex.ru"
-    ]
-    response.headers["Content-Security-Policy"] = '; '.join(csp)
-    return response
-
-
-def track_failure(ip: str):
-    now = time.time()
-    fails = [t for t in _fail_log[ip] if now - t < 300]
-    fails.append(now)
-    _fail_log[ip] = fails
-    if len(fails) >= 20:
-        _blocked_ips.add(ip)
+@app.template_filter('escape_js')
+def escape_js_filter(text):
+    """Экранирование для вставки в JavaScript"""
+    if not text:
+        return ""
+    return escape(str(text)).replace('\\', '\\\\').replace("'", "\\'").replace('"', '\\"')
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 #  Auth loader
 # ──────────────────────────────────────────────────────────────────────────────
+
 @login_mgr.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
@@ -1162,6 +1328,7 @@ def load_user(user_id):
 # ──────────────────────────────────────────────────────────────────────────────
 #  Context Processors
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.context_processor
 def inject_globals():
     unread = 0
@@ -1199,65 +1366,65 @@ def inject_globals():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  OAuth Helper Functions
+#  DDoS Protection
 # ──────────────────────────────────────────────────────────────────────────────
 
-def create_user_from_oauth(email, username, display_name, avatar_url=None):
-    """Create a new user from OAuth data"""
-    # Ensure username is unique
-    base_username = re.sub(r'[^a-zA-Z0-9_]', '_', username.lower())[:30]
-    final_username = base_username
-    counter = 1
-    while User.query.filter_by(username=final_username).first():
-        final_username = f"{base_username[:25]}_{counter}"
-        counter += 1
+_req_log: Dict[str, List[float]] = defaultdict(list)
+_blocked_ips: set = set()
+_fail_log: Dict[str, List[float]] = defaultdict(list)
 
-    # Ensure email is unique or generate one
-    if not email:
-        email = f"{final_username}@oauth.user"
-    else:
-        existing = User.query.filter_by(email=email).first()
-        if existing:
-            email = f"{final_username}_{uuid.uuid4().hex[:8]}@oauth.user"
 
-    new_user = User(
-        username=final_username,
-        email=email,
-        display_name=display_name[:60] if display_name else final_username,
-        bio="",
-        preset_avatar=1,
-        is_verified=False,
-        is_banned=False
-    )
-    # Set a random password for OAuth users
-    new_user.set_password(secrets.token_urlsafe(16))
+@app.before_request
+def ddos_shield():
+    ip = get_client_ip()
+    if ip in _blocked_ips:
+        abort(429)
+    now = time.time()
+    window = [t for t in _req_log[ip] if now - t < 10]
+    window.append(now)
+    _req_log[ip] = window
+    if len(window) > 200:
+        _blocked_ips.add(ip)
+        app.logger.warning(f"[DDoS] Blocked IP: {mask_sensitive_data(ip)}")
+        abort(429)
+    if request.content_length and request.content_length > app.config["MAX_CONTENT_LENGTH"]:
+        abort(413)
 
-    db.session.add(new_user)
-    db.session.flush()
 
-    # Download avatar if provided
-    if avatar_url:
-        try:
-            response = requests.get(avatar_url, timeout=10)
-            if response.status_code == 200:
-                img = Image.open(BytesIO(response.content))
-                img = img.resize((200, 200), Image.Resampling.LANCZOS)
+@app.after_request
+def security_headers(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
-                avatar_filename = f"oauth_{new_user.id}_{uuid.uuid4().hex}.png"
-                avatar_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'custom_avatars')
-                os.makedirs(avatar_dir, exist_ok=True)
-                img.save(os.path.join(avatar_dir, avatar_filename), "PNG")
+    csp = [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' https://cdn.socket.io https://cdnjs.cloudflare.com https://unpkg.com https://accounts.google.com https://oauth.vk.com https://login.yandex.ru",
+        "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com",
+        "font-src 'self' https://cdnjs.cloudflare.com",
+        "img-src 'self' data: blob: https:",
+        "media-src 'self' blob:",
+        "connect-src 'self' wss: ws:",
+        "frame-ancestors 'none'",
+        "frame-src https://oauth.vk.com https://accounts.google.com https://login.yandex.ru"
+    ]
+    response.headers["Content-Security-Policy"] = '; '.join(csp)
+    return response
 
-                new_user.can_upload_custom_avatar = True
-                if is_render:
-                    new_user.custom_avatar = f"/uploads/custom_avatars/{avatar_filename}"
-                else:
-                    new_user.custom_avatar = f"/static/uploads/custom_avatars/{avatar_filename}"
-        except Exception as e:
-            logger.error(f"Failed to download avatar from OAuth: {e}")
 
-    db.session.commit()
-    return new_user
+# ──────────────────────────────────────────────────────────────────────────────
+#  Декоратор для проверки прав администратора
+# ──────────────────────────────────────────────────────────────────────────────
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.is_admin:
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated_function
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1288,7 +1455,6 @@ def google_callback():
             flash("Не удалось получить данные от Google", "error")
             return redirect(url_for("login"))
 
-        # Check if Google account is already linked
         existing_google = UserGoogle.query.filter_by(google_id=google_id).first()
         if existing_google:
             user = existing_google.user
@@ -1296,16 +1462,14 @@ def google_callback():
                 flash("Пользователь заблокирован", "error")
                 return redirect(url_for("login"))
             login_user(user, remember=True)
-            flash(f"Добро пожаловать, {user.display_name or user.username}!", "success")
+            flash(f"Добро пожаловать, {escape_html(user.display_name or user.username)}!", "success")
             return redirect(url_for("index"))
 
-        # Check if user with this email exists
         existing_user = None
         if email:
             existing_user = User.query.filter_by(email=email).first()
 
         if existing_user:
-            # Link Google account to existing user
             google_conn = UserGoogle(
                 user_id=existing_user.id,
                 google_id=google_id,
@@ -1314,15 +1478,13 @@ def google_callback():
             db.session.add(google_conn)
             db.session.commit()
             login_user(existing_user, remember=True)
-            flash(f"Аккаунт Google привязан к {existing_user.username}!", "success")
+            flash(f"Аккаунт Google привязан к {escape_html(existing_user.username)}!", "success")
             return redirect(url_for("index"))
 
-        # Create new user
         username = re.sub(r'[^a-zA-Z0-9_]', '_', name.lower())[:30] if name else f"google_{google_id[:8]}"
         new_user = create_user_from_oauth(email, username, name, avatar)
         db.session.commit()
 
-        # Create Google connection
         google_conn = UserGoogle(
             user_id=new_user.id,
             google_id=google_id,
@@ -1350,8 +1512,7 @@ def login_yandex():
     if not YANDEX_CLIENT_ID or not YANDEX_CLIENT_SECRET:
         flash("Яндекс авторизация временно недоступна", "error")
         return redirect(url_for("login"))
-    # Жестко указываем правильный URL
-    redirect_uri = "https://kildear.onrender.com/login/yandex/callback"
+    redirect_uri = f"{BASE_URL}/login/yandex/callback"
     return oauth.yandex.authorize_redirect(redirect_uri)
 
 
@@ -1360,7 +1521,6 @@ def yandex_callback():
     try:
         token = oauth.yandex.authorize_access_token()
 
-        # Get user info
         resp = oauth.yandex.get('info')
         user_info = resp.json()
 
@@ -1374,7 +1534,6 @@ def yandex_callback():
             flash("Не удалось получить данные от Яндекса", "error")
             return redirect(url_for("login"))
 
-        # Check if Yandex account is already linked
         existing_yandex = UserYandex.query.filter_by(yandex_id=yandex_id).first()
         if existing_yandex:
             user = existing_yandex.user
@@ -1382,16 +1541,14 @@ def yandex_callback():
                 flash("Пользователь заблокирован", "error")
                 return redirect(url_for("login"))
             login_user(user, remember=True)
-            flash(f"Добро пожаловать, {user.display_name or user.username}!", "success")
+            flash(f"Добро пожаловать, {escape_html(user.display_name or user.username)}!", "success")
             return redirect(url_for("index"))
 
-        # Check if user with this email exists
         existing_user = None
         if email:
             existing_user = User.query.filter_by(email=email).first()
 
         if existing_user:
-            # Link Yandex account to existing user
             yandex_conn = UserYandex(
                 user_id=existing_user.id,
                 yandex_id=yandex_id,
@@ -1401,14 +1558,12 @@ def yandex_callback():
             db.session.add(yandex_conn)
             db.session.commit()
             login_user(existing_user, remember=True)
-            flash(f"Аккаунт Яндекса привязан к {existing_user.username}!", "success")
+            flash(f"Аккаунт Яндекса привязан к {escape_html(existing_user.username)}!", "success")
             return redirect(url_for("index"))
 
-        # Create new user
         username = re.sub(r'[^a-zA-Z0-9_]', '_', login)[:30] if login else f"yandex_{yandex_id[:8]}"
         new_user = create_user_from_oauth(email, username, name, avatar_url)
 
-        # Create Yandex connection
         yandex_conn = UserYandex(
             user_id=new_user.id,
             yandex_id=yandex_id,
@@ -1429,37 +1584,18 @@ def yandex_callback():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  VK OAuth Routes (исправленные)
-# ──────────────────────────────────────────────────────────────────────────────
-
-# ──────────────────────────────────────────────────────────────────────────────
-#  VK OAuth Routes (исправленные)
+#  VK OAuth Routes
 # ──────────────────────────────────────────────────────────────────────────────
 
 VK_REDIRECT_URI = f"{BASE_URL}/login/vk/callback"
-
-
-def generate_pkce_pair():
-    """Генерирует пару code_verifier и code_challenge для PKCE (RFC 7636)"""
-    import hashlib
-    import base64
-
-    code_verifier = secrets.token_urlsafe(64)
-    code_challenge = base64.urlsafe_b64encode(
-        hashlib.sha256(code_verifier.encode()).digest()
-    ).decode().rstrip('=')
-
-    return code_verifier, code_challenge
 
 
 @app.route("/login/vk")
 def login_vk():
     from urllib.parse import quote
 
-    # Генерируем PKCE пару
     code_verifier, code_challenge = generate_pkce_pair()
 
-    # Сохраняем verifier в сессии для последующего обмена
     session['vk_code_verifier'] = code_verifier
     session['vk_oauth_state'] = secrets.token_urlsafe(32)
 
@@ -1468,7 +1604,7 @@ def login_vk():
         f"response_type=code&"
         f"client_id={VK_CLIENT_ID}&"
         f"redirect_uri={quote(VK_REDIRECT_URI)}&"
-        f"scope=email&"  # phone убран, так как не всегда доступен
+        f"scope=email&"
         f"state={session['vk_oauth_state']}&"
         f"code_challenge={code_challenge}&"
         f"code_challenge_method=S256&"
@@ -1506,7 +1642,6 @@ def login_vk_callback():
         return redirect(url_for("login"))
 
     try:
-        # Обмен кода на токен через https://id.vk.ru/oauth2/auth
         token_url = "https://id.vk.ru/oauth2/auth"
 
         params = {
@@ -1536,9 +1671,6 @@ def login_vk_callback():
             flash("Не удалось получить ID пользователя VK", "error")
             return redirect(url_for("login"))
 
-        # Получаем информацию о пользователе
-        # Это правильный endpoint для VK ID!
-        # Получаем информацию о пользователе
         user_info_url = "https://id.vk.ru/oauth2/user_info"
         user_info_params = {
             "access_token": access_token,
@@ -1551,7 +1683,6 @@ def login_vk_callback():
         last_name = ""
         vk_avatar = ""
 
-        # ✅ ПРАВИЛЬНО: VK ID API возвращает данные в поле "user"
         if "user" in user_data:
             vk_user = user_data["user"]
             first_name = vk_user.get("first_name", "")
@@ -1560,7 +1691,6 @@ def login_vk_callback():
 
         display_name = f"{first_name} {last_name}".strip() or f"user_{vk_user_id}"
 
-        # Проверяем, привязан ли VK аккаунт
         existing_vk = UserVK.query.filter_by(vk_id=vk_user_id).first()
         if existing_vk:
             user = existing_vk.user
@@ -1568,16 +1698,14 @@ def login_vk_callback():
                 flash("Пользователь заблокирован", "error")
                 return redirect(url_for("login"))
             login_user(user, remember=True)
-            flash(f"Добро пожаловать, {user.display_name or user.username}!", "success")
+            flash(f"Добро пожаловать, {escape_html(user.display_name or user.username)}!", "success")
             return redirect(url_for("index"))
 
-        # Проверяем, существует ли пользователь с таким email
         existing_user = None
         if email:
             existing_user = User.query.filter_by(email=email).first()
 
         if existing_user:
-            # Привязываем VK аккаунт к существующему пользователю
             vk_conn = UserVK(
                 user_id=existing_user.id,
                 vk_id=vk_user_id,
@@ -1587,14 +1715,12 @@ def login_vk_callback():
             db.session.add(vk_conn)
             db.session.commit()
             login_user(existing_user, remember=True)
-            flash(f"Аккаунт ВКонтакте привязан к {existing_user.username}!", "success")
+            flash(f"Аккаунт ВКонтакте привязан к {escape_html(existing_user.username)}!", "success")
             return redirect(url_for("index"))
 
-        # Создаем нового пользователя
         username = re.sub(r'[^a-zA-Z0-9_]', '_', display_name.lower().replace(" ", "_"))[:30]
         new_user = create_user_from_oauth(email, username, display_name, vk_avatar)
 
-        # Создаем связь с VK
         vk_conn = UserVK(
             user_id=new_user.id,
             vk_id=vk_user_id,
@@ -1622,7 +1748,6 @@ def login_vk_callback():
 @app.route("/settings/oauth")
 @login_required
 def settings_oauth():
-    """OAuth connections management page"""
     google_conn = UserGoogle.query.filter_by(user_id=current_user.id).first()
     yandex_conn = UserYandex.query.filter_by(user_id=current_user.id).first()
     vk_conn = UserVK.query.filter_by(user_id=current_user.id).first()
@@ -1667,46 +1792,43 @@ def disconnect_vk():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  QR Code Routes (ИСПРАВЛЕННЫЕ)
+#  QR Code Routes
 # ──────────────────────────────────────────────────────────────────────────────
 
 @app.route("/qr/scan", methods=["GET"])
 @login_required
 def scan_qr_page():
-    """Page for scanning QR code"""
     return render_template("scan_qr.html")
 
 
 @app.route("/qr/search", methods=["POST"])
 @login_required
 def search_by_qr():
-    """Search user by QR code data"""
     data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+    
     qr_data = data.get("qr_data", "").strip()
-
-    if not qr_data:
-        return jsonify({"error": "No QR data provided"}), 400
+    
+    if len(qr_data) > 200:
+        return jsonify({"error": "QR data too long"}), 400
 
     username = None
 
-    # Parse different QR formats
     if re.match(r'^[a-zA-Z0-9_]{3,40}$', qr_data):
         username = qr_data
-
     elif qr_data.startswith("kildear://user/"):
-        username = qr_data.replace("kildear://user/", "")
-
+        username = qr_data.replace("kildear://user/", "")[:40]
     elif '/u/' in qr_data:
-        match = re.search(r'/u/([^/?&#]+)', qr_data)
-        if match:
-            username = match.group(1)
-
+        parts = qr_data.split('/u/')
+        if len(parts) > 1:
+            username = parts[1].split('/')[0].split('?')[0][:40]
     elif '/profile/' in qr_data:
-        match = re.search(r'/profile/([^/?&#]+)', qr_data)
-        if match:
-            username = match.group(1)
+        parts = qr_data.split('/profile/')
+        if len(parts) > 1:
+            username = parts[1].split('/')[0].split('?')[0][:40]
 
-    if not username:
+    if not username or not safe_validate_username(username):
         return jsonify({"error": "Invalid QR code format"}), 400
 
     user = User.query.filter(func.lower(User.username) == username.lower()).first()
@@ -1725,9 +1847,9 @@ def search_by_qr():
         "user": {
             "id": user.id,
             "username": user.username,
-            "display_name": user.display_name or user.username,
+            "display_name": escape_html(user.display_name or user.username),
             "avatar": user.avatar_url,
-            "bio": user.bio,
+            "bio": escape_html(user.bio),
             "is_following": current_user.is_following(user),
             "follower_count": user.follower_count,
             "following_count": user.following_count,
@@ -1740,7 +1862,6 @@ def search_by_qr():
 @app.route("/user/<int:user_id>/qrcode")
 @login_required
 def generate_user_qrcode(user_id):
-    """Generate QR code for user with proper error handling"""
     user = User.query.get_or_404(user_id)
 
     if current_user.is_blocked(user):
@@ -1749,11 +1870,8 @@ def generate_user_qrcode(user_id):
     if user.is_banned:
         return jsonify({"error": "User is banned"}), 403
 
-    # Generate QR code data
     base_url = f"{request.scheme}://{request.host}"
     profile_url = f"{base_url}/u/{user.username}"
-
-    # Also add app-specific format
     qr_data = f"kildear://user/{user.username}\n{profile_url}"
 
     try:
@@ -1777,14 +1895,14 @@ def generate_user_qrcode(user_id):
             "qr_code": f"data:image/png;base64,{img_base64}",
             "data": qr_data,
             "username": user.username,
-            "display_name": user.display_name or user.username,
+            "display_name": escape_html(user.display_name or user.username),
             "profile_url": profile_url
         })
     except Exception as e:
-        app.logger.error(f"QR generation error: {e}")
+        logger.error(f"QR generation error: {e}")
         return jsonify({
             "success": False,
-            "error": f"Failed to generate QR code: {str(e)}"
+            "error": "Failed to generate QR code"
         }), 500
 
 
@@ -1805,8 +1923,8 @@ def admin_banners():
 @admin_required
 def create_banner():
     try:
-        title = request.form.get("title", "").strip()
-        content = request.form.get("content", "").strip()
+        title = escape_html(request.form.get("title", "").strip())
+        content = escape_html(request.form.get("content", "").strip())
         banner_type = request.form.get("banner_type", "info")
         order = int(request.form.get("order", 0))
         expires_days = request.form.get("expires_days", type=int)
@@ -1877,8 +1995,8 @@ def edit_banner(banner_id):
     banner = InfoBanner.query.get_or_404(banner_id)
 
     try:
-        banner.title = request.form.get("title", "").strip()
-        banner.content = request.form.get("content", "").strip()
+        banner.title = escape_html(request.form.get("title", "").strip())
+        banner.content = escape_html(request.form.get("content", "").strip())
         banner.banner_type = request.form.get("banner_type", "info")
 
         expires_days = request.form.get("expires_days", type=int)
@@ -1894,6 +2012,18 @@ def edit_banner(banner_id):
         flash("Ошибка при обновлении баннера", "error")
 
     return redirect(url_for("admin_banners"))
+
+
+@app.route("/admin/banners/<int:banner_id>/data")
+@login_required
+@admin_required
+def get_banner_data(banner_id):
+    banner = InfoBanner.query.get_or_404(banner_id)
+    return jsonify({
+        "title": banner.title,
+        "content": banner.content,
+        "banner_type": banner.banner_type
+    })
 
 
 @app.route("/api/banners/active")
@@ -1919,6 +2049,7 @@ def get_active_banners():
 # ──────────────────────────────────────────────────────────────────────────────
 #  API Routes for Notifications
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.route("/api/unread_counts")
 @login_required
 def unread_counts():
@@ -1957,6 +2088,7 @@ def mark_all_notifications_read():
 # ──────────────────────────────────────────────────────────────────────────────
 #  Verification Request Routes
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.route("/verification/request", methods=["GET", "POST"])
 @login_required
 def request_verification():
@@ -1973,7 +2105,7 @@ def request_verification():
         return redirect(url_for("profile", username=current_user.username))
 
     if request.method == "POST":
-        reason = request.form.get("reason", "").strip()
+        reason = escape_html(request.form.get("reason", "").strip())
 
         if not reason or len(reason) < 10:
             flash("Пожалуйста, опишите причину получения верификации (минимум 10 символов)", "error")
@@ -1999,6 +2131,7 @@ def request_verification():
 # ──────────────────────────────────────────────────────────────────────────────
 #  Admin Application Routes
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.route("/apply", methods=["GET", "POST"])
 @login_required
 def apply_admin():
@@ -2016,9 +2149,9 @@ def apply_admin():
 
     if request.method == "POST":
         position = request.form.get("position")
-        contacts = request.form.get("contacts", "").strip()
-        about = request.form.get("about", "").strip()
-        experience = request.form.get("experience", "").strip()
+        contacts = escape_html(request.form.get("contacts", "").strip())
+        about = escape_html(request.form.get("about", "").strip())
+        experience = escape_html(request.form.get("experience", "").strip())
 
         if position not in ['admin', 'moderator']:
             flash("Выберите должность", "error")
@@ -2051,6 +2184,7 @@ def apply_admin():
 # ──────────────────────────────────────────────────────────────────────────────
 #  Custom Avatar/Cover Upload Routes
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.route("/profile/upload-avatar", methods=["POST"])
 @login_required
 def upload_custom_avatar():
@@ -2070,9 +2204,9 @@ def upload_custom_avatar():
         return jsonify({"error": "Неверный формат файла. Поддерживаются: PNG, JPG, JPEG, GIF, WEBP"}), 400
 
     if current_user.custom_avatar and current_user.custom_avatar.startswith('/static/uploads/custom_avatars/'):
-        old_path = os.path.join(app.config['UPLOAD_FOLDER'], 'custom_avatars',
-                                current_user.custom_avatar.split('/')[-1])
         try:
+            old_path = safe_path_join(app.config['UPLOAD_FOLDER'], 'custom_avatars',
+                                      os.path.basename(current_user.custom_avatar.split('/')[-1]))
             if os.path.exists(old_path):
                 os.remove(old_path)
         except:
@@ -2104,9 +2238,9 @@ def upload_custom_cover():
         return jsonify({"error": "Неверный формат файла. Поддерживаются: PNG, JPG, JPEG, GIF, WEBP"}), 400
 
     if current_user.custom_cover and current_user.custom_cover.startswith('/static/uploads/custom_covers/'):
-        old_path = os.path.join(app.config['UPLOAD_FOLDER'], 'custom_covers',
-                                current_user.custom_cover.split('/')[-1])
         try:
+            old_path = safe_path_join(app.config['UPLOAD_FOLDER'], 'custom_covers',
+                                      os.path.basename(current_user.custom_cover.split('/')[-1]))
             if os.path.exists(old_path):
                 os.remove(old_path)
         except:
@@ -2140,8 +2274,9 @@ def remove_custom_cover():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  Admin Routes (расширенные)
+#  Admin Routes
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.route("/admin")
 @login_required
 @admin_required
@@ -2196,11 +2331,12 @@ def admin_users():
 
     query = User.query
     if search:
+        search_safe = f"%{escape_html(search)}%"
         query = query.filter(
             or_(
-                User.username.ilike(f"%{search}%"),
-                User.email.ilike(f"%{search}%"),
-                User.display_name.ilike(f"%{search}%")
+                User.username.ilike(search_safe),
+                User.email.ilike(search_safe),
+                User.display_name.ilike(search_safe)
             )
         )
 
@@ -2312,7 +2448,7 @@ def admin_verification_requests():
 def admin_review_verification(request_id):
     verification_request = VerificationRequest.query.get_or_404(request_id)
     action = request.form.get("action")
-    comment = request.form.get("comment", "")
+    comment = escape_html(request.form.get("comment", ""))
 
     if action == "approve":
         verification_request.status = "approved"
@@ -2368,7 +2504,7 @@ def admin_applications():
 def admin_review_application(app_id):
     application = AdminApplication.query.get_or_404(app_id)
     action = request.form.get("action")
-    comment = request.form.get("comment", "")
+    comment = escape_html(request.form.get("comment", ""))
 
     if action == "approve":
         application.status = "approved"
@@ -2514,19 +2650,18 @@ def settings_account():
             data = request.get_json()
 
             if 'display_name' in data:
-                current_user.display_name = data['display_name'][:60]
+                current_user.display_name = escape_html(data['display_name'][:60])
             if 'bio' in data:
-                current_user.bio = data['bio'][:500]
+                current_user.bio = escape_html(data['bio'][:500])
             if 'location' in data:
-                current_user.location = data['location'][:100]
+                current_user.location = escape_html(data['location'][:100])
             if 'website' in data:
-                current_user.website = data['website'][:200]
-            if 'email' in data:
-                import re
-                if re.match(r"^[^@]+@[^@]+\.[^@]+$", data['email']):
-                    current_user.email = data['email'].lower()
+                current_user.website = escape_html(data['website'][:200])
+            if 'email' in data and safe_validate_email(data['email']):
+                current_user.email = data['email'].lower()
             if 'accent_color' in data and data['accent_color']:
-                current_user.accent_color = data['accent_color'][:7]
+                if re.match(r'^#[0-9a-fA-F]{6}$', data['accent_color']):
+                    current_user.accent_color = data['accent_color'][:7]
             if 'is_private' in data:
                 current_user.is_private = bool(data['is_private'])
 
@@ -2680,7 +2815,6 @@ def settings_folders():
             data = request.get_json()
 
             if 'folders_data' in data:
-                import json
                 settings.folders_data = json.dumps(data['folders_data'])
 
             db.session.commit()
@@ -2691,7 +2825,6 @@ def settings_folders():
             logger.error(f"Error updating folders: {e}")
             return jsonify({"success": False, "error": str(e)}), 500
 
-    import json
     folders = json.loads(settings.folders_data) if settings.folders_data else []
 
     return render_template("settings/folders.html", settings=settings, folders=folders)
@@ -2873,9 +3006,6 @@ def settings_unblock(user_id):
 @login_required
 def settings_export_data():
     try:
-        import json
-        from datetime import datetime
-
         user_data = {
             "user": {
                 "username": current_user.username,
@@ -2918,6 +3048,7 @@ def settings_export_data():
 # ──────────────────────────────────────────────────────────────────────────────
 #  Voice Message Routes
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.route("/voice/send", methods=["POST"])
 @login_required
 @limiter.limit("30 per hour")
@@ -2934,12 +3065,21 @@ def send_voice_message():
         if current_user.is_blocked(receiver):
             return jsonify({"error": "Cannot send message to blocked user"}), 403
 
-        ext = audio_file.filename.rsplit('.', 1)[1].lower()
+        safe_filename = sanitize_filename(audio_file.filename)
+        if not safe_filename:
+            return jsonify({"error": "Invalid filename"}), 400
+
+        ext = safe_filename.rsplit('.', 1)[1].lower() if '.' in safe_filename else ''
         if ext not in ALLOWED_AUDIO:
             return jsonify({"error": "Audio format not supported"}), 400
 
         audio_file.seek(0)
         audio_data = audio_file.read()
+        
+        # Limit audio file size (10 MB)
+        if len(audio_data) > 10 * 1024 * 1024:
+            return jsonify({"error": "Audio file too large"}), 400
+            
         base64_data = base64.b64encode(audio_data).decode('utf-8')
 
         duration = request.form.get("duration", 0, type=int)
@@ -3023,6 +3163,7 @@ def mark_voice_read(message_id):
 # ──────────────────────────────────────────────────────────────────────────────
 #  Call Routes
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.route("/call/start", methods=["POST"])
 @login_required
 @limiter.limit("30 per hour")
@@ -3193,6 +3334,7 @@ def call_history():
 # ──────────────────────────────────────────────────────────────────────────────
 #  Report Routes
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.route("/report/user/<int:user_id>", methods=["GET", "POST"])
 @login_required
 def report_user(user_id):
@@ -3204,7 +3346,7 @@ def report_user(user_id):
 
     if request.method == "POST":
         reason = request.form.get("reason")
-        description = request.form.get("description", "")
+        description = escape_html(request.form.get("description", ""))
 
         if not reason:
             flash("Укажите причину жалобы", "error")
@@ -3247,7 +3389,7 @@ def report_post(post_id):
 
     if request.method == "POST":
         reason = request.form.get("reason")
-        description = request.form.get("description", "")
+        description = escape_html(request.form.get("description", ""))
 
         if not reason:
             flash("Укажите причину жалобы", "error")
@@ -3291,7 +3433,7 @@ def report_comment(comment_id):
 
     if request.method == "POST":
         reason = request.form.get("reason")
-        description = request.form.get("description", "")
+        description = escape_html(request.form.get("description", ""))
 
         if not reason:
             flash("Укажите причину жалобы", "error")
@@ -3317,6 +3459,7 @@ def report_comment(comment_id):
 # ──────────────────────────────────────────────────────────────────────────────
 #  Auth Routes
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.route("/register", methods=["GET", "POST"])
 @limiter.limit("10 per hour")
 def register():
@@ -3334,16 +3477,15 @@ def register():
                 flash("Все поля обязательны для заполнения", "error")
                 return render_template("register.html")
 
-            if not re.match(r"^[a-zA-Z0-9_]{3,40}$", username):
-                flash("Имя пользователя должно быть 3-40 символов и содержать только буквы, цифры и подчеркивания",
-                      "error")
+            if not safe_validate_username(username):
+                flash("Имя пользователя должно быть 3-40 символов и содержать только буквы, цифры и подчеркивания", "error")
                 return render_template("register.html")
 
-            if not re.match(r"^[^@]+@[^@]+\.[^@]+$", email):
+            if not safe_validate_email(email):
                 flash("Неверный формат email", "error")
                 return render_template("register.html")
 
-            if len(password) < 8:
+            if not safe_validate_password(password):
                 flash("Пароль должен быть не менее 8 символов", "error")
                 return render_template("register.html")
 
@@ -3430,8 +3572,8 @@ def login():
         try:
             login_history = LoginHistory(
                 user_id=user.id if user else None,
-                ip_address=ip,
-                user_agent=user_agent[:200],
+                ip_address=mask_sensitive_data(ip, 2) if is_production else ip,
+                user_agent=mask_sensitive_data(user_agent, 10)[:200],
                 location=None,
                 success=login_success
             )
@@ -3443,7 +3585,9 @@ def login():
 
         if login_success:
             next_page = request.args.get("next")
-            return redirect(next_page or url_for("index"))
+            if next_page and is_safe_url(next_page):
+                return redirect(next_page)
+            return redirect(url_for("index"))
 
     return render_template("login.html")
 
@@ -3463,6 +3607,7 @@ def logout():
 # ──────────────────────────────────────────────────────────────────────────────
 #  Feed / Home
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.route("/")
 @login_required
 def index():
@@ -3490,18 +3635,24 @@ def index():
 # ──────────────────────────────────────────────────────────────────────────────
 #  Posts
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.route("/post/create", methods=["POST"])
 @login_required
 @limiter.limit("30 per hour")
 def create_post():
-    content = request.form.get("content", "").strip()
+    content = escape_html(request.form.get("content", "").strip())
     media_file = request.files.get("media")
     media_url = ""
     media_type = "text"
 
     if media_file and media_file.filename:
         try:
-            ext = media_file.filename.rsplit(".", 1)[-1].lower() if '.' in media_file.filename else ''
+            safe_filename = sanitize_filename(media_file.filename)
+            if not safe_filename:
+                flash("Недопустимое имя файла", "error")
+                return redirect(url_for("index"))
+            
+            ext = safe_filename.rsplit(".", 1)[-1].lower() if '.' in safe_filename else ''
 
             if ext in ALLOWED_VIDEO:
                 media_url = save_file(media_file, "videos") or ""
@@ -3603,7 +3754,7 @@ def add_comment(post_id):
     if post.author.id in [b.id for b in current_user.blocked_users]:
         return jsonify({"error": "Cannot interact with blocked user"}), 403
 
-    content = request.form.get("content", "").strip()
+    content = escape_html(request.form.get("content", "").strip())
     if not content:
         return jsonify({"error": "Comment cannot be empty."}), 400
 
@@ -3657,9 +3808,13 @@ def delete_post(post_id):
 # ──────────────────────────────────────────────────────────────────────────────
 #  Profile
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.route("/u/<username>")
 @login_required
 def profile(username):
+    if not safe_validate_username(username):
+        abort(404)
+    
     user = User.query.filter(func.lower(User.username) == username.lower()).first_or_404()
 
     is_blocked = current_user.is_blocked(user) if user.id != current_user.id else False
@@ -3692,16 +3847,17 @@ def profile(username):
 def edit_profile():
     if request.method == "POST":
         try:
-            current_user.display_name = request.form.get("display_name", "")[:60]
-            current_user.bio = request.form.get("bio", "")[:500]
-            current_user.website = request.form.get("website", "")[:200]
-            current_user.location = request.form.get("location", "")[:100]
+            current_user.display_name = escape_html(request.form.get("display_name", "")[:60])
+            current_user.bio = escape_html(request.form.get("bio", "")[:500])
+            current_user.website = escape_html(request.form.get("website", "")[:200])
+            current_user.location = escape_html(request.form.get("location", "")[:100])
             current_user.is_private = bool(request.form.get("is_private"))
 
             accent_color = request.form.get("accent_color")
             if not accent_color:
                 accent_color = request.form.get("accent_color_custom", "#6c63ff")
-            current_user.accent_color = accent_color[:7]
+            if re.match(r'^#[0-9a-fA-F]{6}$', accent_color):
+                current_user.accent_color = accent_color[:7]
 
             preset_avatar = request.form.get("preset_avatar")
             if preset_avatar:
@@ -3730,7 +3886,7 @@ def edit_profile():
             new_password = request.form.get("new_password")
             if current_password and new_password:
                 if current_user.check_password(current_password):
-                    if len(new_password) >= 8:
+                    if safe_validate_password(new_password):
                         current_user.set_password(new_password)
                         flash("Password changed successfully!", "success")
                     else:
@@ -3744,7 +3900,7 @@ def edit_profile():
         except Exception as e:
             db.session.rollback()
             logger.error(f"Error updating profile: {e}")
-            flash(f"Error updating profile: {str(e)}", "error")
+            flash(f"Error updating profile", "error")
 
         return redirect(url_for("profile", username=current_user.username))
 
@@ -3756,6 +3912,9 @@ def edit_profile():
 @app.route("/follow/<username>", methods=["POST"])
 @login_required
 def follow(username):
+    if not safe_validate_username(username):
+        return jsonify({"error": "Invalid username"}), 400
+    
     user = User.query.filter(func.lower(User.username) == username.lower()).first_or_404()
 
     if user.id == current_user.id:
@@ -3797,6 +3956,7 @@ def follow(username):
 # ──────────────────────────────────────────────────────────────────────────────
 #  Block/Unblock Routes
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.route("/user/<int:user_id>/block", methods=["POST"])
 @login_required
 def block_user(user_id):
@@ -3827,6 +3987,7 @@ def unblock_user(user_id):
 # ──────────────────────────────────────────────────────────────────────────────
 #  Video Feed
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.route("/video")
 @login_required
 def video_feed():
@@ -3845,6 +4006,7 @@ def video_feed():
 # ──────────────────────────────────────────────────────────────────────────────
 #  Search
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.route("/search")
 @login_required
 @limiter.limit("60 per minute")
@@ -3862,8 +4024,8 @@ def search():
 
     blocked_ids = [b.id for b in current_user.blocked_users]
 
-    if q:
-        pattern = f"%{q}%"
+    if q and len(q) <= 100:
+        pattern = f"%{escape_html(q)}%"
         users = User.query.filter(
             or_(
                 User.username.ilike(pattern),
@@ -3904,6 +4066,7 @@ def search():
 # ──────────────────────────────────────────────────────────────────────────────
 #  Chat
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.route("/chat")
 @login_required
 def chat_list():
@@ -3955,6 +4118,9 @@ def chat_list():
 @login_required
 def chat(username):
     try:
+        if not safe_validate_username(username):
+            abort(404)
+        
         partner = User.query.filter(
             func.lower(User.username) == username.lower()).first_or_404()
 
@@ -4037,23 +4203,26 @@ def chat(username):
 @limiter.limit("120 per minute")
 def send_message(username):
     try:
+        if not safe_validate_username(username):
+            return jsonify({"error": "Invalid username"}), 400
+        
         partner = User.query.filter(
             func.lower(User.username) == username.lower()).first_or_404()
 
         if current_user.is_blocked(partner):
             return jsonify({"error": "Cannot send message to blocked user"}), 403
 
-        content = request.form.get("content", "").strip()
+        content = escape_html(request.form.get("content", "").strip())
         media_file = request.files.get("media")
         media_url = ""
         reply_to_id = request.form.get("reply_to", type=int)
 
         if media_file and media_file.filename:
-            ext = media_file.filename.rsplit('.', 1)[1].lower() if '.' in media_file.filename else ''
-            if ext in ALLOWED_IMAGE:
-                media_url = save_file(media_file, "chat_images") or ""
-            else:
-                media_url = save_file(media_file, "chat_images") or ""
+            safe_filename = sanitize_filename(media_file.filename)
+            if safe_filename:
+                ext = safe_filename.rsplit('.', 1)[1].lower() if '.' in safe_filename else ''
+                if ext in ALLOWED_IMAGE:
+                    media_url = save_file(media_file, "chat_images") or ""
 
         if not content and not media_url:
             return jsonify({"error": "Message cannot be empty."}), 400
@@ -4130,6 +4299,7 @@ def delete_message(message_id):
 # ──────────────────────────────────────────────────────────────────────────────
 #  Groups
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.route("/groups")
 @login_required
 def groups():
@@ -4144,8 +4314,8 @@ def groups():
 @limiter.limit("10 per hour")
 def create_group():
     if request.method == "POST":
-        name = request.form.get("name", "").strip()[:100]
-        desc = request.form.get("description", "").strip()[:500]
+        name = escape_html(request.form.get("name", "").strip()[:100])
+        desc = escape_html(request.form.get("description", "").strip()[:500])
         priv = bool(request.form.get("is_private"))
         preset_avatar = int(request.form.get("preset_avatar", 1))
 
@@ -4203,8 +4373,8 @@ def edit_group(slug):
 
     if request.method == "POST":
         try:
-            g.name = request.form.get("name", "").strip()[:100]
-            g.description = request.form.get("description", "").strip()[:500]
+            g.name = escape_html(request.form.get("name", "").strip()[:100])
+            g.description = escape_html(request.form.get("description", "").strip()[:500])
             g.is_private = bool(request.form.get("is_private"))
 
             preset_avatar = request.form.get("preset_avatar", type=int)
@@ -4272,19 +4442,21 @@ def group_post(slug):
     if not g.members.filter(User.id == current_user.id).count():
         abort(403)
 
-    content = request.form.get("content", "").strip()
+    content = escape_html(request.form.get("content", "").strip())
     media_file = request.files.get("media")
     media_url = ""
     media_type = "text"
 
     if media_file and media_file.filename:
-        ext = media_file.filename.rsplit(".", 1)[-1].lower()
-        if ext in ALLOWED_VIDEO:
-            media_url = save_file(media_file, "videos") or ""
-            media_type = "video"
-        elif ext in ALLOWED_IMAGE:
-            media_url = save_file(media_file, "images") or ""
-            media_type = "image" if media_url else "text"
+        safe_filename = sanitize_filename(media_file.filename)
+        if safe_filename:
+            ext = safe_filename.rsplit(".", 1)[-1].lower()
+            if ext in ALLOWED_VIDEO:
+                media_url = save_file(media_file, "videos") or ""
+                media_type = "video"
+            elif ext in ALLOWED_IMAGE:
+                media_url = save_file(media_file, "images") or ""
+                media_type = "image" if media_url else "text"
 
     p = GroupPost(
         group_id=g.id,
@@ -4351,6 +4523,7 @@ def group_post(slug):
 # ──────────────────────────────────────────────────────────────────────────────
 #  Channels
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.route("/channels")
 @login_required
 def channels():
@@ -4366,8 +4539,8 @@ def channels():
 @limiter.limit("5 per hour")
 def create_channel():
     if request.method == "POST":
-        name = request.form.get("name", "").strip()[:100]
-        desc = request.form.get("description", "").strip()[:500]
+        name = escape_html(request.form.get("name", "").strip()[:100])
+        desc = escape_html(request.form.get("description", "").strip()[:500])
         preset_avatar = int(request.form.get("preset_avatar", 1))
 
         if preset_avatar not in PRESET_CHANNEL_AVATARS:
@@ -4423,8 +4596,8 @@ def edit_channel(slug):
 
     if request.method == "POST":
         try:
-            c.name = request.form.get("name", "").strip()[:100]
-            c.description = request.form.get("description", "").strip()[:500]
+            c.name = escape_html(request.form.get("name", "").strip()[:100])
+            c.description = escape_html(request.form.get("description", "").strip()[:500])
             c.is_nsfw = bool(request.form.get("is_nsfw"))
 
             preset_avatar = request.form.get("preset_avatar", type=int)
@@ -4480,19 +4653,21 @@ def channel_publish(slug):
     if c.owner_id != current_user.id:
         abort(403)
 
-    content = request.form.get("content", "").strip()
+    content = escape_html(request.form.get("content", "").strip())
     media_file = request.files.get("media")
     media_url = ""
     media_type = "text"
 
     if media_file and media_file.filename:
-        ext = media_file.filename.rsplit(".", 1)[-1].lower()
-        if ext in ALLOWED_VIDEO:
-            media_url = save_file(media_file, "videos") or ""
-            media_type = "video"
-        elif ext in ALLOWED_IMAGE:
-            media_url = save_file(media_file, "images") or ""
-            media_type = "image" if media_url else "text"
+        safe_filename = sanitize_filename(media_file.filename)
+        if safe_filename:
+            ext = safe_filename.rsplit(".", 1)[-1].lower()
+            if ext in ALLOWED_VIDEO:
+                media_url = save_file(media_file, "videos") or ""
+                media_type = "video"
+            elif ext in ALLOWED_IMAGE:
+                media_url = save_file(media_file, "images") or ""
+                media_type = "image" if media_url else "text"
 
     p = ChannelPost(
         channel_id=c.id,
@@ -4553,6 +4728,7 @@ def channel_publish(slug):
 # ──────────────────────────────────────────────────────────────────────────────
 #  Notifications
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.route("/notifications")
 @login_required
 def notifications():
@@ -4569,8 +4745,9 @@ def notifications():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  Debug endpoint
+#  Debug endpoint (only for admin)
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.route("/debug/uploads")
 @login_required
 def debug_uploads():
@@ -4621,8 +4798,142 @@ def debug_uploads():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+#  Achievements Routes
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.route("/achievements")
+@login_required
+def achievements():
+    from collections import defaultdict
+
+    all_achievements = [
+        {"id": "first_post", "name": "First Post", "description": "Create your first post",
+         "icon": "📝", "requirement": "post_count >= 1"},
+        {"id": "popular_post", "name": "Popular Post", "description": "Get 100 likes on a single post",
+         "icon": "❤️", "requirement": "post_likes >= 100"},
+        {"id": "100_followers", "name": "Growing Star", "description": "Reach 100 followers",
+         "icon": "⭐", "requirement": "follower_count >= 100"},
+        {"id": "1000_followers", "name": "Influencer", "description": "Reach 1000 followers",
+         "icon": "🏆", "requirement": "follower_count >= 1000"},
+        {"id": "5000_followers", "name": "Superstar", "description": "Reach 5000 followers",
+         "icon": "👑", "requirement": "follower_count >= 5000"},
+        {"id": "group_member", "name": "Team Player", "description": "Join a group",
+         "icon": "👥", "requirement": "groups_count >= 1"},
+        {"id": "channel_subscriber", "name": "Channel Surfer", "description": "Subscribe to a channel",
+         "icon": "📢", "requirement": "channels_count >= 1"},
+        {"id": "message_sent", "name": "Social Butterfly", "description": "Send 50 messages",
+         "icon": "💬", "requirement": "messages_sent >= 50"},
+    ]
+
+    user_achievements = {a.achievement_type for a in current_user.achievements}
+
+    post_count = current_user.post_count
+    follower_count = current_user.follower_count
+    groups_count = current_user.groups.count()
+    channels_count = current_user.subscribed_channels.count()
+    messages_sent = Message.query.filter_by(sender_id=current_user.id).count()
+
+    max_likes = db.session.query(func.max(Post.like_count)).filter_by(user_id=current_user.id).scalar() or 0
+
+    new_achievements = []
+
+    if post_count >= 1 and "first_post" not in user_achievements:
+        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="first_post"))
+
+    if max_likes >= 100 and "popular_post" not in user_achievements:
+        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="popular_post"))
+
+    if follower_count >= 100 and "100_followers" not in user_achievements:
+        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="100_followers"))
+
+    if follower_count >= 1000 and "1000_followers" not in user_achievements:
+        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="1000_followers"))
+
+    if follower_count >= 5000 and "5000_followers" not in user_achievements:
+        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="5000_followers"))
+
+    if groups_count >= 1 and "group_member" not in user_achievements:
+        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="group_member"))
+
+    if channels_count >= 1 and "channel_subscriber" not in user_achievements:
+        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="channel_subscriber"))
+
+    if messages_sent >= 50 and "message_sent" not in user_achievements:
+        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="message_sent"))
+
+    if new_achievements:
+        for ach in new_achievements:
+            db.session.add(ach)
+        db.session.commit()
+        user_achievements = {a.achievement_type for a in current_user.achievements}
+
+    achievements_data = []
+    for ach in all_achievements:
+        is_achieved = ach["id"] in user_achievements
+
+        progress = 0
+        max_value = 1
+        current_value = 0
+
+        if ach["id"] == "first_post":
+            progress = min(100, (post_count / 1) * 100)
+            max_value = 1
+            current_value = post_count
+        elif ach["id"] == "popular_post":
+            progress = min(100, (max_likes / 100) * 100)
+            max_value = 100
+            current_value = max_likes
+        elif ach["id"] == "100_followers":
+            progress = min(100, (follower_count / 100) * 100)
+            max_value = 100
+            current_value = follower_count
+        elif ach["id"] == "1000_followers":
+            progress = min(100, (follower_count / 1000) * 100) if follower_count < 1000 else 100
+            max_value = 1000
+            current_value = follower_count
+        elif ach["id"] == "5000_followers":
+            progress = min(100, (follower_count / 5000) * 100) if follower_count < 5000 else 100
+            max_value = 5000
+            current_value = follower_count
+        elif ach["id"] == "group_member":
+            progress = min(100, (groups_count / 1) * 100)
+            max_value = 1
+            current_value = groups_count
+        elif ach["id"] == "channel_subscriber":
+            progress = min(100, (channels_count / 1) * 100)
+            max_value = 1
+            current_value = channels_count
+        elif ach["id"] == "message_sent":
+            progress = min(100, (messages_sent / 50) * 100) if messages_sent < 50 else 100
+            max_value = 50
+            current_value = messages_sent
+
+        achievements_data.append({
+            **ach,
+            "is_achieved": is_achieved,
+            "progress": progress,
+            "current_value": current_value,
+            "max_value": max_value,
+            "achieved_at": next((a.achieved_at for a in current_user.achievements if a.achievement_type == ach["id"]),
+                                None)
+        })
+
+    achievements_data.sort(key=lambda x: (x["is_achieved"], -x["progress"]))
+
+    total_achievements = len(all_achievements)
+    earned_count = len(user_achievements)
+
+    return render_template("achievements.html",
+                           achievements=achievements_data,
+                           total=total_achievements,
+                           earned=earned_count,
+                           percent=(earned_count / total_achievements * 100) if total_achievements > 0 else 0)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 #  WebSocket Helper Functions
 # ──────────────────────────────────────────────────────────────────────────────
+
 def send_notification(user_id, notification_data):
     user_room = f"user_{user_id}"
     socketio.emit("new_notification", notification_data, room=user_room)
@@ -4641,10 +4952,11 @@ def send_channel_update(channel_id, update_data):
 # ──────────────────────────────────────────────────────────────────────────────
 #  Socket.IO Events
 # ──────────────────────────────────────────────────────────────────────────────
+
 @socketio.on("connect")
 def handle_connect():
     if current_user.is_authenticated:
-        logger.info(f"User {current_user.id} connected")
+        logger.info(f"User {mask_sensitive_data(str(current_user.id))} connected")
         user_room = f"user_{current_user.id}"
         join_room(user_room)
 
@@ -4652,7 +4964,7 @@ def handle_connect():
 @socketio.on("disconnect")
 def handle_disconnect():
     if current_user.is_authenticated:
-        logger.info(f"User {current_user.id} disconnected")
+        logger.info(f"User {mask_sensitive_data(str(current_user.id))} disconnected")
         current_user.is_online = False
         current_user.last_seen = datetime.utcnow()
         db.session.commit()
@@ -4727,6 +5039,7 @@ def on_join_user():
 # ──────────────────────────────────────────────────────────────────────────────
 #  WebRTC Signaling
 # ──────────────────────────────────────────────────────────────────────────────
+
 @socketio.on("webrtc_offer")
 def on_webrtc_offer(data):
     room = data.get("room")
@@ -4760,6 +5073,7 @@ def on_webrtc_ice_candidate(data):
 # ──────────────────────────────────────────────────────────────────────────────
 #  Background Tasks
 # ──────────────────────────────────────────────────────────────────────────────
+
 def start_background_tasks():
     import threading
 
@@ -4777,6 +5091,7 @@ def start_background_tasks():
 # ──────────────────────────────────────────────────────────────────────────────
 #  Error Handlers
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.errorhandler(404)
 def not_found(e):
     return render_template("error.html", code=404, msg="Page not found."), 404
@@ -4809,19 +5124,47 @@ def server_error(e):
 # ──────────────────────────────────────────────────────────────────────────────
 #  Static / Uploads
 # ──────────────────────────────────────────────────────────────────────────────
+
 @app.route("/static/uploads/<path:filename>")
 def uploaded_file(filename):
-    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+    safe_filename = os.path.basename(filename)
+    return send_from_directory(app.config["UPLOAD_FOLDER"], safe_filename)
+
+
+@app.route("/uploads/<path:subfolder>/<path:filename>")
+def serve_upload(subfolder, filename):
+    if subfolder not in UPLOAD_SUBFOLDERS:
+        abort(404)
+    
+    safe_filename = os.path.basename(filename)
+    safe_subfolder = os.path.basename(subfolder)
+    
+    if safe_subfolder not in UPLOAD_SUBFOLDERS:
+        abort(404)
+    
+    try:
+        file_path = safe_path_join(app.config['UPLOAD_FOLDER'], safe_subfolder, safe_filename)
+    except ValueError:
+        abort(404)
+    
+    if not os.path.exists(file_path):
+        abort(404)
+    
+    return send_from_directory(
+        os.path.join(app.config['UPLOAD_FOLDER'], safe_subfolder),
+        safe_filename
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  Create Admin User
+#  Create Admin User & Initialization
 # ──────────────────────────────────────────────────────────────────────────────
+
 def create_admin_user():
     try:
         admin = User.query.filter_by(username='admin').first()
         if not admin:
-            admin_password = os.environ.get('ADMIN_PASSWORD', 'Admin123!')
+            admin_password = os.environ.get('ADMIN_PASSWORD', secrets.token_urlsafe(12))
             admin = User(
                 username='admin',
                 email='admin@kildear.com',
@@ -4843,9 +5186,6 @@ def create_admin_user():
         logger.error(f"❌ Ошибка при создании администратора: {e}")
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-#  Функция миграции базы данных
-# ──────────────────────────────────────────────────────────────────────────────
 def run_migrations():
     try:
         inspector = db.inspect(db.engine)
@@ -4853,16 +5193,11 @@ def run_migrations():
 
         for table in ['verification_request', 'admin_application', 'post_expiration',
                       'group_post_expiration', 'channel_post_expiration', 'info_banner',
-                      'user_google', 'user_yandex']:
+                      'user_google', 'user_yandex', 'user_vk']:
             if table not in tables:
                 logger.info(f"➕ Создание таблицы {table}...")
                 db.create_all()
                 logger.info(f"✅ Таблица {table} создана")
-
-        if 'user_vk' not in tables:
-            logger.info("➕ Создание таблицы user_vk...")
-            db.create_all()
-            logger.info("✅ Таблица user_vk создана")
 
         if 'group' in tables:
             columns = [col['name'] for col in inspector.get_columns('group')]
@@ -4890,9 +5225,6 @@ def run_migrations():
         db.session.rollback()
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-#  DB Init & Run
-# ──────────────────────────────────────────────────────────────────────────────
 def init_app():
     with app.app_context():
         try:
@@ -4922,157 +5254,8 @@ def init_app():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  Achievements Routes
+#  Main Entry Point
 # ──────────────────────────────────────────────────────────────────────────────
-
-class UserAchievement(db.Model):
-    """Модель для отслеживания достижений пользователя"""
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    achievement_type = db.Column(db.String(50), nullable=False)
-    achieved_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    user = db.relationship("User", backref="achievements")
-
-
-@app.route("/achievements")
-@login_required
-def achievements():
-    """Страница достижений пользователя"""
-    from collections import defaultdict
-
-    # Определяем доступные достижения
-    all_achievements = [
-        {"id": "first_post", "name": "First Post", "description": "Create your first post",
-         "icon": "📝", "requirement": "post_count >= 1"},
-        {"id": "popular_post", "name": "Popular Post", "description": "Get 100 likes on a single post",
-         "icon": "❤️", "requirement": "post_likes >= 100"},
-        {"id": "100_followers", "name": "Growing Star", "description": "Reach 100 followers",
-         "icon": "⭐", "requirement": "follower_count >= 100"},
-        {"id": "1000_followers", "name": "Influencer", "description": "Reach 1000 followers",
-         "icon": "🏆", "requirement": "follower_count >= 1000"},
-        {"id": "5000_followers", "name": "Superstar", "description": "Reach 5000 followers",
-         "icon": "👑", "requirement": "follower_count >= 5000"},
-        {"id": "group_member", "name": "Team Player", "description": "Join a group",
-         "icon": "👥", "requirement": "groups_count >= 1"},
-        {"id": "channel_subscriber", "name": "Channel Surfer", "description": "Subscribe to a channel",
-         "icon": "📢", "requirement": "channels_count >= 1"},
-        {"id": "message_sent", "name": "Social Butterfly", "description": "Send 50 messages",
-         "icon": "💬", "requirement": "messages_sent >= 50"},
-    ]
-
-    # Получаем достижения пользователя
-    user_achievements = {a.achievement_type for a in current_user.achievements}
-
-    # Вычисляем прогресс
-    post_count = current_user.post_count
-    follower_count = current_user.follower_count
-    groups_count = current_user.groups.count()
-    channels_count = current_user.subscribed_channels.count()
-    messages_sent = Message.query.filter_by(sender_id=current_user.id).count()
-
-    # Проверяем максимальное количество лайков на постах
-    max_likes = db.session.query(func.max(Post.like_count)).filter_by(user_id=current_user.id).scalar() or 0
-
-    # Обновляем достижения (если нужно)
-    new_achievements = []
-
-    if post_count >= 1 and "first_post" not in user_achievements:
-        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="first_post"))
-
-    if max_likes >= 100 and "popular_post" not in user_achievements:
-        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="popular_post"))
-
-    if follower_count >= 100 and "100_followers" not in user_achievements:
-        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="100_followers"))
-
-    if follower_count >= 1000 and "1000_followers" not in user_achievements:
-        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="1000_followers"))
-
-    if follower_count >= 5000 and "5000_followers" not in user_achievements:
-        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="5000_followers"))
-
-    if groups_count >= 1 and "group_member" not in user_achievements:
-        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="group_member"))
-
-    if channels_count >= 1 and "channel_subscriber" not in user_achievements:
-        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="channel_subscriber"))
-
-    if messages_sent >= 50 and "message_sent" not in user_achievements:
-        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="message_sent"))
-
-    if new_achievements:
-        for ach in new_achievements:
-            db.session.add(ach)
-        db.session.commit()
-        user_achievements = {a.achievement_type for a in current_user.achievements}
-
-    # Собираем данные для отображения
-    achievements_data = []
-    for ach in all_achievements:
-        is_achieved = ach["id"] in user_achievements
-
-        # Вычисляем прогресс
-        progress = 0
-        max_value = 1
-
-        if ach["id"] == "first_post":
-            progress = min(100, (post_count / 1) * 100) if is_achieved else min(100, (post_count / 1) * 100)
-            max_value = 1
-            current_value = post_count
-        elif ach["id"] == "popular_post":
-            progress = min(100, (max_likes / 100) * 100)
-            max_value = 100
-            current_value = max_likes
-        elif ach["id"] == "100_followers":
-            progress = min(100, (follower_count / 100) * 100)
-            max_value = 100
-            current_value = follower_count
-        elif ach["id"] == "1000_followers":
-            progress = min(100, (follower_count / 1000) * 100) if follower_count < 1000 else 100
-            max_value = 1000
-            current_value = follower_count
-        elif ach["id"] == "5000_followers":
-            progress = min(100, (follower_count / 5000) * 100) if follower_count < 5000 else 100
-            max_value = 5000
-            current_value = follower_count
-        elif ach["id"] == "group_member":
-            progress = min(100, (groups_count / 1) * 100)
-            max_value = 1
-            current_value = groups_count
-        elif ach["id"] == "channel_subscriber":
-            progress = min(100, (channels_count / 1) * 100)
-            max_value = 1
-            current_value = channels_count
-        elif ach["id"] == "message_sent":
-            progress = min(100, (messages_sent / 50) * 100) if messages_sent < 50 else 100
-            max_value = 50
-            current_value = messages_sent
-        else:
-            progress = 100 if is_achieved else 0
-
-        achievements_data.append({
-            **ach,
-            "is_achieved": is_achieved,
-            "progress": progress,
-            "current_value": current_value,
-            "max_value": max_value,
-            "achieved_at": next((a.achieved_at for a in current_user.achievements if a.achievement_type == ach["id"]),
-                                None)
-        })
-
-    # Сортируем: сначала неполученные, потом полученные
-    achievements_data.sort(key=lambda x: (x["is_achieved"], -x["progress"]))
-
-    # Статистика
-    total_achievements = len(all_achievements)
-    earned_count = len(user_achievements)
-
-    return render_template("achievements.html",
-                           achievements=achievements_data,
-                           total=total_achievements,
-                           earned=earned_count,
-                           percent=(earned_count / total_achievements * 100) if total_achievements > 0 else 0)
 
 if __name__ == "__main__":
     init_app()
@@ -5080,7 +5263,7 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
 
     print("\n" + "=" * 70)
-    print("🚀 ЗАПУСК KILDEAR SOCIAL NETWORK (COMPLETE VERSION)")
+    print("🚀 ЗАПУСК KILDEAR SOCIAL NETWORK (SECURE VERSION)")
     print("=" * 70)
     print(f"🌐 Сервер запускается на порту: {port}")
     print(f"📁 Временная папка: {app.config['UPLOAD_FOLDER']}")
@@ -5092,17 +5275,28 @@ if __name__ == "__main__":
     print(f"🖥️  Платформа: {platform.system()}")
     print(f"🎯 Режим: {'PRODUCTION' if is_production else 'DEVELOPMENT'}")
     print("=" * 70)
-    print("📝 Новые функции:")
-    print("   ✅ Google OAuth авторизация")
-    print("   ✅ Yandex OAuth авторизация")
-    print("   ✅ VK OAuth авторизация")
-    print("   ✅ Исправлен QR-код")
+    print("✅ ИСПРАВЛЕННЫЕ УЯЗВИМОСТИ:")
+    print("   🔒 XSS - DOM text reinterpreted as HTML")
+    print("   🔒 Incomplete string escaping or encoding")
+    print("   🔒 Path traversal - Uncontrolled data used in path expression")
+    print("   🔒 Clear-text logging of sensitive information")
+    print("   🔒 ReDoS - Polynomial regular expression")
+    print("   🔒 Open redirect - URL redirection from remote source")
+    print("   🔒 Information exposure through exceptions")
+    print("=" * 70)
+    print("📝 Функционал:")
+    print("   ✅ Google, Yandex, VK OAuth авторизация")
+    print("   ✅ QR-код для профилей")
     print("   ✅ Верификация пользователей")
-    print("   ✅ Заявки на админа/модера")
+    print("   ✅ Заявки на админа/модератора")
     print("   ✅ Автоматическое удаление постов")
     print("   ✅ Кастомные аватарки (1000+ подписчиков)")
     print("   ✅ Кастомные обложки (5000+ подписчиков)")
     print("   ✅ Информационные баннеры")
+    print("   ✅ Голосовые сообщения")
+    print("   ✅ Аудио/видео звонки (WebRTC)")
+    print("   ✅ Группы и каналы")
+    print("   ✅ Достижения")
     print("=" * 70)
     print("📝 Для остановки нажмите Ctrl+C")
     print("=" * 70 + "\n")
