@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Search{% if q %}: {{ q }}{% endif %} — Kildear{% endblock %}
+{% block title %}Поиск{% if q %}: {{ q }}{% endif %} — Kildear{% endblock %}
 
 {% block head %}
 <style>
@@ -155,9 +155,9 @@
   <div class="search-hero">
     <form method="GET" action="{{ url_for('search') }}" class="search-form">
       <input type="hidden" name="tab" value="{{ tab }}"/>
-      <input type="text" name="q" value="{{ q }}" placeholder="Search people, posts, groups, channels…" autofocus/>
+      <input type="text" name="q" value="{{ q }}" placeholder="Поиск людей, постов, групп, каналов…" autofocus/>
       <button type="submit" class="search-submit">
-        <i class="fa-solid fa-magnifying-glass"></i> Search
+        <i class="fa-solid fa-magnifying-glass"></i> Поиск
       </button>
     </form>
   </div>
@@ -165,7 +165,7 @@
   {% if not q %}
   <!-- Trending / suggestions when no query -->
   <div class="trending-section">
-    <div class="trending-label"><i class="fa-solid fa-fire" style="color:var(--secondary);margin-right:6px"></i>Trending</div>
+    <div class="trending-label"><i class="fa-solid fa-fire" style="color:var(--secondary);margin-right:6px"></i>В тренде</div>
     <div class="trend-chips">
       <a href="?q=photography&tab=posts"   class="trend-chip"><i class="fa-solid fa-camera"></i> photography</a>
       <a href="?q=music&tab=posts"          class="trend-chip"><i class="fa-solid fa-music"></i> music</a>
@@ -179,10 +179,10 @@
   </div>
 
   <!-- People you may know -->
-  <div class="trending-label" style="margin-bottom:12px;"><i class="fa-solid fa-user-group" style="color:var(--primary);margin-right:6px"></i>People you may know</div>
+  <div class="trending-label" style="margin-bottom:12px;"><i class="fa-solid fa-user-group" style="color:var(--primary);margin-right:6px"></i>Возможно, вы знаете</div>
   <div class="people-grid" id="suggestions">
     <div style="color:var(--text-muted);font-size:13px;grid-column:1/-1;text-align:center;padding:30px">
-      Start searching to discover people.
+      Начните поиск, чтобы найти людей.
     </div>
   </div>
 
@@ -190,19 +190,19 @@
   <!-- Result tabs -->
   <div class="search-tabs">
     <a href="?q={{ q }}&tab=people"   class="search-tab {% if tab=='people'   %}active{% endif %}">
-      <i class="fa-solid fa-user"></i> People
+      <i class="fa-solid fa-user"></i> Люди
       <span class="tab-count">{{ users|length }}</span>
     </a>
     <a href="?q={{ q }}&tab=posts"    class="search-tab {% if tab=='posts'    %}active{% endif %}">
-      <i class="fa-solid fa-grid-2"></i> Posts
+      <i class="fa-solid fa-grid-2"></i> Посты
       <span class="tab-count">{{ posts|length }}</span>
     </a>
     <a href="?q={{ q }}&tab=groups"   class="search-tab {% if tab=='groups'   %}active{% endif %}">
-      <i class="fa-solid fa-users"></i> Groups
+      <i class="fa-solid fa-users"></i> Группы
       <span class="tab-count">{{ groups|length }}</span>
     </a>
     <a href="?q={{ q }}&tab=channels" class="search-tab {% if tab=='channels' %}active{% endif %}">
-      <i class="fa-solid fa-satellite-dish"></i> Channels
+      <i class="fa-solid fa-satellite-dish"></i> Каналы
       <span class="tab-count">{{ channels|length }}</span>
     </a>
   </div>
@@ -222,10 +222,10 @@
         </a>
         <div class="phandle">@{{ u.username }}</div>
         {% if u.bio %}<div class="pbio">{{ u.bio[:60] }}{% if u.bio|length > 60 %}…{% endif %}</div>{% endif %}
-        <div style="font-size:12px;color:var(--text-muted);">{{ u.follower_count }} followers</div>
+        <div style="font-size:12px;color:var(--text-muted);">{{ u.follower_count }} подписчиков</div>
         {% if u.id != current_user.id %}
         <button class="follow-btn" onclick="quickFollow('{{ u.username }}', this)">
-          + Follow
+          + Подписаться
         </button>
         {% endif %}
       </div>
@@ -234,8 +234,8 @@
     {% else %}
     <div class="no-results">
       <div class="nr-icon">🔍</div>
-      <h3>No people found</h3>
-      <p>Try a different search term.</p>
+      <h3>Люди не найдены</h3>
+      <p>Попробуйте другой поисковый запрос.</p>
     </div>
     {% endif %}
 
@@ -268,8 +268,8 @@
     {% else %}
     <div class="no-results">
       <div class="nr-icon">📝</div>
-      <h3>No posts found</h3>
-      <p>Nothing matched "<strong>{{ q }}</strong>".</p>
+      <h3>Посты не найдены</h3>
+      <p>Ничего не найдено по запросу "<strong>{{ q }}</strong>".</p>
     </div>
     {% endif %}
 
@@ -284,8 +284,8 @@
           <div class="cname">{{ g.name }}</div>
           <div class="cdesc">{{ g.description[:60] }}{% if g.description|length > 60 %}…{% endif %}</div>
           <div class="cmeta">
-            <span><i class="fa-solid fa-users"></i> {{ g.member_count }} members</span>
-            {% if g.is_private %}<span><i class="fa-solid fa-lock"></i> Private</span>{% endif %}
+            <span><i class="fa-solid fa-users"></i> {{ g.member_count }} участников</span>
+            {% if g.is_private %}<span><i class="fa-solid fa-lock"></i> Приватная</span>{% endif %}
           </div>
         </div>
       </a>
@@ -294,7 +294,7 @@
     {% else %}
     <div class="no-results">
       <div class="nr-icon">👥</div>
-      <h3>No groups found</h3>
+      <h3>Группы не найдены</h3>
     </div>
     {% endif %}
 
@@ -309,7 +309,7 @@
           <div class="cname">{{ c.name }}</div>
           <div class="cdesc">{{ c.description[:60] }}{% if c.description|length > 60 %}…{% endif %}</div>
           <div class="cmeta">
-            <span><i class="fa-solid fa-satellite-dish"></i> {{ c.sub_count }} subscribers</span>
+            <span><i class="fa-solid fa-satellite-dish"></i> {{ c.sub_count }} подписчиков</span>
           </div>
         </div>
       </a>
@@ -318,7 +318,7 @@
     {% else %}
     <div class="no-results">
       <div class="nr-icon">📡</div>
-      <h3>No channels found</h3>
+      <h3>Каналы не найдены</h3>
     </div>
     {% endif %}
   {% endif %}
@@ -333,7 +333,7 @@ function quickFollow(username, btn) {
     headers: { 'X-CSRFToken': '{{ csrf_token() }}' },
     credentials: 'same-origin',
   }).then(r=>r.json()).then(d=>{
-    btn.textContent = d.following ? '✓ Following' : '+ Follow';
+    btn.textContent = d.following ? '✓ Подписан' : '+ Подписаться';
     btn.style.color = d.following ? 'var(--success)' : '';
   });
 }

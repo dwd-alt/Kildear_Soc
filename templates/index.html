@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Home — Kildear{% endblock %}
+{% block title %}Главная — Kildear{% endblock %}
 
 {% block content %}
 <div class="feed-layout">
@@ -8,18 +8,18 @@
   <div class="quick-actions" style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
     {% if not current_user.is_verified %}
     <a href="{{ url_for('request_verification') }}" class="btn btn-outline btn-sm">
-      <i class="fa-solid fa-circle-check"></i> Get Verified
+      <i class="fa-solid fa-circle-check"></i> Получить верификацию
     </a>
     {% endif %}
 
     {% if not current_user.is_admin and not current_user.is_moderator %}
     <a href="{{ url_for('apply_admin') }}" class="btn btn-outline btn-sm">
-      <i class="fa-solid fa-user-tie"></i> Apply for Staff
+      <i class="fa-solid fa-user-tie"></i> Стать модератором
     </a>
     {% endif %}
 
     <button class="btn btn-outline btn-sm" onclick="showMyQRCode()">
-      <i class="fa-solid fa-qrcode"></i> My QR Code
+      <i class="fa-solid fa-qrcode"></i> Мой QR-код
     </button>
   </div>
 
@@ -27,10 +27,10 @@
   <div class="card create-post-card" id="createPostCard">
     <div class="create-post-header">
       <a href="{{ url_for('profile', username=current_user.username) }}">
-        <img src="{{ current_user.avatar_url }}" class="avatar avatar-md" alt="You">
+        <img src="{{ current_user.avatar_url }}" class="avatar avatar-md" alt="Вы">
       </a>
       <button class="create-post-trigger" id="createPostTrigger">
-        What's on your mind, {{ current_user.username }}?
+        Что у вас нового, {{ current_user.username }}?
       </button>
     </div>
 
@@ -39,7 +39,7 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
       <textarea name="content" id="postContent" class="post-textarea"
-                placeholder="Share something with the world…" maxlength="5000"
+                placeholder="Поделитесь чем-нибудь с миром…" maxlength="5000"
                 oninput="autoResize(this)"></textarea>
       <div class="char-counter"><span id="postCharCount">0</span>/5000</div>
 
@@ -48,31 +48,31 @@
 
       <div class="create-post-actions">
         <div class="media-buttons">
-          <label class="btn btn-ghost btn-sm media-btn" title="Photo">
+          <label class="btn btn-ghost btn-sm media-btn" title="Фото">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
               <polyline points="21 15 16 10 5 21"/>
             </svg>
-            Photo
+            Фото
             <input type="file" name="image" accept="image/*" class="hidden" id="imageInput"
                    onchange="previewMedia(this,'image')">
           </label>
-          <label class="btn btn-ghost btn-sm media-btn" title="Video">
+          <label class="btn btn-ghost btn-sm media-btn" title="Видео">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/>
             </svg>
-            Video
+            Видео
             <input type="file" name="video" accept="video/*" class="hidden" id="videoInput"
                    onchange="previewMedia(this,'video')">
           </label>
         </div>
         <div class="post-submit-row">
           <select name="visibility" class="visibility-select">
-            <option value="public">🌍 Public</option>
-            <option value="followers">👥 Followers</option>
-            <option value="private">🔒 Only me</option>
+            <option value="public">🌍 Для всех</option>
+            <option value="followers">👥 Только подписчикам</option>
+            <option value="private">🔒 Только мне</option>
           </select>
-          <button type="submit" class="btn btn-primary btn-sm">Post</button>
+          <button type="submit" class="btn btn-primary btn-sm">Опубликовать</button>
         </div>
       </div>
     </form>
@@ -98,8 +98,8 @@
             </svg>
           </button>
           <div class="dropdown-menu">
-            <a href="{{ url_for('view_post', post_id=post.id) }}" class="dropdown-item">View post</a>
-            <button class="dropdown-item danger" onclick="confirmDeletePost({{ post.id }})">Delete</button>
+            <a href="{{ url_for('view_post', post_id=post.id) }}" class="dropdown-item">Открыть пост</a>
+            <button class="dropdown-item danger" onclick="confirmDeletePost({{ post.id }})">Удалить</button>
           </div>
         </div>
         {% endif %}
@@ -109,7 +109,7 @@
       <div class="post-body">
         <p class="post-text {% if post.content|length > 280 %}collapsed{% endif %}" id="text-{{ post.id }}">{{ post.content }}</p>
         {% if post.content|length > 280 %}
-        <button class="read-more-btn" onclick="toggleReadMore({{ post.id }})">Read more</button>
+        <button class="read-more-btn" onclick="toggleReadMore({{ post.id }})">Читать далее</button>
         {% endif %}
       </div>
       {% endif %}
@@ -117,7 +117,7 @@
       {% if post.media_url %}
       <div class="post-media">
         {% if post.media_type == 'image' %}
-        <img src="{{ post.media_url }}" alt="Post image" class="post-image" loading="lazy" onclick="openLightbox(this.src, 'image')">
+        <img src="{{ post.media_url }}" alt="Изображение поста" class="post-image" loading="lazy" onclick="openLightbox(this.src, 'image')">
         {% elif post.media_type == 'video' %}
         <video class="post-video" controls preload="metadata" playsinline>
           <source src="{{ post.media_url }}">
@@ -147,7 +147,7 @@
             <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
             <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
           </svg>
-          Share
+          Поделиться
         </button>
       </div>
 
@@ -156,8 +156,8 @@
         <img src="{{ current_user.avatar_url }}" class="avatar avatar-xs" alt="">
         <form class="inline-comment-form" id="comment-form-{{ post.id }}" onsubmit="submitInlineComment(event, {{ post.id }})">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="text" name="content" class="inline-comment-input" placeholder="Write a comment…" maxlength="1000">
-          <button type="submit" class="btn btn-primary btn-xs">Send</button>
+          <input type="text" name="content" class="inline-comment-input" placeholder="Написать комментарий…" maxlength="1000">
+          <button type="submit" class="btn btn-primary btn-xs">Отправить</button>
         </form>
       </div>
       <div id="comments-list-{{ post.id }}" class="comments-list"></div>
@@ -167,20 +167,20 @@
     <!-- PAGINATION -->
     <div class="pagination-row">
       {% if posts.has_prev %}
-        <a href="{{ url_for('index', page=posts.prev_num) }}" class="btn btn-ghost">← Newer</a>
+        <a href="{{ url_for('index', page=posts.prev_num) }}" class="btn btn-ghost">← Новые</a>
       {% endif %}
-      <span class="page-info">Page {{ posts.page }} of {{ posts.pages }}</span>
+      <span class="page-info">Страница {{ posts.page }} из {{ posts.pages }}</span>
       {% if posts.has_next %}
-        <a href="{{ url_for('index', page=posts.next_num) }}" class="btn btn-ghost">Older →</a>
+        <a href="{{ url_for('index', page=posts.next_num) }}" class="btn btn-ghost">Старые →</a>
       {% endif %}
     </div>
 
   {% else %}
     <div class="empty-state card">
       <div class="empty-icon">🌌</div>
-      <h3>Your feed is empty</h3>
-      <p>Follow people or create your first post to get started.</p>
-      <a href="{{ url_for('search') }}" class="btn btn-primary">Explore Kildear</a>
+      <h3>Ваша лента пуста</h3>
+      <p>Подпишитесь на людей или создайте первый пост, чтобы начать.</p>
+      <a href="{{ url_for('search') }}" class="btn btn-primary">Исследовать Kildear</a>
     </div>
   {% endif %}
 
@@ -189,7 +189,7 @@
 <!-- RIGHT SIDEBAR -->
 <aside class="right-sidebar">
   <div class="card sidebar-card">
-    <h4 class="sidebar-title">Who to follow</h4>
+    <h4 class="sidebar-title">Кого подписаться</h4>
     {% if suggestions %}
       {% for user in suggestions %}
       <div class="suggestion-row">
@@ -197,20 +197,20 @@
           <img src="{{ user.avatar_url }}" class="avatar avatar-xs" alt="{{ user.username }}">
           <div>
             <div class="suggestion-name">{{ user.display_name or user.username }}</div>
-            <div class="suggestion-sub">{{ user.follower_count }} followers</div>
+            <div class="suggestion-sub">{{ user.follower_count }} подписчиков</div>
           </div>
         </a>
-        <button class="btn btn-outline btn-xs" onclick="followUser('{{ user.username }}', this)">Follow</button>
+        <button class="btn btn-outline btn-xs" onclick="followUser('{{ user.username }}', this)">Подписаться</button>
       </div>
       {% endfor %}
     {% else %}
-      <p class="sidebar-empty">No suggestions right now.</p>
+      <p class="sidebar-empty">Нет предложений.</p>
     {% endif %}
-    <a href="{{ url_for('search') }}" class="sidebar-more">Browse all →</a>
+    <a href="{{ url_for('search') }}" class="sidebar-more">Все пользователи →</a>
   </div>
 
   <div class="card sidebar-card">
-    <h4 class="sidebar-title">Trending</h4>
+    <h4 class="sidebar-title">В тренде</h4>
     <div class="trending-tags">
       <a href="{{ url_for('search', q='kildear') }}" class="trending-tag">#kildear</a>
       <a href="{{ url_for('search', q='social') }}" class="trending-tag">#social</a>
@@ -345,8 +345,8 @@ function previewMedia(input, type){
 function toggleReadMore(id){
   const el=document.getElementById('text-'+id);
   const btn=el.nextElementSibling;
-  if(el.classList.contains('collapsed')){el.classList.remove('collapsed');btn.textContent='Show less';}
-  else{el.classList.add('collapsed');btn.textContent='Read more';}
+  if(el.classList.contains('collapsed')){el.classList.remove('collapsed');btn.textContent='Свернуть';}
+  else{el.classList.add('collapsed');btn.textContent='Читать далее';}
 }
 
 function toggleMenu(btn){
@@ -388,12 +388,12 @@ async function submitInlineComment(e, postId){
       }
       const countSpan = document.getElementById(`comment-count-${postId}`);
       if(countSpan) countSpan.textContent = parseInt(countSpan.textContent) + 1;
-      toast('Comment posted!','success');
+      toast('Комментарий опубликован!','success');
     } else {
-      toast(data.error || 'Could not post comment.', 'error');
+      toast(data.error || 'Не удалось опубликовать комментарий.', 'error');
     }
   } catch(err) {
-    toast('Could not post comment.', 'error');
+    toast('Не удалось опубликовать комментарий.', 'error');
   }
 }
 
@@ -423,7 +423,7 @@ async function likePost(postId){
     }
     if(countSpan) countSpan.textContent = data.count;
   } catch(e) {
-    toast('Could not process like.', 'error');
+    toast('Не удалось поставить лайк.', 'error');
   }
 }
 
@@ -435,26 +435,26 @@ async function followUser(username, btn){
     });
     const data = await response.json();
     if(btn){
-      btn.textContent = data.following ? '✓ Following' : '+ Follow';
+      btn.textContent = data.following ? '✓ Подписан' : '+ Подписаться';
       btn.classList.toggle('following', data.following);
     }
-    toast(data.following ? `You are now following ${username}!` : `Unfollowed ${username}`, 'success');
+    toast(data.following ? `Вы подписались на ${username}!` : `Вы отписались от ${username}`, 'success');
   } catch(e) {
-    toast('Could not update follow status.', 'error');
+    toast('Не удалось изменить статус подписки.', 'error');
   }
 }
 
 function sharePost(postId){
   const url = `${window.location.origin}/post/${postId}`;
   if(navigator.share){
-    navigator.share({ url, title: 'Check this post on Kildear' }).catch(()=>{});
+    navigator.share({ url, title: 'Посмотрите этот пост в Kildear' }).catch(()=>{});
   } else {
-    navigator.clipboard.writeText(url).then(() => toast('Link copied to clipboard!', 'success'));
+    navigator.clipboard.writeText(url).then(() => toast('Ссылка скопирована в буфер обмена!', 'success'));
   }
 }
 
 function confirmDeletePost(postId){
-  if(!confirm('Delete this post? This cannot be undone.')) return;
+  if(!confirm('Удалить этот пост? Это действие нельзя отменить.')) return;
   const form = document.createElement('form');
   form.method = 'POST';
   form.action = `/post/${postId}/delete`;

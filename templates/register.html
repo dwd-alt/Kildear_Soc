@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Create Account — Kildear</title>
+  <title>Создать аккаунт — Kildear</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
@@ -173,12 +173,12 @@
     <div class="brand">
       <div class="brand-mark">K</div>
       <div class="brand-name">Kildear</div>
-      <div class="brand-tagline">Join millions of creators worldwide</div>
+      <div class="brand-tagline">Присоединяйтесь к миллионам создателей по всему миру</div>
     </div>
 
     <div class="auth-card">
-      <div class="auth-title">Create your account</div>
-      <div class="auth-sub">Free forever. No credit card required.</div>
+      <div class="auth-title">Создайте аккаунт</div>
+      <div class="auth-sub">Навсегда бесплатно. Без привязки карты.</div>
 
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% for cat, msg in messages %}
@@ -194,18 +194,18 @@
 
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label" for="username">Username</label>
+            <label class="form-label" for="username">Имя пользователя</label>
             <div class="input-wrap">
               <input class="form-control" type="text" id="username" name="username"
                      placeholder="coolname" autocomplete="username"
                      maxlength="40" required/>
               <i class="fa-solid fa-at icon"></i>
             </div>
-            <div class="hint" id="usernameHint">Letters, numbers, underscores · 3–40 chars</div>
+            <div class="hint" id="usernameHint">Буквы, цифры, знаки подчёркивания · 3–40 символов</div>
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="email">Email</label>
+            <label class="form-label" for="email">Электронная почта</label>
             <div class="input-wrap">
               <input class="form-control" type="email" id="email" name="email"
                      placeholder="you@example.com" autocomplete="email" required/>
@@ -215,10 +215,10 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="password">Password</label>
+          <label class="form-label" for="password">Пароль</label>
           <div class="input-wrap">
             <input class="form-control" type="password" id="password" name="password"
-                   placeholder="Min. 8 characters" autocomplete="new-password"
+                   placeholder="Минимум 8 символов" autocomplete="new-password"
                    minlength="8" required/>
             <i class="fa-solid fa-lock icon"></i>
             <button type="button" class="toggle-pw" onclick="togglePw('password',this)">
@@ -231,14 +231,14 @@
             <div class="strength-seg" id="s3"></div>
             <div class="strength-seg" id="s4"></div>
           </div>
-          <div class="strength-label" id="strengthLabel">Enter a password</div>
+          <div class="strength-label" id="strengthLabel">Введите пароль</div>
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="confirm">Confirm Password</label>
+          <label class="form-label" for="confirm">Подтвердите пароль</label>
           <div class="input-wrap">
             <input class="form-control" type="password" id="confirm" name="confirm"
-                   placeholder="Repeat password" autocomplete="new-password"
+                   placeholder="Повторите пароль" autocomplete="new-password"
                    minlength="8" required/>
             <i class="fa-solid fa-shield-halved icon"></i>
             <button type="button" class="toggle-pw" onclick="togglePw('confirm',this)">
@@ -248,16 +248,16 @@
         </div>
 
         <p class="terms">
-          By creating an account, you agree to our
-          <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
-          You must be 13+ to use Kildear.
+          Создавая аккаунт, вы соглашаетесь с нашими
+          <a href="#">Условиями использования</a> и <a href="#">Политикой конфиденциальности</a>.
+          Вам должно быть не менее 13 лет для использования Kildear.
         </p>
 
-        <button type="submit" class="btn-submit" id="submitBtn">Create Account</button>
+        <button type="submit" class="btn-submit" id="submitBtn">Создать аккаунт</button>
       </form>
 
       <div class="auth-footer">
-        Already have an account? <a href="{{ url_for('login') }}">Log in →</a>
+        Уже есть аккаунт? <a href="{{ url_for('login') }}">Войти →</a>
       </div>
     </div>
   </div>
@@ -276,7 +276,7 @@
                   document.getElementById('s3'), document.getElementById('s4')];
     const lbl  = document.getElementById('strengthLabel');
     const levels = ['', 'weak', 'fair', 'fair', 'strong'];
-    const labels = ['Enter a password', 'Too weak', 'Getting there…', 'Almost strong', '✓ Strong password'];
+    const labels = ['Введите пароль', 'Слишком слабый', 'Неплохо…', 'Почти надёжный', '✓ Надёжный пароль'];
 
     pwEl.addEventListener('input', () => {
       const v = pwEl.value;
@@ -310,7 +310,7 @@
     // Form submit guard
     document.getElementById('regForm').addEventListener('submit', e => {
       const pw = pwEl.value, cf = confirmEl.value;
-      if (pw !== cf) { e.preventDefault(); alert('Passwords do not match.'); }
+      if (pw !== cf) { e.preventDefault(); alert('Пароли не совпадают.'); }
     });
   </script>
 </body>

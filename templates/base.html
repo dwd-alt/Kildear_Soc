@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="ru" data-theme="dark">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <meta name="description" content="Kildear — Connect. Create. Belong."/>
+  <meta name="description" content="Kildear — Общайся. Твори. Будь собой."/>
   <title>{% block title %}Kildear{% endblock %}</title>
 
   <!-- ── Favicon ─────────────────────────────────────────── -->
@@ -20,6 +20,8 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- VK ID SDK -->
+  <script src="https://unpkg.com/@vkid/sdk@2.6.1/dist-sdk/umd/index.js"></script>
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <style>
     /* ── Design Tokens ───────────────────────────────────────────────── */
@@ -533,78 +535,69 @@
     <span class="logo-text">Kildear</span>
   </a>
 
-  <span class="nav-section">Main</span>
+  <span class="nav-section">Основное</span>
   <a href="{{ url_for('index') }}" class="nav-item {% if request.endpoint == 'index' %}active{% endif %}">
-    <i class="fa-solid fa-house"></i> Home
+    <i class="fa-solid fa-house"></i> Главная
   </a>
   <a href="{{ url_for('video_feed') }}" class="nav-item {% if request.endpoint == 'video_feed' %}active{% endif %}">
-    <i class="fa-solid fa-play-circle"></i> Videos
+    <i class="fa-solid fa-play-circle"></i> Видео
   </a>
   <a href="{{ url_for('search') }}" class="nav-item {% if request.endpoint == 'search' %}active{% endif %}">
-    <i class="fa-solid fa-magnifying-glass"></i> Search
+    <i class="fa-solid fa-magnifying-glass"></i> Поиск
   </a>
   <a href="{{ url_for('scan_qr_page') }}" class="nav-item {% if request.endpoint == 'scan_qr_page' %}active{% endif %}">
-    <i class="fa-solid fa-qrcode"></i> Scan QR
+    <i class="fa-solid fa-qrcode"></i> Сканировать QR
   </a>
 
-  <span class="nav-section">Social</span>
+  <span class="nav-section">Социальное</span>
   <a href="{{ url_for('chat_list') }}" class="nav-item {% if 'chat' in request.endpoint %}active{% endif %}">
-    <i class="fa-solid fa-message"></i> Messages
+    <i class="fa-solid fa-message"></i> Сообщения
     {% if unread_messages > 0 %}
       <span class="nav-badge">{{ unread_messages }}</span>
     {% endif %}
   </a>
   <a href="{{ url_for('notifications') }}" class="nav-item {% if request.endpoint == 'notifications' %}active{% endif %}">
-    <i class="fa-solid fa-bell"></i> Notifications
+    <i class="fa-solid fa-bell"></i> Уведомления
     {% if notif_count > 0 %}
       <span class="nav-badge">{{ notif_count }}</span>
     {% endif %}
   </a>
   <a href="{{ url_for('groups') }}" class="nav-item {% if 'group' in request.endpoint %}active{% endif %}">
-    <i class="fa-solid fa-users"></i> Groups
+    <i class="fa-solid fa-users"></i> Группы
   </a>
   <a href="{{ url_for('channels') }}" class="nav-item {% if 'channel' in request.endpoint %}active{% endif %}">
-    <i class="fa-solid fa-satellite-dish"></i> Channels
+    <i class="fa-solid fa-satellite-dish"></i> Каналы
   </a>
 
   {% if current_user.is_authenticated and current_user.is_admin %}
-  <span class="nav-section">Administration</span>
+  <span class="nav-section">Администрирование</span>
   <a href="{{ url_for('admin_dashboard') }}" class="nav-item {% if 'admin' in request.endpoint %}active{% endif %}" style="color: var(--primary); font-weight: 600;">
-    <i class="fa-solid fa-crown"></i> Admin Panel
+    <i class="fa-solid fa-crown"></i> Панель администратора
     {% set pending_reports = stats.total_reports if stats else 0 %}
     {% if pending_reports > 0 %}
       <span class="nav-badge" style="background: var(--danger);">{{ pending_reports }}</span>
     {% endif %}
   </a>
   <a href="{{ url_for('admin_users') }}" class="nav-item {% if request.endpoint == 'admin_users' %}active{% endif %}">
-    <i class="fa-solid fa-users-gear"></i> Users
+    <i class="fa-solid fa-users-gear"></i> Пользователи
   </a>
   <a href="{{ url_for('admin_reports') }}" class="nav-item {% if request.endpoint == 'admin_reports' %}active{% endif %}">
-    <i class="fa-solid fa-flag"></i> Reports
+    <i class="fa-solid fa-flag"></i> Жалобы
   </a>
   <a href="{{ url_for('admin_verification_requests') }}" class="nav-item {% if request.endpoint == 'admin_verification_requests' %}active{% endif %}">
-    <i class="fa-solid fa-circle-check"></i> Verification Reqs
+    <i class="fa-solid fa-circle-check"></i> Запросы на верификацию
     {% if stats.pending_verification > 0 %}
     <span class="nav-badge" style="background: var(--warning);">{{ stats.pending_verification }}</span>
     {% endif %}
   </a>
   <a href="{{ url_for('admin_applications') }}" class="nav-item {% if request.endpoint == 'admin_applications' %}active{% endif %}">
-    <i class="fa-solid fa-user-tie"></i> Staff Apps
+    <i class="fa-solid fa-user-tie"></i> Заявки в модераторы
     {% if stats.pending_admin_apps > 0 %}
     <span class="nav-badge" style="background: var(--warning);">{{ stats.pending_admin_apps }}</span>
     {% endif %}
   </a>
-  <a href="{{ url_for('admin_verification') }}" class="nav-item {% if request.endpoint == 'admin_verification' %}active{% endif %}">
-    <i class="fa-solid fa-check-double"></i> Verify Users
-  </a>
-  <a href="{{ url_for('admin_banned') }}" class="nav-item {% if request.endpoint == 'admin_banned' %}active{% endif %}">
-    <i class="fa-solid fa-ban"></i> Banned
-  </a>
-  <a href="{{ url_for('admin_logs') }}" class="nav-item {% if request.endpoint == 'admin_logs' %}active{% endif %}">
-    <i class="fa-solid fa-history"></i> Logs
-  </a>
   <a href="{{ url_for('admin_banners') }}" class="nav-item {% if request.endpoint == 'admin_banners' %}active{% endif %}">
-    <i class="fa-solid fa-bullhorn"></i> Info Banners
+    <i class="fa-solid fa-bullhorn"></i> Инфо-баннеры
     {% if stats.active_banners > 0 %}
     <span class="nav-badge" style="background: var(--primary);">{{ stats.active_banners }}</span>
     {% endif %}
@@ -612,15 +605,15 @@
   {% endif %}
 
   {% if current_user.is_authenticated %}
-  <span class="nav-section">You</span>
+  <span class="nav-section">Вы</span>
   <a href="{{ url_for('profile', username=current_user.username) }}" class="nav-item {% if request.endpoint == 'profile' and request.view_args.get('username') == current_user.username %}active{% endif %}">
-    <i class="fa-solid fa-user"></i> Profile
+    <i class="fa-solid fa-user"></i> Профиль
   </a>
   <a href="{{ url_for('edit_profile') }}" class="nav-item {% if request.endpoint == 'edit_profile' %}active{% endif %}">
-    <i class="fa-solid fa-pen-to-square"></i> Edit Profile
+    <i class="fa-solid fa-pen-to-square"></i> Редактировать профиль
   </a>
   <a href="{{ url_for('logout') }}" class="nav-item">
-    <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
+    <i class="fa-solid fa-arrow-right-from-bracket"></i> Выйти
   </a>
 
   <div class="sidebar-user">
@@ -732,7 +725,7 @@
                   sessionStorage.setItem('shownBanners', JSON.stringify(shownBanners));
               }
           })
-          .catch(err => console.error('Banner error:', err));
+          .catch(err => console.error('Ошибка баннера:', err));
   }
 
   function showBannerToast(banner) {

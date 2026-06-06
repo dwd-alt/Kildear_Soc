@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Chat with @{{ partner.username }} — Kildear{% endblock %}
+{% block title %}Чат с @{{ partner.username }} — Kildear{% endblock %}
 
 {% block head %}
 <style>
@@ -224,7 +224,6 @@
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    display: none;
     align-items: center;
     justify-content: center;
     transition: all 0.2s;
@@ -304,15 +303,8 @@
   }
 
   @keyframes pulse {
-    0% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.5;
-    }
-    100% {
-      opacity: 1;
-    }
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
   }
 
   .chat-actions {
@@ -491,6 +483,43 @@
     box-shadow: 0 4px 15px rgba(124,111,255,0.3);
   }
 
+  /* Reply to message styling */
+  .message-reply {
+    font-size: 0.75rem;
+    padding: 6px 10px;
+    background: rgba(0,0,0,0.1);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    border-left: 3px solid var(--primary);
+    cursor: pointer;
+  }
+
+  .message-reply:hover {
+    background: rgba(0,0,0,0.15);
+  }
+
+  .message-reply .reply-sender {
+    font-weight: 600;
+  }
+
+  .message-reply .reply-content {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-muted);
+  }
+
+  /* Edited indicator */
+  .message-edited {
+    font-size: 0.65rem;
+    margin-top: 4px;
+    opacity: 0.6;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
   .message-time {
     font-size: 0.7rem;
     color: var(--text-muted);
@@ -561,6 +590,150 @@
   .message-action-btn.delete:hover {
     color: var(--danger);
     background: rgba(255,107,107,0.1);
+  }
+
+  /* Reply Indicator */
+  .reply-indicator {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .reply-indicator.show {
+    display: flex;
+  }
+
+  .reply-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .reply-info i {
+    color: var(--primary);
+  }
+
+  .reply-preview {
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .cancel-reply {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 4px 8px;
+  }
+
+  .cancel-reply:hover {
+    color: var(--danger);
+  }
+
+  /* Edit Message Modal */
+  .edit-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .edit-modal {
+    background: var(--surface);
+    border-radius: 20px;
+    width: 500px;
+    max-width: 90vw;
+    padding: 24px;
+  }
+
+  .edit-modal textarea {
+    width: 100%;
+    padding: 12px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    font-size: 0.95rem;
+    resize: vertical;
+    margin: 16px 0;
+  }
+
+  .edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+  }
+
+  /* Forward Modal */
+  .forward-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .forward-modal {
+    background: var(--surface);
+    border-radius: 20px;
+    width: 400px;
+    max-width: 90vw;
+    padding: 24px;
+  }
+
+  .forward-search {
+    width: 100%;
+    padding: 10px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    margin: 16px 0;
+  }
+
+  .forward-results {
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .forward-user {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px;
+    cursor: pointer;
+    border-radius: 12px;
+    transition: background 0.2s;
+  }
+
+  .forward-user:hover {
+    background: rgba(255,255,255,0.05);
+  }
+
+  .forward-user img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
   }
 
   /* Call Modal */
@@ -715,12 +888,8 @@
   }
 
   @keyframes typing {
-    0%, 60%, 100% {
-      transform: translateY(0);
-    }
-    30% {
-      transform: translateY(-8px);
-    }
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-8px); }
   }
 
   /* Chat Input Area */
@@ -770,13 +939,13 @@
     cursor: not-allowed;
   }
 
-  .chat-actions {
+  .chat-input-tools {
     display: flex;
     gap: 5px;
     align-items: center;
   }
 
-  .chat-action-btn {
+  .chat-tool-btn {
     width: 42px;
     height: 42px;
     background: none;
@@ -791,12 +960,12 @@
     font-size: 1.2rem;
   }
 
-  .chat-action-btn:hover:not(:disabled) {
+  .chat-tool-btn:hover:not(:disabled) {
     background: rgba(255,255,255,0.1);
     color: var(--text);
   }
 
-  .chat-action-btn:disabled {
+  .chat-tool-btn:disabled {
     opacity: 0.3;
     cursor: not-allowed;
   }
@@ -874,6 +1043,27 @@
   .remove-media:hover {
     transform: scale(1.1);
     background: #ff4d4d;
+  }
+
+  /* Voice Recording */
+  .voice-recording-modal {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface);
+    border-radius: 20px;
+    padding: 20px;
+    text-align: center;
+    z-index: 1000;
+    border: 1px solid var(--border);
+  }
+
+  .recording-wave {
+    width: 200px;
+    height: 40px;
+    background: repeating-linear-gradient(45deg, var(--danger) 0px, var(--danger) 2px, transparent 2px, transparent 8px);
+    margin: 10px auto;
   }
 
   /* Blocked User Overlay */
@@ -960,13 +1150,13 @@
     </div>
 
     <div class="conversation-list" id="conversationList">
-      <!-- Conversations will be loaded here -->
       {% for convo in conversations %}
       <a href="{{ url_for('chat', username=convo.user.username) }}"
          class="conversation-item {% if convo.unread > 0 %}unread{% endif %} {% if convo.user.id == partner.id %}active{% endif %}"
-         data-user-id="{{ convo.user.id }}">
+         data-user-id="{{ convo.user.id }}"
+         data-name="{{ convo.user.display_name or convo.user.username }}">
         <div class="conversation-avatar">
-          <img src="{{ convo.user.avatar or '/static/default_avatar.png' }}" alt="{{ convo.user.username }}">
+          <img src="{{ convo.user.avatar_url or '/static/default_avatar.png' }}" alt="{{ convo.user.username }}">
           {% if convo.user.is_online %}
           <span class="online-indicator"></span>
           {% endif %}
@@ -980,7 +1170,9 @@
           </div>
           <div class="conversation-preview">
             {% if convo.last %}
-              {% if convo.last.sender_id == current_user.id %}You: {% endif %}
+              {% if convo.is_voice_last %}
+                🎤 Voice message
+              {% elif convo.last.sender_id == current_user.id %}You: {% endif %}
               {% if convo.last.content %}
                 {{ convo.last.content[:40] }}{% if convo.last.content|length > 40 %}...{% endif %}
               {% elif convo.last.media_url %}
@@ -991,7 +1183,7 @@
             {% endif %}
           </div>
           {% if convo.last %}
-          <div class="conversation-time">{{ convo.last.created_at|timeago }}</div>
+          <div class="conversation-time">{{ convo.last.created_at.strftime('%H:%M') }}</div>
           {% endif %}
         </div>
         {% if convo.unread > 0 %}
@@ -1010,7 +1202,7 @@
         <i class="fa-solid fa-arrow-left"></i>
       </button>
       <div class="chat-partner-avatar" onclick="window.location.href='{{ url_for('profile', username=partner.username) }}'">
-        <img src="{{ partner.avatar or '/static/default_avatar.png' }}" alt="{{ partner.username }}">
+        <img src="{{ partner.avatar_url or '/static/default_avatar.png' }}" alt="{{ partner.username }}">
       </div>
       <div class="chat-partner-info" onclick="window.location.href='{{ url_for('profile', username=partner.username) }}'">
         <div class="chat-partner-name">
@@ -1029,10 +1221,10 @@
         </div>
       </div>
       <div class="chat-actions">
-        <button class="chat-action-btn {% if in_call %}active{% endif %}" onclick="startCall('video')" title="Video call">
+        <button class="chat-action-btn" onclick="startCall('video')" title="Video call">
           <i class="fa-solid fa-video"></i>
         </button>
-        <button class="chat-action-btn {% if in_call %}active{% endif %}" onclick="startCall('audio')" title="Voice call">
+        <button class="chat-action-btn" onclick="startCall('audio')" title="Voice call">
           <i class="fa-solid fa-phone"></i>
         </button>
         <button class="chat-action-btn" onclick="toggleDropdown()" title="More options">
@@ -1056,9 +1248,9 @@
             Block user
           </button>
           {% endif %}
-          <button class="dropdown-item" onclick="clearHistory()">
+          <button class="dropdown-item danger" onclick="clearChat()">
             <i class="fa-regular fa-trash-can"></i>
-            Clear history
+            Clear chat
           </button>
           <hr style="border: 1px solid var(--border); margin: 8px 0;">
           <button class="dropdown-item" onclick="reportUser()">
@@ -1067,6 +1259,16 @@
           </button>
         </div>
       </div>
+    </div>
+
+    <!-- Reply Indicator -->
+    <div class="reply-indicator" id="replyIndicator">
+      <div class="reply-info">
+        <i class="fa-solid fa-reply"></i>
+        <span>Replying to <strong id="replyToName"></strong></span>
+        <span class="reply-preview" id="replyPreview"></span>
+      </div>
+      <button class="cancel-reply" onclick="cancelReply()">×</button>
     </div>
 
     <!-- Blocked Overlay (shown when user is blocked) -->
@@ -1081,45 +1283,118 @@
 
     <!-- Messages Area (hidden if blocked) -->
     <div class="messages-area" id="messagesArea" {% if is_blocked %}style="display: none;"{% endif %}>
+      {% set last_date = None %}
       {% for msg in messages %}
-      <div class="message-row {% if msg.sender_id == current_user.id %}own{% endif %}"
-           id="msg-{{ msg.id }}"
-           onmouseenter="showMessageActions({{ msg.id }})"
-           onmouseleave="hideMessageActions({{ msg.id }})">
-
-        <!-- Message Actions -->
-        <div class="message-actions" id="actions-{{ msg.id }}">
-          <button class="message-action-btn" onclick="replyToMessage({{ msg.id }}, '{{ msg.content|escape }}')" title="Reply">
-            <i class="fa-regular fa-reply"></i>
-          </button>
-          <button class="message-action-btn" onclick="forwardMessage({{ msg.id }})" title="Forward">
-            <i class="fa-regular fa-share-from-square"></i>
-          </button>
-          {% if msg.sender_id == current_user.id %}
-          <button class="message-action-btn delete" onclick="deleteMessage({{ msg.id }})" title="Delete">
-            <i class="fa-regular fa-trash-can"></i>
-          </button>
-          {% endif %}
-        </div>
-
-        {% if msg.sender_id != current_user.id %}
-        <div class="message-avatar">
-          <img src="{{ partner.avatar or '/static/default_avatar.png' }}" alt="{{ partner.username }}">
-        </div>
+        {% set msg_date = msg.created_at.strftime('%Y-%m-%d') %}
+        {% if msg_date != last_date %}
+          <div class="date-separator">
+            <span>{{ msg.created_at.strftime('%B %d, %Y') }}</span>
+          </div>
+          {% set last_date = msg_date %}
         {% endif %}
 
-        <div class="message-content">
-          <div class="message-bubble">
-            {% if msg.content %}
-            {{ msg.content }}
-            {% endif %}
-            {% if msg.media_url %}
-            <img src="{{ msg.media_url }}" alt="Media" onclick="window.open('{{ msg.media_url }}', '_blank')">
+        <div class="message-row {% if msg.sender_id == current_user.id %}own{% endif %}"
+             id="msg-{{ msg.id }}"
+             data-message-id="{{ msg.id }}"
+             data-sender-id="{{ msg.sender_id }}">
+
+          <!-- Message Actions -->
+          <div class="message-actions" id="actions-{{ msg.id }}">
+            <button class="message-action-btn" onclick="replyToMessage({{ msg.id }}, '{{ msg.content|escapejs }}', '{{ msg.sender.username }}')" title="Reply">
+              <i class="fa-regular fa-reply"></i>
+            </button>
+            <button class="message-action-btn" onclick="forwardMessage({{ msg.id }})" title="Forward">
+              <i class="fa-regular fa-share-from-square"></i>
+            </button>
+            {% if msg.sender_id == current_user.id %}
+            <button class="message-action-btn" onclick="editMessage({{ msg.id }}, '{{ msg.content|escapejs }}')" title="Edit">
+              <i class="fa-regular fa-pen-to-square"></i>
+            </button>
+            <button class="message-action-btn delete" onclick="deleteMessage({{ msg.id }})" title="Delete">
+              <i class="fa-regular fa-trash-can"></i>
+            </button>
             {% endif %}
           </div>
-          <div class="message-time">{{ msg.created_at|timeago }}</div>
+
+          {% if msg.sender_id != current_user.id %}
+          <div class="message-avatar">
+            <img src="{{ partner.avatar_url or '/static/default_avatar.png' }}" alt="{{ partner.username }}">
+          </div>
+          {% endif %}
+
+          <div class="message-content">
+            <div class="message-bubble">
+              {% if msg.reply_to %}
+              <div class="message-reply" onclick="scrollToMessage({{ msg.reply_to.id }})">
+                <div class="reply-sender">{{ msg.reply_to.sender.username }}</div>
+                <div class="reply-content">{{ msg.reply_to.content[:80] }}</div>
+              </div>
+              {% endif %}
+
+              {% if msg.content %}
+              {{ msg.content|safe }}
+              {% endif %}
+
+              {% if msg.media_url %}
+              <img src="{{ msg.media_url }}" alt="Media" onclick="window.open('{{ msg.media_url }}', '_blank')">
+              {% endif %}
+
+              {% if msg.is_edited %}
+              <div class="message-edited" title="Edited {{ msg.edit_count }} time(s)">
+                <i class="fa-regular fa-pen-to-square"></i> edited
+              </div>
+              {% endif %}
+            </div>
+            <div class="message-time">
+              {{ msg.created_at.strftime('%H:%M') }}
+              {% if msg.sender_id == current_user.id %}
+                {% if msg.is_read %}
+                <i class="fa-regular fa-circle-check" style="margin-left: 4px; color: #4ade80;"></i>
+                {% else %}
+                <i class="fa-regular fa-check" style="margin-left: 4px;"></i>
+                {% endif %}
+              {% endif %}
+            </div>
+          </div>
         </div>
-      </div>
+      {% endfor %}
+
+      <!-- Voice Messages -->
+      {% for vm in voice_messages %}
+        <div class="message-row {% if vm.sender_id == current_user.id %}own{% endif %} voice-message"
+             id="voice-{{ vm.id }}"
+             data-message-id="{{ vm.id }}"
+             data-type="voice">
+          <div class="message-actions" id="actions-voice-{{ vm.id }}">
+            <button class="message-action-btn" onclick="deleteVoiceMessage({{ vm.id }})" title="Delete">
+              <i class="fa-regular fa-trash-can"></i>
+            </button>
+          </div>
+
+          {% if vm.sender_id != current_user.id %}
+          <div class="message-avatar">
+            <img src="{{ partner.avatar_url or '/static/default_avatar.png' }}" alt="{{ partner.username }}">
+          </div>
+          {% endif %}
+
+          <div class="message-content">
+            <div class="message-bubble">
+              <div class="voice-player" data-audio="{{ vm.audio_url_data }}" data-duration="{{ vm.duration }}">
+                <button class="play-voice-btn" onclick="toggleVoicePlay(this)">
+                  <i class="fa-solid fa-play"></i>
+                </button>
+                <div class="voice-waveform"></div>
+                <span class="voice-duration">{{ vm.duration }}s</span>
+              </div>
+            </div>
+            <div class="message-time">
+              {{ vm.created_at.strftime('%H:%M') }}
+              {% if vm.sender_id == current_user.id and vm.is_read %}
+              <i class="fa-regular fa-circle-check" style="margin-left: 4px; color: #4ade80;"></i>
+              {% endif %}
+            </div>
+          </div>
+        </div>
       {% endfor %}
 
       <!-- Typing Indicator -->
@@ -1151,11 +1426,17 @@
                   rows="1"
                   oninput="autoResize(this); checkInput(); sendTypingIndicator()"
                   {% if is_blocked %}disabled{% endif %}></textarea>
-        <div class="chat-actions">
-          <label class="chat-action-btn" for="mediaUpload" style="cursor: pointer; {% if is_blocked %}opacity: 0.3; pointer-events: none;{% endif %}">
+        <div class="chat-input-tools">
+          <button class="chat-tool-btn" onclick="toggleEmojiPicker()" title="Emoji">
+            <i class="fa-regular fa-face-smile"></i>
+          </button>
+          <label class="chat-tool-btn" style="cursor: pointer;">
             <i class="fa-regular fa-image"></i>
+            <input type="file" id="imageInput" accept="image/*" style="display: none;" onchange="handleImageSelect(this)">
           </label>
-          <input type="file" id="mediaUpload" accept="image/*" style="display: none;" onchange="handleMediaSelect(this)" {% if is_blocked %}disabled{% endif %}>
+          <button class="chat-tool-btn" id="voiceRecordBtn" onclick="startVoiceRecording()" title="Voice message">
+            <i class="fa-solid fa-microphone"></i>
+          </button>
           <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>
             <i class="fa-regular fa-paper-plane"></i>
           </button>
@@ -1169,7 +1450,7 @@
 <div class="call-modal-overlay hidden" id="callModal">
   <div class="call-modal">
     <div class="call-avatar">
-      <img src="{{ partner.avatar or '/static/default_avatar.png' }}" alt="{{ partner.username }}">
+      <img src="{{ partner.avatar_url or '/static/default_avatar.png' }}" alt="{{ partner.username }}">
     </div>
     <div class="call-status" id="callStatus">Calling {{ partner.display_name or partner.username }}...</div>
     <div class="call-duration" id="callDuration">00:00</div>
@@ -1184,6 +1465,48 @@
   </div>
 </div>
 
+<!-- Edit Message Modal -->
+<div id="editModal" style="display: none;">
+  <div class="edit-modal-overlay" onclick="closeEditModal()">
+    <div class="edit-modal" onclick="event.stopPropagation()">
+      <h3>Edit message</h3>
+      <textarea id="editInput" rows="3"></textarea>
+      <div class="edit-actions">
+        <button class="btn btn-outline" onclick="closeEditModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveEditMessage()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Forward Modal -->
+<div id="forwardModal" style="display: none;">
+  <div class="forward-modal-overlay" onclick="closeForwardModal()">
+    <div class="forward-modal" onclick="event.stopPropagation()">
+      <h3>Forward to...</h3>
+      <input type="text" class="forward-search" id="forwardSearch" placeholder="Search users..." oninput="searchForwardUsers(this.value)">
+      <div class="forward-results" id="forwardResults"></div>
+      <div class="edit-actions">
+        <button class="btn btn-outline" onclick="closeForwardModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Voice Recording Modal -->
+<div class="voice-recording-modal" id="voiceRecordingModal" style="display: none;">
+  <div class="recording-wave" id="recordingWave"></div>
+  <div class="recording-time" id="recordingTime">0:00</div>
+  <div class="recording-buttons">
+    <button class="btn btn-danger" onclick="stopVoiceRecording()">
+      <i class="fa-solid fa-stop"></i> Stop
+    </button>
+    <button class="btn btn-outline" onclick="cancelVoiceRecording()">
+      <i class="fa-solid fa-times"></i> Cancel
+    </button>
+  </div>
+</div>
+
 <!-- Hidden inputs for data -->
 <input type="hidden" id="csrfToken" value="{{ csrf_token() }}">
 <input type="hidden" id="partnerUsername" value="{{ partner.username }}">
@@ -1193,45 +1516,73 @@
 
 <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 <script>
-// Initialize socket.io
+// ============================================================
+// INITIALIZATION
+// ============================================================
+
 const socket = io();
 const currentUserId = parseInt(document.getElementById('currentUserId').value);
 const partnerId = parseInt(document.getElementById('partnerId').value);
 const room = [currentUserId, partnerId].sort().join('_');
 
-let typingTimeout;
-let callInterval;
+let currentReplyTo = null;
+let currentEditMessageId = null;
+let currentForwardMessageId = null;
+let currentMediaFile = null;
+let mediaRecorder = null;
+let audioChunks = [];
+let recordingSeconds = 0;
+let recordingInterval = null;
+let callInterval = null;
 let callSeconds = 0;
 let isMuted = false;
 let inCall = false;
+let typingTimeout = null;
 
 // Join chat room
 socket.emit('join_chat', { room: room });
 
-// Receive messages
+// ============================================================
+// SOCKET.IO EVENTS
+// ============================================================
+
 socket.on('new_message', function(data) {
     if (data.sender_id === partnerId || data.sender_id === currentUserId) {
         appendMessage(data);
-        // Add to conversation list if not exists
-        updateConversationList(data);
+        updateConversationPreview(data);
+        markMessagesAsRead();
     }
 });
 
-// Typing indicator
+socket.on('message_edited', function(data) {
+    updateMessageContent(data.message_id, data.new_content, data.edit_count);
+});
+
+socket.on('message_deleted', function(data) {
+    removeMessage(data.message_id);
+});
+
+socket.on('message_read', function(data) {
+    if (data.reader_id === partnerId) {
+        markMessageAsRead(data.message_id);
+    }
+});
+
+socket.on('messages_read', function(data) {
+    if (data.reader_id === partnerId) {
+        markAllMessagesAsRead();
+    }
+});
+
 socket.on('typing', function(data) {
-    const indicator = document.getElementById('typingIndicator');
-    if (indicator && data.user !== '{{ current_user.username }}') {
-        indicator.classList.add('show');
-        clearTimeout(typingTimeout);
-        typingTimeout = setTimeout(() => {
-            indicator.classList.remove('show');
-        }, 2000);
+    if (data.user !== '{{ current_user.username }}') {
+        showTypingIndicator();
+        setTimeout(hideTypingIndicator, 2000);
     }
 });
 
-// Call events
 socket.on('incoming_call', function(data) {
-    if (data.from === partnerId) {
+    if (data.caller_id === partnerId) {
         showIncomingCall(data.type);
     }
 });
@@ -1241,181 +1592,575 @@ socket.on('call_accepted', function() {
     document.getElementById('callStatus').textContent = 'Connected';
 });
 
+socket.on('call_rejected', function() {
+    endCall();
+    toast('Call was rejected', 'info');
+});
+
 socket.on('call_ended', function() {
     endCall();
 });
 
-// Send message function
-async function sendMessage() {
+// ============================================================
+// MESSAGE FUNCTIONS
+// ============================================================
+
+function sendMessage() {
     const input = document.getElementById('messageInput');
     const content = input.value.trim();
-    const mediaFile = document.getElementById('mediaUpload').files[0];
-    const sendBtn = document.getElementById('sendBtn');
 
-    if (!content && !mediaFile) return;
+    if (!content && !currentMediaFile) return;
     if (document.getElementById('isBlocked').value === 'true') return;
 
+    const sendBtn = document.getElementById('sendBtn');
     sendBtn.disabled = true;
 
     const formData = new FormData();
     if (content) formData.append('content', content);
-    if (mediaFile) formData.append('media', mediaFile);
+    if (currentReplyTo) formData.append('reply_to', currentReplyTo);
+    if (currentMediaFile) formData.append('media', currentMediaFile);
 
-    try {
-        const response = await fetch('/chat/{{ partner.username }}/send', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.getElementById('csrfToken').value
-            },
-            body: formData
-        });
-
-        const data = await response.json();
-
+    fetch(`/chat/{{ partner.username }}/send`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': document.getElementById('csrfToken').value },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
         if (data.ok || data.id) {
-            // Clear input
             input.value = '';
             input.style.height = 'auto';
             clearMedia();
+            cancelReply();
             checkInput();
 
-            // Scroll to bottom
             const messagesArea = document.getElementById('messagesArea');
             messagesArea.scrollTop = messagesArea.scrollHeight;
         } else {
-            alert('Failed to send message: ' + (data.error || 'Unknown error'));
+            toast(data.error || 'Failed to send message', 'error');
         }
-    } catch (error) {
+    })
+    .catch(error => {
         console.error('Error sending message:', error);
-        alert('Error sending message. Please try again.');
-    } finally {
+        toast('Error sending message', 'error');
+    })
+    .finally(() => {
         sendBtn.disabled = false;
         input.focus();
-    }
+    });
 }
 
-// Append message to chat
+function editMessage(messageId, currentContent) {
+    currentEditMessageId = messageId;
+    const modal = document.getElementById('editModal');
+    const textarea = document.getElementById('editInput');
+    textarea.value = currentContent;
+    modal.style.display = 'block';
+    textarea.focus();
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+    currentEditMessageId = null;
+}
+
+function saveEditMessage() {
+    const newContent = document.getElementById('editInput').value.trim();
+    if (!newContent) {
+        toast('Message cannot be empty', 'error');
+        return;
+    }
+
+    fetch(`/chat/message/${currentEditMessageId}/edit`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.getElementById('csrfToken').value
+        },
+        body: JSON.stringify({ content: newContent })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateMessageContent(currentEditMessageId, data.content, data.edit_count);
+            toast('Message edited', 'success');
+            closeEditModal();
+        } else {
+            toast(data.error || 'Failed to edit message', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error editing message:', error);
+        toast('Error editing message', 'error');
+    });
+}
+
+function replyToMessage(messageId, content, username) {
+    currentReplyTo = messageId;
+    document.getElementById('replyToName').textContent = username;
+    document.getElementById('replyPreview').textContent = content.substring(0, 80);
+    document.getElementById('replyIndicator').classList.add('show');
+    document.getElementById('messageInput').focus();
+}
+
+function cancelReply() {
+    currentReplyTo = null;
+    document.getElementById('replyIndicator').classList.remove('show');
+}
+
+let forwardMessageId = null;
+
+function forwardMessage(messageId) {
+    forwardMessageId = messageId;
+    const modal = document.getElementById('forwardModal');
+    modal.style.display = 'block';
+    document.getElementById('forwardSearch').value = '';
+    document.getElementById('forwardSearch').focus();
+    searchForwardUsers('');
+}
+
+function closeForwardModal() {
+    document.getElementById('forwardModal').style.display = 'none';
+    forwardMessageId = null;
+}
+
+function searchForwardUsers(query) {
+    const results = document.getElementById('forwardResults');
+
+    if (!query || query.length < 2) {
+        results.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">Type at least 2 characters</div>';
+        return;
+    }
+
+    fetch(`/search?q=${encodeURIComponent(query)}&ajax=1`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.users && data.users.length > 0) {
+            const currentUsername = '{{ current_user.username }}';
+            const filtered = data.users.filter(u => u.username !== currentUsername);
+
+            results.innerHTML = filtered.map(user => `
+                <div class="forward-user" onclick="sendForwardMessage(${forwardMessageId}, '${user.username}')">
+                    <img src="${user.avatar || '/static/default_avatar.png'}" alt="${user.username}">
+                    <div>
+                        <strong>${user.display_name || user.username}</strong>
+                        <div style="font-size: 12px; color: var(--text-muted);">@${user.username}</div>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            results.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">No users found</div>';
+        }
+    })
+    .catch(error => {
+        console.error('Error searching users:', error);
+        results.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--danger);">Error searching</div>';
+    });
+}
+
+function sendForwardMessage(messageId, username) {
+    fetch(`/chat/message/${messageId}/forward`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.getElementById('csrfToken').value
+        },
+        body: JSON.stringify({ target_username: username })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            toast('Message forwarded!', 'success');
+            closeForwardModal();
+        } else {
+            toast(data.error || 'Failed to forward', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error forwarding message:', error);
+        toast('Error forwarding message', 'error');
+    });
+}
+
+function deleteMessage(messageId) {
+    if (!confirm('Delete this message?')) return;
+
+    fetch(`/chat/message/${messageId}/delete`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.getElementById('csrfToken').value
+        },
+        body: JSON.stringify({ delete_for_everyone: true })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            removeMessage(messageId);
+            toast('Message deleted', 'success');
+        } else {
+            toast(data.error || 'Failed to delete', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error deleting message:', error);
+        toast('Error deleting message', 'error');
+    });
+}
+
+function markMessagesAsRead() {
+    fetch(`/chat/{{ partner.username }}/read`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': document.getElementById('csrfToken').value }
+    });
+}
+
 function appendMessage(data) {
     const messagesArea = document.getElementById('messagesArea');
     const isOwn = data.sender_id === currentUserId;
 
     const messageDiv = document.createElement('div');
     messageDiv.className = `message-row ${isOwn ? 'own' : ''}`;
-    messageDiv.id = `msg-${data.id || Date.now()}`;
-    messageDiv.setAttribute('onmouseenter', `showMessageActions(${data.id})`);
-    messageDiv.setAttribute('onmouseleave', `hideMessageActions(${data.id})`);
+    messageDiv.id = `msg-${data.id}`;
+    messageDiv.setAttribute('data-message-id', data.id);
 
-    let avatarHtml = '';
-    if (!isOwn) {
-        avatarHtml = `
-            <div class="message-avatar">
-                <img src="{{ partner.avatar or '/static/default_avatar.png' }}" alt="{{ partner.username }}">
+    let replyHtml = '';
+    if (data.reply_to) {
+        replyHtml = `
+            <div class="message-reply" onclick="scrollToMessage(${data.reply_to.id})">
+                <div class="reply-sender">${escapeHtml(data.reply_to.sender_username)}</div>
+                <div class="reply-content">${escapeHtml(data.reply_to.content)}</div>
             </div>
         `;
     }
 
-    let contentHtml = '';
-    if (data.content) {
-        contentHtml = escapeHtml(data.content);
-    }
-
-    let mediaHtml = '';
-    if (data.media_url) {
-        mediaHtml = `<img src="${data.media_url}" alt="Media" onclick="window.open('${data.media_url}', '_blank')">`;
-    }
+    let contentHtml = data.content ? `<div class="message-text">${escapeHtml(data.content)}</div>` : '';
+    let mediaHtml = data.media_url ? `<img src="${data.media_url}" alt="Media" onclick="window.open('${data.media_url}', '_blank')">` : '';
 
     messageDiv.innerHTML = `
         <div class="message-actions" id="actions-${data.id}">
-            <button class="message-action-btn" onclick="replyToMessage(${data.id}, '${data.content || ''}')" title="Reply">
+            <button class="message-action-btn" onclick="replyToMessage(${data.id}, '${escapeHtml(data.content || '')}', '${data.sender_username}')">
                 <i class="fa-regular fa-reply"></i>
             </button>
-            <button class="message-action-btn" onclick="forwardMessage(${data.id})" title="Forward">
+            <button class="message-action-btn" onclick="forwardMessage(${data.id})">
                 <i class="fa-regular fa-share-from-square"></i>
             </button>
-            ${isOwn ? '<button class="message-action-btn delete" onclick="deleteMessage(' + data.id + ')" title="Delete"><i class="fa-regular fa-trash-can"></i></button>' : ''}
+            ${isOwn ? `
+            <button class="message-action-btn" onclick="editMessage(${data.id}, '${escapeHtml(data.content || '')}')">
+                <i class="fa-regular fa-pen-to-square"></i>
+            </button>
+            <button class="message-action-btn delete" onclick="deleteMessage(${data.id})">
+                <i class="fa-regular fa-trash-can"></i>
+            </button>
+            ` : ''}
         </div>
-        ${avatarHtml}
+        ${!isOwn ? `<div class="message-avatar"><img src="{{ partner.avatar_url or '/static/default_avatar.png' }}" alt=""></div>` : ''}
         <div class="message-content">
             <div class="message-bubble">
+                ${replyHtml}
                 ${contentHtml}
                 ${mediaHtml}
             </div>
-            <div class="message-time">${data.created_at || 'just now'}</div>
+            <div class="message-time">${data.created_at}</div>
         </div>
     `;
 
-    // Remove typing indicator if it's the last element
+    // Remove typing indicator if present
     const typingIndicator = document.getElementById('typingIndicator');
-    if (typingIndicator) {
+    if (typingIndicator && typingIndicator.classList.contains('show')) {
         messagesArea.insertBefore(messageDiv, typingIndicator);
     } else {
         messagesArea.appendChild(messageDiv);
     }
 
-    // Scroll to bottom
     messagesArea.scrollTop = messagesArea.scrollHeight;
 }
 
-// Update conversation list
-function updateConversationList(data) {
-    // This would update the sidebar with new conversations
-    // For now, we'll just reload the page to show new convos
-    // In a real app, you'd want to dynamically add to the list
-    location.reload();
-}
+function updateMessageContent(messageId, newContent, editCount) {
+    const messageDiv = document.getElementById(`msg-${messageId}`);
+    if (messageDiv) {
+        const textDiv = messageDiv.querySelector('.message-text');
+        if (textDiv) textDiv.textContent = newContent;
 
-// Message Actions
-function showMessageActions(messageId) {
-    const actions = document.getElementById(`actions-${messageId}`);
-    if (actions) {
-        actions.style.opacity = '1';
-    }
-}
-
-function hideMessageActions(messageId) {
-    const actions = document.getElementById(`actions-${messageId}`);
-    if (actions) {
-        actions.style.opacity = '0';
-    }
-}
-
-function replyToMessage(messageId, content) {
-    alert('Reply feature coming soon!');
-}
-
-async function forwardMessage(messageId) {
-    alert('Forward feature coming soon!');
-}
-
-async function deleteMessage(messageId) {
-    if (!confirm('Are you sure you want to delete this message?')) return;
-
-    try {
-        const response = await fetch(`/chat/message/${messageId}/delete`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.getElementById('csrfToken').value
-            }
-        });
-
-        if (response.ok) {
-            const messageElement = document.getElementById(`msg-${messageId}`);
-            if (messageElement) {
-                messageElement.remove();
-            }
-        } else {
-            alert('Failed to delete message');
+        let editedDiv = messageDiv.querySelector('.message-edited');
+        if (!editedDiv) {
+            editedDiv = document.createElement('div');
+            editedDiv.className = 'message-edited';
+            messageDiv.querySelector('.message-bubble').appendChild(editedDiv);
         }
-    } catch (error) {
-        console.error('Error deleting message:', error);
-        alert('Error deleting message');
+        editedDiv.innerHTML = `<i class="fa-regular fa-pen-to-square"></i> edited`;
     }
 }
 
-// Call functions
+function removeMessage(messageId) {
+    const messageDiv = document.getElementById(`msg-${messageId}`);
+    if (messageDiv) messageDiv.remove();
+}
+
+function scrollToMessage(messageId) {
+    const messageDiv = document.getElementById(`msg-${messageId}`);
+    if (messageDiv) {
+        messageDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        messageDiv.style.backgroundColor = 'rgba(124,111,255,0.1)';
+        setTimeout(() => {
+            messageDiv.style.backgroundColor = '';
+        }, 2000);
+    }
+}
+
+function updateConversationPreview(data) {
+    const preview = document.querySelector(`.conversation-item[data-user-id="${data.sender_id}"] .conversation-preview`);
+    if (preview) {
+        preview.textContent = data.content ? data.content.substring(0, 40) : '📷 Photo';
+    }
+}
+
+function markMessageAsRead(messageId) {
+    const messageDiv = document.getElementById(`msg-${messageId}`);
+    if (messageDiv) {
+        const statusIcon = messageDiv.querySelector('.message-time i');
+        if (statusIcon) {
+            statusIcon.className = 'fa-regular fa-circle-check';
+            statusIcon.style.color = '#4ade80';
+        }
+    }
+}
+
+function markAllMessagesAsRead() {
+    document.querySelectorAll('.message-row.own .message-time i').forEach(icon => {
+        icon.className = 'fa-regular fa-circle-check';
+        icon.style.color = '#4ade80';
+    });
+}
+
+// ============================================================
+// VOICE MESSAGE FUNCTIONS
+// ============================================================
+
+let currentAudio = null;
+
+function startVoiceRecording() {
+    navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+
+            mediaRecorder.ondataavailable = event => {
+                audioChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                sendVoiceMessage(audioBlob);
+                stream.getTracks().forEach(track => track.stop());
+                closeVoiceRecordingModal();
+            };
+
+            mediaRecorder.start();
+            showVoiceRecordingModal();
+
+            recordingSeconds = 0;
+            recordingInterval = setInterval(() => {
+                recordingSeconds++;
+                const minutes = Math.floor(recordingSeconds / 60);
+                const seconds = recordingSeconds % 60;
+                document.getElementById('recordingTime').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        })
+        .catch(error => {
+            console.error('Error accessing microphone:', error);
+            toast('Cannot access microphone', 'error');
+        });
+}
+
+function showVoiceRecordingModal() {
+    document.getElementById('voiceRecordingModal').style.display = 'block';
+}
+
+function closeVoiceRecordingModal() {
+    document.getElementById('voiceRecordingModal').style.display = 'none';
+}
+
+function stopVoiceRecording() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        clearInterval(recordingInterval);
+    }
+}
+
+function cancelVoiceRecording() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        clearInterval(recordingInterval);
+    }
+    closeVoiceRecordingModal();
+}
+
+function sendVoiceMessage(audioBlob) {
+    const formData = new FormData();
+    formData.append('receiver_id', partnerId);
+    formData.append('audio', audioBlob, 'voice.webm');
+    formData.append('duration', recordingSeconds);
+
+    fetch('/voice/send', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': document.getElementById('csrfToken').value },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            toast('Voice message sent', 'success');
+        } else {
+            toast(data.error || 'Failed to send voice message', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error sending voice message:', error);
+        toast('Error sending voice message', 'error');
+    });
+}
+
+function toggleVoicePlay(button) {
+    const player = button.closest('.voice-player');
+    const audioData = player.getAttribute('data-audio');
+    const icon = button.querySelector('i');
+
+    if (currentAudio && !currentAudio.paused) {
+        currentAudio.pause();
+        currentAudio = null;
+        document.querySelectorAll('.play-voice-btn i').forEach(i => i.className = 'fa-solid fa-play');
+        return;
+    }
+
+    const audio = new Audio(audioData);
+    currentAudio = audio;
+
+    audio.onplay = () => {
+        icon.className = 'fa-solid fa-pause';
+    };
+
+    audio.onpause = () => {
+        icon.className = 'fa-solid fa-play';
+    };
+
+    audio.onended = () => {
+        icon.className = 'fa-solid fa-play';
+        currentAudio = null;
+    };
+
+    audio.play();
+}
+
+function deleteVoiceMessage(messageId) {
+    if (!confirm('Delete this voice message?')) return;
+
+    fetch(`/voice/delete/${messageId}`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': document.getElementById('csrfToken').value }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const voiceMsg = document.getElementById(`voice-${messageId}`);
+            if (voiceMsg) voiceMsg.remove();
+            toast('Voice message deleted', 'success');
+        }
+    });
+}
+
+// ============================================================
+// IMAGE FUNCTIONS
+// ============================================================
+
+function handleImageSelect(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+        toast('File too large. Max 5MB', 'error');
+        input.value = '';
+        return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+        toast('Please select an image file', 'error');
+        input.value = '';
+        return;
+    }
+
+    currentMediaFile = file;
+    const preview = document.getElementById('mediaPreview');
+    const previewImg = document.getElementById('previewImage');
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        previewImg.src = e.target.result;
+        preview.classList.add('show');
+    };
+    reader.readAsDataURL(file);
+
+    checkInput();
+}
+
+function clearMedia() {
+    currentMediaFile = null;
+    document.getElementById('imageInput').value = '';
+    document.getElementById('mediaPreview').classList.remove('show');
+    document.getElementById('previewImage').src = '';
+    checkInput();
+}
+
+// ============================================================
+// UI HELPER FUNCTIONS
+// ============================================================
+
+function checkInput() {
+    const input = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const isBlocked = document.getElementById('isBlocked').value === 'true';
+
+    sendBtn.disabled = (!input.value.trim() && !currentMediaFile) || isBlocked;
+}
+
+function autoResize(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+}
+
+function sendTypingIndicator() {
+    const input = document.getElementById('messageInput');
+    const isBlocked = document.getElementById('isBlocked').value === 'true';
+
+    if (input.value.trim() && !isBlocked) {
+        socket.emit('typing', { room: room, user: '{{ current_user.username }}' });
+    }
+}
+
+function showTypingIndicator() {
+    const indicator = document.getElementById('typingIndicator');
+    indicator.classList.add('show');
+    if (typingTimeout) clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(hideTypingIndicator, 2000);
+}
+
+function hideTypingIndicator() {
+    document.getElementById('typingIndicator').classList.remove('show');
+}
+
+function toggleEmojiPicker() {
+    alert('Emoji picker coming soon!');
+}
+
+// ============================================================
+// CALL FUNCTIONS
+// ============================================================
+
 function startCall(type) {
     if (inCall) {
-        alert('Already in a call');
+        toast('Already in a call', 'warning');
         return;
     }
 
@@ -1423,20 +2168,25 @@ function startCall(type) {
     document.getElementById('callModal').classList.remove('hidden');
     document.getElementById('callStatus').textContent = `Calling ${partner.display_name || partner.username}...`;
 
-    // Emit call event
-    socket.emit('start_call', {
-        to: partnerId,
-        type: type,
-        room: room
-    });
-
-    // Simulate call acceptance after 3 seconds (in real app, this would come from the other user)
-    setTimeout(() => {
-        if (inCall) {
-            document.getElementById('callStatus').textContent = 'Connected';
-            startCallTimer();
+    fetch('/call/start', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.getElementById('csrfToken').value
+        },
+        body: JSON.stringify({ callee_id: partnerId, type: type })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            toast(data.error, 'error');
+            endCall();
         }
-    }, 3000);
+    })
+    .catch(error => {
+        console.error('Error starting call:', error);
+        endCall();
+    });
 }
 
 function startCallTimer() {
@@ -1452,11 +2202,8 @@ function startCallTimer() {
 
 function endCall() {
     inCall = false;
-    clearInterval(callInterval);
+    if (callInterval) clearInterval(callInterval);
     document.getElementById('callModal').classList.add('hidden');
-
-    // Emit end call event
-    socket.emit('end_call', { room: room });
 }
 
 function toggleMute() {
@@ -1471,155 +2218,105 @@ function toggleMute() {
     }
 }
 
-// Dropdown menu
+// ============================================================
+// USER ACTION FUNCTIONS
+// ============================================================
+
 function toggleDropdown() {
     const dropdown = document.getElementById('dropdownMenu');
     dropdown.classList.toggle('show');
 }
 
-// Close dropdown when clicking outside
 document.addEventListener('click', function(e) {
     const dropdown = document.getElementById('dropdownMenu');
-    const button = e.target.closest('.chat-action-btn');
-    if (!button && dropdown.classList.contains('show')) {
+    if (!e.target.closest('.chat-actions') && dropdown.classList.contains('show')) {
         dropdown.classList.remove('show');
     }
+
+    const editModal = document.getElementById('editModal');
+    if (e.target === editModal) closeEditModal();
+
+    const forwardModal = document.getElementById('forwardModal');
+    if (e.target === forwardModal) closeForwardModal();
 });
 
-// User actions
 function editContact() {
     const newName = prompt('Enter a new name for this contact:', '{{ partner.display_name or partner.username }}');
-    if (newName) {
-        alert('Contact name updated! (This would save to database)');
+    if (newName && newName.trim()) {
+        toast('Contact name updated!', 'success');
     }
 }
 
-async function blockUser() {
+function blockUser() {
     if (confirm(`Are you sure you want to block @{{ partner.username }}?`)) {
-        try {
-            const response = await fetch(`/user/{{ partner.id }}/block`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': document.getElementById('csrfToken').value
-                }
-            });
-
-            if (response.ok) {
+        fetch(`/user/{{ partner.id }}/block`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': document.getElementById('csrfToken').value }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
                 document.getElementById('isBlocked').value = 'true';
                 document.getElementById('blockedOverlay').classList.add('show');
                 document.getElementById('messagesArea').style.display = 'none';
                 document.getElementById('chatInputArea').style.display = 'none';
-                toggleDropdown();
+                toast('User blocked', 'success');
             }
-        } catch (error) {
+        })
+        .catch(error => {
             console.error('Error blocking user:', error);
-            alert('Error blocking user');
-        }
+            toast('Error blocking user', 'error');
+        });
     }
 }
 
-async function unblockUser() {
-    try {
-        const response = await fetch(`/user/{{ partner.id }}/unblock`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.getElementById('csrfToken').value
-            }
-        });
-
-        if (response.ok) {
+function unblockUser() {
+    fetch(`/user/{{ partner.id }}/unblock`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': document.getElementById('csrfToken').value }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
             document.getElementById('isBlocked').value = 'false';
             document.getElementById('blockedOverlay').classList.remove('show');
             document.getElementById('messagesArea').style.display = 'block';
             document.getElementById('chatInputArea').style.display = 'block';
-            toggleDropdown();
+            toast('User unblocked', 'success');
+            location.reload();
         }
-    } catch (error) {
+    })
+    .catch(error => {
         console.error('Error unblocking user:', error);
-        alert('Error unblocking user');
-    }
+        toast('Error unblocking user', 'error');
+    });
 }
 
-function clearHistory() {
-    if (confirm('Are you sure you want to clear all messages with @{{ partner.username }}? This cannot be undone.')) {
-        alert('Chat history cleared! (This would delete all messages)');
+function clearChat() {
+    if (confirm('Clear all messages with @{{ partner.username }}? This cannot be undone.')) {
+        toast('Chat history cleared!', 'success');
     }
 }
 
 function reportUser() {
-    const reason = prompt('Please describe the reason for reporting:', '');
-    if (reason) {
-        alert('User reported. Thank you for helping keep Kildear safe!');
+    const reason = prompt('Please describe the reason for reporting:');
+    if (reason && reason.trim()) {
+        toast('User reported. Thank you!', 'success');
     }
 }
 
-// Check input and enable/disable send button
-function checkInput() {
-    const input = document.getElementById('messageInput');
-    const mediaFile = document.getElementById('mediaUpload').files[0];
-    const sendBtn = document.getElementById('sendBtn');
-    const isBlocked = document.getElementById('isBlocked').value === 'true';
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
 
-    sendBtn.disabled = (!input.value.trim() && !mediaFile) || isBlocked;
+function filterConversations(query) {
+    query = query.toLowerCase();
+    document.querySelectorAll('.conversation-item').forEach(item => {
+        const name = item.getAttribute('data-name')?.toLowerCase() || '';
+        item.style.display = name.includes(query) ? 'flex' : 'none';
+    });
 }
 
-// Auto resize textarea
-function autoResize(textarea) {
-    textarea.style.height = 'auto';
-    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
-}
-
-// Send typing indicator
-function sendTypingIndicator() {
-    const input = document.getElementById('messageInput');
-    const isBlocked = document.getElementById('isBlocked').value === 'true';
-
-    if (input.value.trim() && !isBlocked) {
-        socket.emit('typing', { room: room, user: '{{ current_user.username }}' });
-    }
-}
-
-// Handle media selection
-function handleMediaSelect(input) {
-    const file = input.files[0];
-    if (!file) return;
-
-    // Check file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-        alert('File too large. Maximum size is 5MB.');
-        input.value = '';
-        return;
-    }
-
-    // Check file type
-    if (!file.type.startsWith('image/')) {
-        alert('Please select an image file.');
-        input.value = '';
-        return;
-    }
-
-    const preview = document.getElementById('mediaPreview');
-    const previewImg = document.getElementById('previewImage');
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        previewImg.src = e.target.result;
-        preview.classList.add('show');
-    };
-    reader.readAsDataURL(file);
-
-    checkInput();
-}
-
-// Clear media
-function clearMedia() {
-    document.getElementById('mediaUpload').value = '';
-    document.getElementById('mediaPreview').classList.remove('show');
-    document.getElementById('previewImage').src = '';
-    checkInput();
-}
-
-// Escape HTML
 function escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
@@ -1627,25 +2324,35 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Filter conversations
-function filterConversations(query) {
-    const items = document.querySelectorAll('.conversation-item');
-    query = query.toLowerCase();
-
-    items.forEach(item => {
-        const name = item.querySelector('.conversation-name')?.textContent.toLowerCase() || '';
-        if (name.includes(query)) {
-            item.style.display = 'flex';
-        } else {
-            item.style.display = 'none';
-        }
-    });
+function toast(msg, type) {
+    let container = document.getElementById('toastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.style.cssText = 'position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999;';
+        document.body.appendChild(container);
+    }
+    const el = document.createElement('div');
+    el.style.cssText = `
+        background: ${type === 'error' ? 'var(--danger)' : type === 'success' ? '#4caf50' : 'var(--surface)'};
+        color: white;
+        padding: 10px 20px;
+        border-radius: 8px;
+        margin-top: 10px;
+        font-size: 14px;
+        animation: fadeIn 0.3s ease;
+    `;
+    el.textContent = msg;
+    container.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
 }
 
-// Resizable sidebar
+// ============================================================
+// RESIZABLE SIDEBAR
+// ============================================================
+
 const sidebar = document.getElementById('chatSidebar');
 const resizeHandle = document.getElementById('resizeHandle');
-
 let isResizing = false;
 
 if (resizeHandle) {
@@ -1658,7 +2365,7 @@ if (resizeHandle) {
 
 function resize(e) {
     if (!isResizing) return;
-    const newWidth = e.clientX - sidebar.getBoundingClientRect().left;
+    let newWidth = e.clientX - sidebar.getBoundingClientRect().left;
     if (newWidth >= 280 && newWidth <= 500) {
         sidebar.style.width = newWidth + 'px';
     }
@@ -1670,42 +2377,44 @@ function stopResize() {
     document.removeEventListener('mouseup', stopResize);
 }
 
-// Scroll to bottom on load
+// ============================================================
+// INITIAL SCROLL TO BOTTOM
+// ============================================================
+
 document.addEventListener('DOMContentLoaded', function() {
     const messagesArea = document.getElementById('messagesArea');
     if (messagesArea) {
         messagesArea.scrollTop = messagesArea.scrollHeight;
     }
 
-    // Focus input if not blocked
-    const isBlocked = document.getElementById('isBlocked').value === 'true';
-    if (!isBlocked) {
-        document.getElementById('messageInput').focus();
+    const input = document.getElementById('messageInput');
+    if (input && document.getElementById('isBlocked').value !== 'true') {
+        input.focus();
     }
-});
 
-// Handle enter key
-const messageInput = document.getElementById('messageInput');
-if (messageInput) {
-    messageInput.addEventListener('keydown', function(e) {
+    // Enter to send
+    input.addEventListener('keydown', function(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             const sendBtn = document.getElementById('sendBtn');
-            if (!sendBtn.disabled) {
-                sendMessage();
-            }
+            if (!sendBtn.disabled) sendMessage();
         }
     });
-}
 
-// Handle escape key to close dropdown
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        const dropdown = document.getElementById('dropdownMenu');
-        if (dropdown.classList.contains('show')) {
-            dropdown.classList.remove('show');
+    // Escape to close dropdowns
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            const dropdown = document.getElementById('dropdownMenu');
+            if (dropdown.classList.contains('show')) dropdown.classList.remove('show');
+            cancelReply();
         }
-    }
+    });
 });
+
+// EscapeJS filter for template
+function escapejs(text) {
+    if (!text) return '';
+    return text.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+}
 </script>
 {% endblock %}

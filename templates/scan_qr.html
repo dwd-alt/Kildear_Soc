@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Scan QR Code — Kildear{% endblock %}
+{% block title %}Сканировать QR-код — Kildear{% endblock %}
 
 {% block head %}
 <style>
 .scan-container {
     max-width: 650px;
     margin: 40px auto;
-    padding: 24px;
+    padding: 0 20px;
 }
 
 .scan-header {
@@ -25,6 +25,35 @@
     color: var(--text-muted);
 }
 
+.mode-switch {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 24px;
+}
+
+.mode-btn {
+    flex: 1;
+    max-width: 200px;
+    padding: 10px;
+    border-radius: 99px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 600;
+}
+
+.mode-btn.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
+.mode-btn i {
+    margin-right: 8px;
+}
+
 .scan-area {
     background: var(--surface);
     border: 2px dashed var(--border);
@@ -36,13 +65,12 @@
 }
 
 .scan-area:hover {
-    border-color: var(--accent);
+    border-color: var(--primary);
     background: var(--surface-hover);
-    transform: translateY(-2px);
 }
 
 .scan-area.drag-over {
-    border-color: var(--accent);
+    border-color: var(--primary);
     background: rgba(124, 111, 255, 0.1);
     transform: scale(1.02);
 }
@@ -51,16 +79,6 @@
     font-size: 72px;
     color: var(--text-muted);
     margin-bottom: 20px;
-}
-
-.scan-area h3 {
-    margin-bottom: 8px;
-    font-size: 20px;
-}
-
-.scan-area p {
-    color: var(--text-muted);
-    font-size: 14px;
 }
 
 .file-input {
@@ -78,6 +96,23 @@
     border-radius: 16px;
     margin-top: 16px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+}
+
+.camera-container {
+    margin-top: 20px;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #000;
+}
+
+#qr-reader {
+    width: 100%;
+    border: none;
+}
+
+#qr-reader video {
+    width: 100%;
+    height: auto;
 }
 
 .result-card {
@@ -112,7 +147,7 @@
     height: 80px;
     border-radius: 50%;
     object-fit: cover;
-    border: 3px solid var(--accent);
+    border: 3px solid var(--primary);
 }
 
 .result-info {
@@ -139,7 +174,6 @@
 .result-bio {
     font-size: 14px;
     margin-top: 12px;
-    color: var(--text);
     line-height: 1.5;
 }
 
@@ -181,7 +215,7 @@
     width: 50px;
     height: 50px;
     border: 3px solid var(--border);
-    border-top-color: var(--accent);
+    border-top-color: var(--primary);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
     margin: 40px auto;
@@ -197,51 +231,6 @@
     color: var(--danger);
 }
 
-.camera-container {
-    margin-top: 20px;
-    border-radius: 16px;
-    overflow: hidden;
-    background: #000;
-}
-
-#qr-reader {
-    width: 100%;
-    border: none;
-}
-
-#qr-reader video {
-    width: 100%;
-    height: auto;
-}
-
-.switch-mode {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-    margin-bottom: 24px;
-}
-
-.mode-btn {
-    flex: 1;
-    max-width: 200px;
-    padding: 10px;
-    border-radius: 99px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.mode-btn.active {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: white;
-}
-
-.mode-btn i {
-    margin-right: 8px;
-}
-
 .verified-badge-small {
     background: var(--accent);
     border-radius: 50%;
@@ -255,12 +244,6 @@
 }
 
 @media (max-width: 600px) {
-    .scan-container {
-        padding: 16px;
-    }
-    .scan-area {
-        padding: 40px 20px;
-    }
     .result-user {
         flex-direction: column;
         text-align: center;
@@ -275,16 +258,16 @@
 {% block content %}
 <div class="scan-container">
     <div class="scan-header">
-        <h2><i class="fa-solid fa-qrcode"></i> Scan QR Code</h2>
-        <p>Scan a Kildear user's QR code to quickly find and follow them</p>
+        <h2><i class="fa-solid fa-qrcode"></i> Сканировать QR-код</h2>
+        <p>Отсканируйте QR-код пользователя Kildear, чтобы быстро найти и подписаться</p>
     </div>
 
-    <div class="switch-mode">
+    <div class="mode-switch">
         <button class="mode-btn active" id="uploadModeBtn" onclick="switchMode('upload')">
-            <i class="fa-solid fa-image"></i> Upload Image
+            <i class="fa-solid fa-image"></i> Загрузить
         </button>
         <button class="mode-btn" id="cameraModeBtn" onclick="switchMode('camera')">
-            <i class="fa-solid fa-camera"></i> Use Camera
+            <i class="fa-solid fa-camera"></i> Камера
         </button>
     </div>
 
@@ -293,19 +276,15 @@
             <div class="scan-icon">
                 <i class="fa-solid fa-cloud-upload-alt"></i>
             </div>
-            <h3>Upload QR Code Image</h3>
-            <p>Click or drag & drop a QR code image here</p>
-            <p style="font-size: 12px; margin-top: 8px;">
-                <i class="fa-regular fa-image"></i> JPG, PNG, GIF, WEBP
-            </p>
+            <h3>Загрузите изображение QR-кода</h3>
+            <p>Нажмите или перетащите изображение с QR-кодом</p>
             <input type="file" id="qrFileInput" class="file-input" accept="image/*">
         </div>
-
         <div id="previewArea" class="preview-area" style="display: none;">
             <img id="previewImage" class="preview-image" alt="Preview">
             <div style="margin-top: 12px;">
                 <button class="btn btn-outline btn-sm" onclick="resetScanner()">
-                    <i class="fa-solid fa-arrow-left"></i> Scan Another
+                    <i class="fa-solid fa-arrow-left"></i> Другое изображение
                 </button>
             </div>
         </div>
@@ -317,7 +296,7 @@
         </div>
         <div style="text-align: center; margin-top: 16px;">
             <button class="btn btn-outline btn-sm" onclick="stopCamera()">
-                <i class="fa-solid fa-stop"></i> Stop Camera
+                <i class="fa-solid fa-stop"></i> Остановить камеру
             </button>
         </div>
     </div>
@@ -325,36 +304,25 @@
     <div id="resultArea" style="display: none;"></div>
 </div>
 
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 let html5QrCode = null;
 let currentMode = 'upload';
+let currentScannedUser = null;
 
 function getCSRF() {
-    const m = document.querySelector('meta[name="csrf-token"]');
-    return m ? m.content : (window._csrf || '');
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.content : '';
 }
 
-function toast(msg, type) {
-    let container = document.getElementById('flashContainer');
-    if (!container) {
-        container = document.createElement('div');
-        container.id = 'flashContainer';
-        container.className = 'flash-container';
-        document.body.appendChild(container);
-    }
-    const el = document.createElement('div');
-    el.className = `flash flash-${type}`;
-    const icons = {
-        success: 'circle-check',
-        error: 'circle-xmark',
-        info: 'circle-info',
-        warning: 'triangle-exclamation'
-    };
-    el.innerHTML = `<i class="fa-solid fa-${icons[type] || 'circle-info'}"></i> ${msg}`;
-    el.style.cursor = 'pointer';
-    el.onclick = () => el.remove();
-    container.appendChild(el);
-    setTimeout(() => el.remove(), 4000);
+function showFlash(message, type) {
+    const container = document.getElementById('flashContainer');
+    if (!container) return;
+    const flash = document.createElement('div');
+    flash.className = `flash flash-${type}`;
+    flash.innerHTML = `<i class="fa-solid fa-${type === 'success' ? 'circle-check' : 'circle-xmark'}"></i> ${message}`;
+    container.appendChild(flash);
+    setTimeout(() => flash.remove(), 4000);
 }
 
 function switchMode(mode) {
@@ -386,16 +354,10 @@ async function startCamera() {
 
     html5QrCode = new Html5Qrcode("qr-reader");
 
-    const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0
-    };
-
     try {
         await html5QrCode.start(
             { facingMode: "environment" },
-            config,
+            { fps: 10, qrbox: { width: 250, height: 250 } },
             onScanSuccess,
             onScanError
         );
@@ -404,9 +366,9 @@ async function startCamera() {
         document.getElementById('cameraContainer').innerHTML = `
             <div class="error-message">
                 <i class="fa-solid fa-exclamation-triangle"></i>
-                <p>Could not access camera. Please check permissions or use upload mode.</p>
+                <p>Не удалось получить доступ к камере. Проверьте разрешения.</p>
                 <button class="btn btn-primary btn-sm" onclick="switchMode('upload')" style="margin-top:16px;">
-                    <i class="fa-solid fa-image"></i> Switch to Upload
+                    <i class="fa-solid fa-image"></i> Переключиться на загрузку
                 </button>
             </div>
         `;
@@ -419,16 +381,15 @@ function stopCamera() {
     }
 }
 
-async function onScanSuccess(decodedText, decodedResult) {
+async function onScanSuccess(decodedText) {
     console.log('QR scanned:', decodedText);
     stopCamera();
     await processQRData(decodedText);
 }
 
-function onScanError(errorMessage) {
-    // Silent fail - continue scanning
-}
+function onScanError(errorMessage) {}
 
+// Upload mode handlers
 document.getElementById('scanArea').addEventListener('click', () => {
     document.getElementById('qrFileInput').click();
 });
@@ -442,8 +403,8 @@ document.getElementById('qrFileInput').addEventListener('change', async (e) => {
     document.getElementById('previewArea').style.display = 'block';
     document.getElementById('scanArea').style.display = 'none';
 
-    document.getElementById('resultArea').style.display = 'block';
     document.getElementById('resultArea').innerHTML = '<div class="loader"></div>';
+    document.getElementById('resultArea').style.display = 'block';
 
     await processQRCodeImage(file);
 });
@@ -459,15 +420,11 @@ function preventDefaults(e) {
 }
 
 ['dragenter', 'dragover'].forEach(eventName => {
-    scanArea.addEventListener(eventName, () => {
-        scanArea.classList.add('drag-over');
-    });
+    scanArea.addEventListener(eventName, () => scanArea.classList.add('drag-over'));
 });
 
 ['dragleave', 'drop'].forEach(eventName => {
-    scanArea.addEventListener(eventName, () => {
-        scanArea.classList.remove('drag-over');
-    });
+    scanArea.addEventListener(eventName, () => scanArea.classList.remove('drag-over'));
 });
 
 scanArea.addEventListener('drop', async (e) => {
@@ -499,41 +456,29 @@ async function processQRCodeImage(imageFile) {
         await processQRData(qrData);
     } catch (error) {
         console.error('QR scan error:', error);
-        displayError('Could not read QR code. Please make sure the image contains a valid Kildear QR code.');
+        displayError('Не удалось прочитать QR-код. Убедитесь, что изображение содержит корректный QR-код Kildear.');
     }
 }
 
 async function processQRData(qrData) {
-    console.log('Processing QR data:', qrData);
-
-    // Извлекаем username из ЛЮБОГО формата
     let username = null;
 
-    // Формат 1: kildear://user/username
     if (qrData.startsWith('kildear://user/')) {
         username = qrData.replace('kildear://user/', '');
-    }
-    // Формат 2: http://localhost:5000/u/username или https://site.com/u/username
-    else if (qrData.includes('/u/')) {
+    } else if (qrData.includes('/u/')) {
         const match = qrData.match(/\/u\/([^\/?#]+)/);
         if (match) username = match[1];
-    }
-    // Формат 3: http://localhost:5000/profile/username
-    else if (qrData.includes('/profile/')) {
+    } else if (qrData.includes('/profile/')) {
         const match = qrData.match(/\/profile\/([^\/?#]+)/);
         if (match) username = match[1];
-    }
-    // Формат 4: просто username (без слешей и протоколов)
-    else if (!qrData.includes('/') && !qrData.includes('://') && qrData.length < 40) {
+    } else if (!qrData.includes('/') && !qrData.includes('://') && qrData.length < 40) {
         username = qrData;
     }
 
     if (!username) {
-        displayError('Invalid QR code format. Please scan a valid Kildear QR code.');
+        displayError('Неверный формат QR-кода');
         return;
     }
-
-    console.log('Extracted username:', username);
 
     try {
         const response = await fetch('/qr/search', {
@@ -546,25 +491,26 @@ async function processQRData(qrData) {
         });
 
         const data = await response.json();
-        console.log('Response:', data);
 
         if (data.success && data.user) {
             displayUserResult(data.user);
         } else {
-            displayError(data.error || 'User not found');
+            displayError(data.error || 'Пользователь не найден');
         }
     } catch (error) {
         console.error('Error:', error);
-        displayError('Failed to process QR code. Please try again.');
+        displayError('Ошибка обработки QR-кода');
     }
 }
 
 function displayUserResult(user) {
+    currentScannedUser = user;
+
     const resultArea = document.getElementById('resultArea');
     resultArea.innerHTML = `
         <div class="result-card">
             <div class="result-user">
-                <img src="${user.avatar}" class="result-avatar" alt="${user.username}" onerror="this.src='/static/default_avatar.png'">
+                <img src="${user.avatar}" class="result-avatar" alt="${user.username}" onerror="this.src='/static/default-avatar.png'">
                 <div class="result-info">
                     <div class="result-name">
                         ${escapeHtml(user.display_name)}
@@ -577,32 +523,32 @@ function displayUserResult(user) {
             <div class="result-stats">
                 <div class="stat-item">
                     <span class="stat-value">${user.post_count}</span>
-                    <span class="stat-label">Posts</span>
+                    <span class="stat-label">Постов</span>
                 </div>
                 <div class="stat-item">
                     <span class="stat-value">${user.follower_count}</span>
-                    <span class="stat-label">Followers</span>
+                    <span class="stat-label">Подписчиков</span>
                 </div>
                 <div class="stat-item">
                     <span class="stat-value">${user.following_count}</span>
-                    <span class="stat-label">Following</span>
+                    <span class="stat-label">Подписок</span>
                 </div>
             </div>
             <div class="result-actions">
                 <a href="/u/${user.username}" class="btn btn-primary">
-                    <i class="fa-solid fa-user"></i> View Profile
+                    <i class="fa-solid fa-user"></i> Профиль
                 </a>
                 ${!user.is_following ? `
-                    <button class="btn btn-outline" onclick="followFromQR('${user.username}')">
-                        <i class="fa-solid fa-user-plus"></i> Follow
+                    <button class="btn btn-outline" onclick="followFromQR()">
+                        <i class="fa-solid fa-user-plus"></i> Подписаться
                     </button>
                 ` : `
                     <button class="btn btn-outline" disabled>
-                        <i class="fa-solid fa-check"></i> Following
+                        <i class="fa-solid fa-check"></i> Подписан
                     </button>
                 `}
                 <a href="/chat/${user.username}" class="btn btn-outline">
-                    <i class="fa-solid fa-message"></i> Message
+                    <i class="fa-solid fa-message"></i> Сообщение
                 </a>
             </div>
         </div>
@@ -615,10 +561,10 @@ function displayError(message) {
     resultArea.innerHTML = `
         <div class="result-card" style="text-align: center;">
             <i class="fa-solid fa-exclamation-triangle" style="font-size: 48px; color: var(--danger); margin-bottom: 16px;"></i>
-            <h3 style="color: var(--danger);">Scan Failed</h3>
+            <h3 style="color: var(--danger);">Ошибка</h3>
             <p>${escapeHtml(message)}</p>
             <button class="btn btn-primary btn-sm" onclick="resetScanner()" style="margin-top: 16px;">
-                <i class="fa-solid fa-arrow-left"></i> Try Again
+                <i class="fa-solid fa-arrow-left"></i> Попробовать снова
             </button>
         </div>
     `;
@@ -631,21 +577,21 @@ function resetScanner() {
     document.getElementById('resultArea').style.display = 'none';
     document.getElementById('resultArea').innerHTML = '';
     document.getElementById('qrFileInput').value = '';
+    currentScannedUser = null;
 }
 
 function escapeHtml(str) {
     if (!str) return '';
-    return str.replace(/[&<>]/g, function(m) {
-        if (m === '&') return '&amp;';
-        if (m === '<') return '&lt;';
-        if (m === '>') return '&gt;';
-        return m;
-    });
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
 }
 
-async function followFromQR(username) {
+async function followFromQR() {
+    if (!currentScannedUser) return;
+
     try {
-        const response = await fetch(`/follow/${username}`, {
+        const response = await fetch(`/follow/${currentScannedUser.username}`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': getCSRF(),
@@ -654,13 +600,11 @@ async function followFromQR(username) {
         });
         const data = await response.json();
         if (data.following) {
-            toast(`You are now following @${username}!`, 'success');
-            setTimeout(() => {
-                location.reload();
-            }, 1500);
+            showFlash(`Вы подписались на @${currentScannedUser.username}!`, 'success');
+            setTimeout(() => location.reload(), 1500);
         }
     } catch (error) {
-        toast('Failed to follow user', 'error');
+        showFlash('Ошибка при подписке', 'error');
     }
 }
 </script>

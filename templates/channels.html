@@ -1,21 +1,21 @@
 {% extends "base.html" %}
-{% block title %}Channels — Kildear{% endblock %}
+{% block title %}Каналы — Kildear{% endblock %}
 {% block content %}
 <div class="channels-page">
   <div class="page-header-row">
     <div>
-      <h1 class="page-title">Channels</h1>
-      <p class="page-subtitle">Follow channels for curated content from creators you love</p>
+      <h1 class="page-title">Каналы</h1>
+      <p class="page-subtitle">Подпишитесь на каналы, чтобы получать контент от любимых авторов</p>
     </div>
     <a href="{{ url_for('create_channel') }}" class="btn btn-primary">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      Create Channel
+      Создать канал
     </a>
   </div>
 
   <div class="tab-bar">
-    <button class="tab-btn {% if tab!='subscribed' %}active{% endif %}" onclick="switchChannelTab('all')">All Channels</button>
-    <button class="tab-btn {% if tab=='subscribed' %}active{% endif %}" onclick="switchChannelTab('subscribed')">Subscribed</button>
+    <button class="tab-btn {% if tab!='subscribed' %}active{% endif %}" onclick="switchChannelTab('all')">Все каналы</button>
+    <button class="tab-btn {% if tab=='subscribed' %}active{% endif %}" onclick="switchChannelTab('subscribed')">Подписки</button>
   </div>
 
   <div class="tab-panel" id="tab-all" {% if tab=='subscribed' %}style="display:none"{% endif %}>
@@ -37,20 +37,20 @@
           </div>
           {% if ch.description %}<p class="channel-desc">{{ ch.description[:90] }}{% if ch.description|length>90 %}…{% endif %}</p>{% endif %}
           <div class="channel-stats">
-            <span>{{ ch.subscribers.count() }} subscribers</span>
+            <span>{{ ch.subscribers.count() }} подписчиков</span>
             <span>·</span>
-            <span>{{ ch.posts.count() }} posts</span>
+            <span>{{ ch.posts.count() }} постов</span>
           </div>
           <button class="btn {% if current_user in ch.subscribers %}btn-outline{% else %}btn-primary{% endif %} btn-sm sub-btn"
                   onclick="toggleSubscribe({{ ch.id }}, this)">
-            {% if current_user in ch.subscribers %}Subscribed{% else %}Subscribe{% endif %}
+            {% if current_user in ch.subscribers %}Подписан{% else %}Подписаться{% endif %}
           </button>
         </div>
       </div>
       {% endfor %}
     </div>
     {% else %}
-      <div class="empty-state card"><div class="empty-icon">📡</div><h3>No channels yet</h3><p>Start the first channel on Kildear!</p><a href="{{ url_for('create_channel') }}" class="btn btn-primary">Create Channel</a></div>
+      <div class="empty-state card"><div class="empty-icon">📡</div><h3>Пока нет каналов</h3><p>Запустите первый канал на Kildear!</p><a href="{{ url_for('create_channel') }}" class="btn btn-primary">Создать канал</a></div>
     {% endif %}
   </div>
 
@@ -65,14 +65,14 @@
         </div>
         <div class="channel-card-body">
           <div class="channel-title-row"><a href="{{ url_for('channel_detail', channel_id=ch.id) }}" class="channel-name">{{ ch.name }}</a>{% if ch.is_verified %}<span class="verified-badge">✓</span>{% endif %}</div>
-          <div class="channel-stats"><span>{{ ch.subscribers.count() }} subscribers</span></div>
-          <a href="{{ url_for('channel_detail', channel_id=ch.id) }}" class="btn btn-primary btn-sm">View Channel</a>
+          <div class="channel-stats"><span>{{ ch.subscribers.count() }} подписчиков</span></div>
+          <a href="{{ url_for('channel_detail', channel_id=ch.id) }}" class="btn btn-primary btn-sm">Перейти в канал</a>
         </div>
       </div>
       {% endfor %}
     </div>
     {% else %}
-      <div class="empty-state card"><div class="empty-icon">📡</div><h3>No subscriptions yet</h3><p>Discover channels and subscribe to the ones you love.</p><button class="btn btn-primary" onclick="switchChannelTab('all')">Browse Channels</button></div>
+      <div class="empty-state card"><div class="empty-icon">📡</div><h3>Нет подписок</h3><p>Откройте каналы и подпишитесь на те, которые вам нравятся.</p><button class="btn btn-primary" onclick="switchChannelTab('all')">Обзор каналов</button></div>
     {% endif %}
   </div>
 </div>
@@ -104,7 +104,7 @@
 <script>
 function switchChannelTab(name){
   document.querySelectorAll('.tab-btn').forEach(b=>{
-    b.classList.toggle('active',(name==='all' && b.textContent.includes('All'))||(name==='subscribed' && b.textContent.includes('Subscribed')));
+    b.classList.toggle('active',(name==='all' && b.textContent.includes('Все'))||(name==='subscribed' && b.textContent.includes('Подписки')));
   });
   document.getElementById('tab-all').style.display=name==='all'?'block':'none';
   document.getElementById('tab-subscribed').style.display=name==='subscribed'?'block':'none';

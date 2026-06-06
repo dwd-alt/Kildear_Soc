@@ -1,25 +1,25 @@
 {% extends "base.html" %}
-{% block title %}Groups — Kildear{% endblock %}
+{% block title %}Группы — Kildear{% endblock %}
 
 {% block content %}
 <div class="groups-page">
   <div class="page-header-row">
     <div>
-      <h1 class="page-title">Groups</h1>
-      <p class="page-subtitle">Connect with communities that share your interests</p>
+      <h1 class="page-title">Группы</h1>
+      <p class="page-subtitle">Общайтесь с сообществами, которые разделяют ваши интересы</p>
     </div>
     <a href="{{ url_for('create_group') }}" class="btn btn-primary">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
       </svg>
-      Create Group
+      Создать группу
     </a>
   </div>
 
   <!-- Tabs -->
   <div class="tab-bar">
-    <button class="tab-btn {% if tab=='discover' %}active{% endif %}" onclick="switchTab('discover')">Discover</button>
-    <button class="tab-btn {% if tab=='my' %}active{% endif %}" onclick="switchTab('my')">My Groups</button>
+    <button class="tab-btn {% if tab=='discover' %}active{% endif %}" onclick="switchTab('discover')">Обзор</button>
+    <button class="tab-btn {% if tab=='my' %}active{% endif %}" onclick="switchTab('my')">Мои группы</button>
   </div>
 
   <!-- Discover tab -->
@@ -51,21 +51,21 @@
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
               </svg>
-              {{ group.member_count }} members
+              {{ group.member_count }} участников
             </span>
             <span class="group-badge {% if group.is_private %}private{% else %}public{% endif %}">
-              {% if group.is_private %}🔒 Private{% else %}🌍 Public{% endif %}
+              {% if group.is_private %}🔒 Приватная{% else %}🌍 Публичная{% endif %}
             </span>
           </div>
           <div class="group-card-actions">
-            <a href="{{ url_for('group_detail', slug=group.slug) }}" class="btn btn-ghost btn-sm">View</a>
+            <a href="{{ url_for('group_detail', slug=group.slug) }}" class="btn btn-ghost btn-sm">Просмотр</a>
             {% if current_user not in group.members %}
               <form action="{{ url_for('join_group', slug=group.slug) }}" method="POST" style="display:inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-primary btn-sm">Join</button>
+                <button type="submit" class="btn btn-primary btn-sm">Вступить</button>
               </form>
             {% else %}
-              <span class="member-badge">✓ Member</span>
+              <span class="member-badge">✓ Участник</span>
             {% endif %}
           </div>
         </div>
@@ -75,9 +75,9 @@
     {% else %}
       <div class="empty-state card">
         <div class="empty-icon">👥</div>
-        <h3>No groups yet</h3>
-        <p>Be the first to create a community!</p>
-        <a href="{{ url_for('create_group') }}" class="btn btn-primary">Create Group</a>
+        <h3>Пока нет групп</h3>
+        <p>Станьте первым, кто создаст сообщество!</p>
+        <a href="{{ url_for('create_group') }}" class="btn btn-primary">Создать группу</a>
       </div>
     {% endif %}
   </div>
@@ -104,11 +104,11 @@
           <p class="group-desc">{{ group.description[:100] }}{% if group.description|length > 100 %}…{% endif %}</p>
           {% endif %}
           <div class="group-meta">
-            <span class="group-meta-item">{{ group.member_count }} members</span>
-            {% if group.owner_id == current_user.id %}<span class="group-badge admin">👑 Admin</span>{% endif %}
+            <span class="group-meta-item">{{ group.member_count }} участников</span>
+            {% if group.owner_id == current_user.id %}<span class="group-badge admin">👑 Админ</span>{% endif %}
           </div>
           <div class="group-card-actions">
-            <a href="{{ url_for('group_detail', slug=group.slug) }}" class="btn btn-primary btn-sm">Open</a>
+            <a href="{{ url_for('group_detail', slug=group.slug) }}" class="btn btn-primary btn-sm">Открыть</a>
           </div>
         </div>
       </div>
@@ -117,9 +117,9 @@
     {% else %}
       <div class="empty-state card">
         <div class="empty-icon">🚀</div>
-        <h3>You haven't joined any groups</h3>
-        <p>Discover and join communities that interest you.</p>
-        <button class="btn btn-primary" onclick="switchTab('discover')">Discover Groups</button>
+        <h3>Вы ещё не вступили ни в одну группу</h3>
+        <p>Найдите и вступите в сообщества, которые вам интересны.</p>
+        <button class="btn btn-primary" onclick="switchTab('discover')">Найти группы</button>
       </div>
     {% endif %}
   </div>

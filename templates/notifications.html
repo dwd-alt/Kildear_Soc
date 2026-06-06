@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Notifications — Kildear{% endblock %}
+{% block title %}Уведомления — Kildear{% endblock %}
 
 {% block head %}
 <style>
@@ -209,11 +209,11 @@
   <div class="page-header">
     <h1 class="page-title">
       <i class="fa-solid fa-bell"></i>
-      Notifications
+      Уведомления
     </h1>
     {% if notifs %}
     <button class="mark-read-btn" onclick="markAllAsRead()">
-      <i class="fa-regular fa-circle-check"></i> Mark all as read
+      <i class="fa-regular fa-circle-check"></i> Отметить все как прочитанные
     </button>
     {% endif %}
   </div>
@@ -249,7 +249,7 @@
             {% if notif.from_user %}
               {{ notif.from_user.display_name or notif.from_user.username }}
             {% else %}
-              Kildear System
+              Система Kildear
             {% endif %}
           </span>
           <span class="notification-time" data-time="{{ notif.created_at.isoformat() }}">
@@ -260,16 +260,16 @@
         <div class="notification-text">
           {% if notif.type == 'like' %}
             <i class="fa-solid fa-heart" style="color:#ff6b9d; margin-right:5px;"></i>
-            Liked your post
+            Оценил(а) ваш пост
           {% elif notif.type == 'follow' %}
             <i class="fa-solid fa-user-plus" style="color:var(--primary); margin-right:5px;"></i>
-            Started following you
+            Начал(а) следить за вами
           {% elif notif.type == 'comment' %}
             <i class="fa-solid fa-comment" style="color:#4caf50; margin-right:5px;"></i>
-            Commented on your post
+            Прокомментировал(а) ваш пост
           {% elif notif.type == 'mention' %}
             <i class="fa-solid fa-at" style="color:#ffc107; margin-right:5px;"></i>
-            Mentioned you in a post
+            Упомянул(а) вас в посте
           {% elif notif.type == 'verification' %}
             <i class="fa-solid fa-circle-check" style="color:#1da1f2; margin-right:5px;"></i>
             {{ notif.text }}
@@ -281,10 +281,10 @@
             {{ notif.text }}
           {% elif notif.type == 'group_post' %}
             <i class="fa-solid fa-users" style="color:var(--primary); margin-right:5px;"></i>
-            New post in group
+            Новый пост в группе
           {% elif notif.type == 'channel_post' %}
             <i class="fa-solid fa-satellite-dish" style="color:var(--accent); margin-right:5px;"></i>
-            New post in channel
+            Новый пост в канале
           {% elif notif.type == 'message' %}
             <i class="fa-solid fa-message" style="color:#22d3a0; margin-right:5px;"></i>
             {{ notif.text }}
@@ -295,7 +295,7 @@
             <i class="fa-solid fa-phone" style="color:#ff4757; margin-right:5px;"></i>
             {{ notif.text }}
           {% else %}
-            {{ notif.text or 'New notification' }}
+            {{ notif.text or 'Новое уведомление' }}
           {% endif %}
         </div>
 
@@ -317,13 +317,13 @@
     <div class="empty-icon">
       <i class="fa-regular fa-bell-slash"></i>
     </div>
-    <h2 class="empty-title">No notifications yet</h2>
+    <h2 class="empty-title">Нет уведомлений</h2>
     <p class="empty-text">
-      When someone likes your post, follows you, or comments,<br>
-      you'll see it here.
+      Когда кто-то оценит ваш пост, подпишется на вас или оставит комментарий,<br>
+      вы увидите это здесь.
     </p>
     <a href="{{ url_for('index') }}" class="btn btn-primary">
-      <i class="fa-solid fa-house"></i> Go to Feed
+      <i class="fa-solid fa-house"></i> Перейти в ленту
     </a>
   </div>
   {% endif %}
@@ -361,7 +361,7 @@ async function markAsRead(notifId) {
       }
     }
   } catch (e) {
-    console.error('Error marking notification as read:', e);
+    console.error('Ошибка при отметке уведомления как прочитанного:', e);
   }
 }
 
@@ -383,11 +383,11 @@ async function markAllAsRead() {
       if (badge) {
         badge.style.display = 'none';
       }
-      toast('All notifications marked as read', 'success');
+      toast('Все уведомления отмечены как прочитанные', 'success');
     }
   } catch (e) {
-    console.error('Error marking all notifications as read:', e);
-    toast('Failed to mark notifications as read', 'error');
+    console.error('Ошибка при отметке всех уведомлений как прочитанных:', e);
+    toast('Не удалось отметить уведомления как прочитанные', 'error');
   }
 }
 
@@ -395,10 +395,10 @@ function timeAgo(dateStr) {
   const now = new Date();
   const then = new Date(dateStr);
   const secs = Math.floor((now - then) / 1000);
-  if (secs < 60) return 'just now';
-  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
-  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
-  if (secs < 604800) return `${Math.floor(secs / 86400)}d ago`;
+  if (secs < 60) return 'только что';
+  if (secs < 3600) return `${Math.floor(secs / 60)} мин назад`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)} ч назад`;
+  if (secs < 604800) return `${Math.floor(secs / 86400)} д назад`;
   return then.toLocaleDateString();
 }
 

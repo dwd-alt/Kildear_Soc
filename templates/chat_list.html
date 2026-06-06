@@ -2,6 +2,463 @@
 
 {% block title %}Messages — Kildear{% endblock %}
 
+{% block head %}
+<style>
+  .messages-layout {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 1.5rem;
+    height: calc(100vh - 80px);
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  @media (max-width: 700px) {
+    .messages-layout {
+      grid-template-columns: 1fr;
+    }
+    .messages-empty-panel {
+      display: none;
+    }
+  }
+
+  .conversations-panel {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--card);
+    border-radius: 1rem;
+    border: 1px solid var(--border);
+  }
+
+  .conv-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.25rem 0.75rem;
+  }
+
+  .conv-panel-header h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .conv-panel-header h2 i {
+    color: var(--primary);
+  }
+
+  .conv-search-wrap {
+    position: relative;
+    padding: 0 1rem 0.75rem;
+  }
+
+  .conv-search-icon {
+    position: absolute;
+    left: 1.7rem;
+    top: 50%;
+    transform: translateY(-60%);
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+
+  .conv-search {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 2rem;
+    padding: 0.6rem 0.75rem 0.6rem 2.5rem;
+    color: var(--text);
+    font-size: 0.9rem;
+    transition: all 0.2s;
+  }
+
+  .conv-search:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: rgba(124,111,255,0.05);
+  }
+
+  .conv-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.25rem 0;
+  }
+
+  .conv-item {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.85rem 1.25rem;
+    text-decoration: none;
+    transition: all 0.2s;
+    border-left: 3px solid transparent;
+  }
+
+  .conv-item:hover {
+    background: rgba(255,255,255,0.05);
+  }
+
+  .conv-item.unread {
+    border-left-color: var(--primary);
+    background: rgba(124,111,255,0.05);
+  }
+
+  .conv-avatar-wrap {
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .conv-avatar-wrap img {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--border);
+  }
+
+  .online-dot {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 12px;
+    height: 12px;
+    background: #4ade80;
+    border-radius: 50%;
+    border: 2px solid var(--surface);
+  }
+
+  .conv-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .conv-name-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.3rem;
+  }
+
+  .conv-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .verified-icon {
+    color: var(--primary);
+    font-size: 0.8rem;
+  }
+
+  .conv-time {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .conv-preview-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .conv-preview {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+  }
+
+  .conv-preview i {
+    margin-right: 3px;
+  }
+
+  .conv-preview.empty {
+    font-style: italic;
+    color: var(--text-muted);
+    opacity: 0.7;
+  }
+
+  .unread-badge {
+    background: var(--primary);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.2rem 0.5rem;
+    border-radius: 1rem;
+    min-width: 1.5rem;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .voice-unread-badge {
+    background: rgba(255, 179, 71, 0.2);
+    color: #ffb347;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 1rem;
+    flex-shrink: 0;
+  }
+
+  .conv-empty {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    color: var(--text-muted);
+  }
+
+  .conv-empty-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+
+  .messages-empty-panel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--card);
+    border-radius: 1rem;
+    border: 1px solid var(--border);
+  }
+
+  .messages-empty-content {
+    text-align: center;
+    padding: 2rem;
+  }
+
+  .messages-empty-icon {
+    margin-bottom: 1.5rem;
+    color: var(--text-muted);
+    opacity: 0.5;
+  }
+
+  .messages-empty-content h3 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .messages-empty-content p {
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+  }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.8);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(5px);
+  }
+
+  .modal-overlay.hidden {
+    display: none;
+  }
+
+  .modal-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 1.25rem;
+    width: 480px;
+    max-width: 95vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .modal-header h3 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .modal-close-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .modal-close-btn:hover {
+    background: rgba(255,255,255,0.1);
+    color: var(--text);
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+  }
+
+  .user-search-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .search-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 1rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    z-index: 1;
+  }
+
+  .user-search-input {
+    width: 100%;
+    padding: 0.85rem 1rem 0.85rem 2.5rem;
+    background: rgba(255,255,255,0.05);
+    border: 2px solid var(--border);
+    border-radius: 1rem;
+    color: var(--text);
+    font-size: 0.95rem;
+    transition: all 0.2s;
+  }
+
+  .user-search-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: rgba(124,111,255,0.05);
+  }
+
+  .clear-search-btn {
+    position: absolute;
+    right: 1rem;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.5rem;
+    z-index: 1;
+  }
+
+  .clear-search-btn:hover {
+    color: var(--text);
+    background: rgba(255,255,255,0.1);
+  }
+
+  .user-search-results {
+    max-height: 350px;
+    overflow-y: auto;
+    border-radius: 1rem;
+    background: rgba(0,0,0,0.2);
+  }
+
+  .search-hint {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+  }
+
+  .search-hint i {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.5;
+  }
+
+  .user-result {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    text-decoration: none;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    transition: background 0.2s;
+    cursor: pointer;
+  }
+
+  .user-result:last-child {
+    border-bottom: none;
+  }
+
+  .user-result:hover {
+    background: rgba(124,111,255,0.1);
+  }
+
+  .user-result-avatar {
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .user-result-avatar img {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  .user-result-online {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 10px;
+    height: 10px;
+    background: #4ade80;
+    border-radius: 50%;
+    border: 2px solid var(--surface);
+  }
+
+  .user-result-info {
+    flex: 1;
+  }
+
+  .user-result-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 0.25rem;
+    color: var(--text);
+  }
+
+  .user-result-username {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="messages-layout">
   <!-- CONVERSATION LIST -->
@@ -23,9 +480,10 @@
         {% for convo in conversations %}
         <a href="{{ url_for('chat', username=convo.user.username) }}"
            class="conv-item {% if convo.unread > 0 %}unread{% endif %}"
-           data-name="{{ convo.user.display_name or convo.user.username }}">
+           data-name="{{ convo.user.display_name or convo.user.username }}"
+           data-username="{{ convo.user.username }}">
           <div class="conv-avatar-wrap">
-            <img src="{{ convo.user.avatar or '/static/default_avatar.png' }}"
+            <img src="{{ convo.user.avatar_url or '/static/default_avatar.png' }}"
                  class="avatar avatar-md"
                  alt="{{ convo.user.username }}"
                  onerror="this.src='/static/default_avatar.png'">
@@ -42,26 +500,31 @@
                 {% endif %}
               </span>
               {% if convo.last %}
-              <span class="conv-time">{{ convo.last.created_at|timeago }}</span>
+              <span class="conv-time">{{ convo.last.created_at.strftime('%H:%M') if convo.last else '' }}</span>
               {% endif %}
             </div>
             <div class="conv-preview-row">
-              {% if convo.last %}
-                <span class="conv-preview">
+              <span class="conv-preview">
+                {% if convo.is_voice_last %}
+                  <i class="fa-solid fa-microphone"></i> Voice message
+                {% elif convo.last %}
                   {% if convo.last.sender_id == current_user.id %}
-                    <i class="fa-regular fa-check" style="font-size: 0.7rem;"></i> You:
+                    <i class="fa-regular fa-check"></i> You:
                   {% endif %}
                   {% if convo.last.content %}
                     {{ convo.last.content[:50] }}{% if convo.last.content|length > 50 %}…{% endif %}
                   {% elif convo.last.media_url %}
                     <i class="fa-regular fa-image"></i> Photo
                   {% endif %}
-                </span>
-              {% else %}
-                <span class="conv-preview empty">No messages yet</span>
-              {% endif %}
+                {% else %}
+                  <span class="empty">No messages yet</span>
+                {% endif %}
+              </span>
               {% if convo.unread > 0 %}
               <span class="unread-badge">{{ convo.unread }}</span>
+              {% endif %}
+              {% if convo.voice_unread > 0 %}
+              <span class="voice-unread-badge">🎤</span>
               {% endif %}
             </div>
           </div>
@@ -125,467 +588,29 @@
   </div>
 </div>
 
-<style>
-.messages-layout {
-  display: grid;
-  grid-template-columns: 340px 1fr;
-  gap: 1.5rem;
-  height: calc(100vh - 80px);
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
-}
-
-@media (max-width: 700px) {
-  .messages-layout {
-    grid-template-columns: 1fr;
-  }
-  .messages-empty-panel {
-    display: none;
-  }
-}
-
-.conversations-panel {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--card);
-  border-radius: 1rem;
-  border: 1px solid var(--border);
-}
-
-.conv-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1.25rem 1.25rem 0.75rem;
-}
-
-.conv-panel-header h2 {
-  font-size: 1.2rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.conv-panel-header h2 i {
-  color: var(--primary);
-}
-
-.conv-search-wrap {
-  position: relative;
-  padding: 0 1rem 0.75rem;
-}
-
-.conv-search-icon {
-  position: absolute;
-  left: 1.7rem;
-  top: 50%;
-  transform: translateY(-60%);
-  color: var(--text-muted);
-  font-size: 0.9rem;
-}
-
-.conv-search {
-  width: 100%;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid var(--border);
-  border-radius: 2rem;
-  padding: 0.6rem 0.75rem 0.6rem 2.5rem;
-  color: var(--text);
-  font-size: 0.9rem;
-  transition: all 0.2s;
-}
-
-.conv-search:focus {
-  outline: none;
-  border-color: var(--primary);
-  background: rgba(124,111,255,0.05);
-}
-
-.conv-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0.25rem 0;
-}
-
-.conv-item {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  padding: 0.85rem 1.25rem;
-  text-decoration: none;
-  transition: all 0.2s;
-  border-left: 3px solid transparent;
-}
-
-.conv-item:hover {
-  background: rgba(255,255,255,0.05);
-}
-
-.conv-item.unread {
-  border-left-color: var(--primary);
-  background: rgba(124,111,255,0.05);
-}
-
-.conv-avatar-wrap {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.conv-avatar-wrap img {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid var(--border);
-}
-
-.online-dot {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 12px;
-  height: 12px;
-  background: #4ade80;
-  border-radius: 50%;
-  border: 2px solid var(--surface);
-}
-
-.conv-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.conv-name-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.3rem;
-}
-
-.conv-name {
-  font-weight: 600;
-  font-size: 0.95rem;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.verified-icon {
-  color: var(--primary);
-  font-size: 0.8rem;
-}
-
-.conv-time {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-
-.conv-preview-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-
-.conv-preview {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 180px;
-}
-
-.conv-preview.empty {
-  font-style: italic;
-  color: var(--text-muted);
-  opacity: 0.7;
-}
-
-.unread-badge {
-  background: var(--primary);
-  color: white;
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 0.2rem 0.5rem;
-  border-radius: 1rem;
-  min-width: 1.5rem;
-  text-align: center;
-  flex-shrink: 0;
-}
-
-.conv-empty {
-  text-align: center;
-  padding: 3rem 1.5rem;
-  color: var(--text-muted);
-}
-
-.conv-empty-icon {
-  font-size: 3rem;
-  margin-bottom: 1rem;
-  opacity: 0.5;
-}
-
-/* Empty panel */
-.messages-empty-panel {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--card);
-  border-radius: 1rem;
-  border: 1px solid var(--border);
-}
-
-.messages-empty-content {
-  text-align: center;
-  padding: 2rem;
-}
-
-.messages-empty-icon {
-  margin-bottom: 1.5rem;
-  color: var(--text-muted);
-  opacity: 0.5;
-}
-
-.messages-empty-content h3 {
-  font-size: 1.3rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-}
-
-.messages-empty-content p {
-  color: var(--text-muted);
-  margin-bottom: 1.5rem;
-}
-
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.8);
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(5px);
-}
-
-.modal-overlay.hidden {
-  display: none;
-}
-
-.modal-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 1.25rem;
-  width: 480px;
-  max-width: 95vw;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.modal-header h3 {
-  font-size: 1.2rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.modal-close-btn {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 1.2rem;
-  cursor: pointer;
-  padding: 0.5rem;
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-
-.modal-close-btn:hover {
-  background: rgba(255,255,255,0.1);
-  color: var(--text);
-}
-
-.modal-body {
-  padding: 1.5rem;
-}
-
-.user-search-container {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.search-input-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.search-icon {
-  position: absolute;
-  left: 1rem;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  z-index: 1;
-}
-
-.user-search-input {
-  width: 100%;
-  padding: 0.85rem 1rem 0.85rem 2.5rem;
-  background: rgba(255,255,255,0.05);
-  border: 2px solid var(--border);
-  border-radius: 1rem;
-  color: var(--text);
-  font-size: 0.95rem;
-  transition: all 0.2s;
-}
-
-.user-search-input:focus {
-  outline: none;
-  border-color: var(--primary);
-  background: rgba(124,111,255,0.05);
-}
-
-.clear-search-btn {
-  position: absolute;
-  right: 1rem;
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 0.9rem;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.5rem;
-  z-index: 1;
-}
-
-.clear-search-btn:hover {
-  color: var(--text);
-  background: rgba(255,255,255,0.1);
-}
-
-.user-search-results {
-  max-height: 350px;
-  overflow-y: auto;
-  border-radius: 1rem;
-  background: rgba(0,0,0,0.2);
-}
-
-.search-hint {
-  text-align: center;
-  padding: 3rem 1rem;
-  color: var(--text-muted);
-}
-
-.search-hint i {
-  font-size: 2.5rem;
-  margin-bottom: 0.5rem;
-  opacity: 0.5;
-}
-
-.user-result {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  text-decoration: none;
-  color: var(--text);
-  border-bottom: 1px solid var(--border);
-  transition: background 0.2s;
-  cursor: pointer;
-}
-
-.user-result:last-child {
-  border-bottom: none;
-}
-
-.user-result:hover {
-  background: rgba(124,111,255,0.1);
-}
-
-.user-result-avatar {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.user-result-avatar img {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.user-result-online {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 10px;
-  height: 10px;
-  background: #4ade80;
-  border-radius: 50%;
-  border: 2px solid var(--surface);
-}
-
-.user-result-info {
-  flex: 1;
-}
-
-.user-result-name {
-  font-weight: 600;
-  font-size: 0.95rem;
-  margin-bottom: 0.25rem;
-  color: var(--text);
-}
-
-.user-result-username {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-}
-</style>
-
 <script>
-// Filter conversations
+// ============================================================
+// CONVERSATION FILTERING
+// ============================================================
+
 function filterConvs(q) {
   q = q.toLowerCase();
   document.querySelectorAll('.conv-item').forEach(el => {
-    const name = (el.dataset.name || '').toLowerCase();
-    el.style.display = name.includes(q) ? 'flex' : 'none';
+    const name = (el.getAttribute('data-name') || '').toLowerCase();
+    const username = (el.getAttribute('data-username') || '').toLowerCase();
+    el.style.display = (name.includes(q) || username.includes(q)) ? 'flex' : 'none';
   });
 }
 
-// Modal functions
+// ============================================================
+// NEW MESSAGE MODAL
+// ============================================================
+
 function openNewMessageModal() {
   const modal = document.getElementById('newMsgModal');
   if (modal) {
     modal.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
-
     setTimeout(() => {
       const input = document.getElementById('userSearchInput');
       if (input) input.focus();
@@ -614,7 +639,6 @@ function closeNewMessageModal() {
   }
 }
 
-// Clear search
 function clearSearch() {
   const input = document.getElementById('userSearchInput');
   if (input) {
@@ -624,33 +648,12 @@ function clearSearch() {
   }
 }
 
-// Show/hide clear button
-document.addEventListener('DOMContentLoaded', function() {
-  const input = document.getElementById('userSearchInput');
-  const clearBtn = document.querySelector('.clear-search-btn');
+// ============================================================
+// USER SEARCH
+// ============================================================
 
-  if (input && clearBtn) {
-    input.addEventListener('input', function(e) {
-      clearBtn.style.display = e.target.value ? 'flex' : 'none';
-    });
-  }
-
-  // Close modal when clicking overlay
-  const modal = document.getElementById('newMsgModal');
-  if (modal) {
-    modal.addEventListener('click', function(e) {
-      if (e.target === modal) closeNewMessageModal();
-    });
-  }
-
-  // Close on escape key
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeNewMessageModal();
-  });
-});
-
-// Search users
 let searchTimer;
+
 async function searchUsers(q) {
   clearTimeout(searchTimer);
   const results = document.getElementById('userSearchResults');
@@ -658,6 +661,10 @@ async function searchUsers(q) {
 
   let searchQuery = q.trim();
   if (searchQuery.startsWith('@')) searchQuery = searchQuery.substring(1);
+
+  // Show/hide clear button
+  const clearBtn = document.querySelector('.clear-search-btn');
+  if (clearBtn) clearBtn.style.display = q ? 'flex' : 'none';
 
   if (!searchQuery || searchQuery.length < 2) {
     results.innerHTML = `
@@ -692,7 +699,7 @@ async function searchUsers(q) {
 
         if (filteredUsers.length > 0) {
           results.innerHTML = filteredUsers.map(user => `
-            <div class="user-result" onclick="window.location.href='/chat/${user.username}'">
+            <div class="user-result" onclick="startChat('${user.username}')">
               <div class="user-result-avatar">
                 <img src="${user.avatar || '/static/default_avatar.png'}"
                      alt="${user.username}"
@@ -700,8 +707,8 @@ async function searchUsers(q) {
                 ${user.is_online ? '<span class="user-result-online"></span>' : ''}
               </div>
               <div class="user-result-info">
-                <div class="user-result-name">${user.display_name || user.username}</div>
-                <div class="user-result-username">@${user.username}</div>
+                <div class="user-result-name">${escapeHtml(user.display_name || user.username)}</div>
+                <div class="user-result-username">@${escapeHtml(user.username)}</div>
               </div>
               <i class="fa-solid fa-chevron-right" style="color: var(--text-muted);"></i>
             </div>
@@ -718,7 +725,7 @@ async function searchUsers(q) {
         results.innerHTML = `
           <div class="search-hint">
             <i class="fa-regular fa-user-slash"></i>
-            <p>No users found matching "${searchQuery}"</p>
+            <p>No users found matching "${escapeHtml(searchQuery)}"</p>
           </div>
         `;
       }
@@ -733,5 +740,33 @@ async function searchUsers(q) {
     }
   }, 500);
 }
+
+function startChat(username) {
+  window.location.href = `/chat/${username}`;
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ============================================================
+// CLOSE MODAL ON ESCAPE AND OUTSIDE CLICK
+// ============================================================
+
+document.addEventListener('DOMContentLoaded', function() {
+  const modal = document.getElementById('newMsgModal');
+  if (modal) {
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) closeNewMessageModal();
+    });
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeNewMessageModal();
+  });
+});
 </script>
 {% endblock %}

@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Edit Profile — Kildear{% endblock %}
+{% block title %}Редактировать профиль — Kildear{% endblock %}
 
 {% block content %}
 <div class="edit-profile-layout">
   <div class="card edit-profile-card">
     <div class="edit-profile-header">
-      <h2>Edit Profile</h2>
-      <a href="{{ url_for('profile', username=current_user.username) }}" class="btn btn-ghost btn-sm">← Back to profile</a>
+      <h2>Редактировать профиль</h2>
+      <a href="{{ url_for('profile', username=current_user.username) }}" class="btn btn-ghost btn-sm">← Назад в профиль</a>
     </div>
 
     <form action="{{ url_for('edit_profile') }}" method="POST" id="editProfileForm">
@@ -14,13 +14,13 @@
 
       <!-- Cover Photo Selection -->
       <div class="edit-cover-section">
-        <label class="section-label">Cover Photo</label>
+        <label class="section-label">Обложка</label>
 
         <!-- Current Cover Preview -->
         <div class="cover-preview-wrapper">
           <div class="cover-preview" id="coverPreview">
             {% if current_user.cover_url %}
-              <img src="{{ current_user.cover_url }}" alt="Cover" class="cover-image" id="coverImage">
+              <img src="{{ current_user.cover_url }}" alt="Обложка" class="cover-image" id="coverImage">
             {% else %}
               <div class="cover-placeholder">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -28,7 +28,7 @@
                   <circle cx="8.5" cy="8.5" r="2.5"/>
                   <polyline points="21 15 16 10 5 21"/>
                 </svg>
-                <span>No cover selected</span>
+                <span>Обложка не выбрана</span>
               </div>
             {% endif %}
           </div>
@@ -36,7 +36,7 @@
 
         <!-- Preset Covers Grid -->
         <div class="preset-covers-section">
-          <p class="section-desc">Choose a cover photo</p>
+          <p class="section-desc">Выберите обложку</p>
           <div class="preset-covers-grid">
             <div class="cover-option {% if not current_user.preset_cover %}selected{% endif %}" data-cover="none" onclick="selectPresetCover(null)">
               <div class="cover-option-preview no-cover">
@@ -46,17 +46,17 @@
                   <line x1="15" y1="9" x2="9" y2="15"/>
                 </svg>
               </div>
-              <span>No cover</span>
+              <span>Без обложки</span>
             </div>
             {% for num in range(1, 6) %}
             <div class="cover-option {% if current_user.preset_cover == num %}selected{% endif %}" data-cover="{{ num }}" onclick="selectPresetCover({{ num }})">
               <div class="cover-option-preview">
                 <img src="{{ url_for('static', filename='covers/preset/' + num|string + 'cover.jpg') }}"
-                     alt="Cover {{ num }}"
+                     alt="Обложка {{ num }}"
                      class="cover-option-img"
                      onerror="this.style.backgroundColor='#2a2a2a'">
               </div>
-              <span>Cover {{ num }}</span>
+              <span>Обложка {{ num }}</span>
             </div>
             {% endfor %}
           </div>
@@ -65,23 +65,23 @@
 
       <!-- Avatar Selection -->
       <div class="edit-avatar-section">
-        <label class="section-label">Profile Picture</label>
+        <label class="section-label">Аватар профиля</label>
 
         <!-- Current Avatar Preview -->
         <div class="avatar-preview-wrap">
-          <img src="{{ current_user.avatar_url }}" class="avatar avatar-xl" id="avatarPreview" alt="Avatar">
+          <img src="{{ current_user.avatar_url }}" class="avatar avatar-xl" id="avatarPreview" alt="Аватар">
         </div>
 
         <!-- Preset Avatars Grid -->
         <div class="preset-avatars-section">
-          <p class="section-desc">Choose your profile picture</p>
+          <p class="section-desc">Выберите аватар</p>
           <div class="preset-avatars-grid">
             {% for num in range(1, 11) %}
             <div class="preset-avatar-item {% if current_user.preset_avatar == num %}selected{% endif %}"
                  data-avatar-num="{{ num }}"
                  onclick="selectPresetAvatar({{ num }})">
               <img src="{{ url_for('static', filename='avatars/preset/' + num|string + 'av.png') }}"
-                   alt="Avatar {{ num }}"
+                   alt="Аватар {{ num }}"
                    class="preset-avatar-img"
                    onerror="this.src='{{ url_for('static', filename='default_avatar.png') }}'">
               <div class="preset-avatar-check">
@@ -104,15 +104,15 @@
       <!-- Custom Avatar Upload (1000+ followers) -->
       {% if permissions and permissions.can_upload_custom_avatar %}
       <div class="form-section">
-        <h3><i class="fa-solid fa-camera"></i> Custom Avatar</h3>
-        <p class="text-muted">You have 1000+ followers! You can upload your own avatar.</p>
+        <h3><i class="fa-solid fa-camera"></i> Пользовательский аватар</h3>
+        <p class="text-muted">У вас 1000+ подписчиков! Вы можете загрузить свой аватар.</p>
 
         {% if current_user.custom_avatar %}
         <div class="current-custom">
           <img src="{{ current_user.custom_avatar }}" class="custom-avatar-preview">
           <form method="POST" action="{{ url_for('remove_custom_avatar') }}" style="display: inline;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-sm btn-danger">Remove Custom Avatar</button>
+            <button type="submit" class="btn btn-sm btn-danger">Удалить пользовательский аватар</button>
           </form>
         </div>
         {% endif %}
@@ -120,11 +120,11 @@
         <form method="POST" action="{{ url_for('upload_custom_avatar') }}" enctype="multipart/form-data">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="form-group">
-            <label>Upload New Avatar</label>
+            <label>Загрузить новый аватар</label>
             <input type="file" name="avatar" accept="image/*" class="form-control">
-            <small class="text-muted">Recommended size: 200x200px. Formats: PNG, JPG, GIF, WEBP</small>
+            <small class="text-muted">Рекомендуемый размер: 200x200px. Форматы: PNG, JPG, GIF, WEBP</small>
           </div>
-          <button type="submit" class="btn btn-primary">Upload Avatar</button>
+          <button type="submit" class="btn btn-primary">Загрузить аватар</button>
         </form>
       </div>
       {% elif permissions %}
@@ -132,8 +132,8 @@
         <div class="permission-locked">
           <i class="fa-solid fa-lock"></i>
           <div>
-            <strong>Custom Avatar Locked</strong>
-            <p>You need 1000 followers to upload your own avatar. Current: {{ current_user.follower_count }} followers</p>
+            <strong>Пользовательский аватар заблокирован</strong>
+            <p>Вам нужно 1000 подписчиков, чтобы загрузить свой аватар. Сейчас: {{ current_user.follower_count }} подписчиков</p>
           </div>
         </div>
       </div>
@@ -142,15 +142,15 @@
       <!-- Custom Cover Upload (5000+ followers) -->
       {% if permissions and permissions.can_upload_custom_cover %}
       <div class="form-section">
-        <h3><i class="fa-solid fa-image"></i> Custom Cover</h3>
-        <p class="text-muted">You have 5000+ followers! You can upload your own cover.</p>
+        <h3><i class="fa-solid fa-image"></i> Пользовательская обложка</h3>
+        <p class="text-muted">У вас 5000+ подписчиков! Вы можете загрузить свою обложку.</p>
 
         {% if current_user.custom_cover %}
         <div class="current-custom">
           <img src="{{ current_user.custom_cover }}" class="custom-cover-preview">
           <form method="POST" action="{{ url_for('remove_custom_cover') }}" style="display: inline;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-sm btn-danger">Remove Custom Cover</button>
+            <button type="submit" class="btn btn-sm btn-danger">Удалить пользовательскую обложку</button>
           </form>
         </div>
         {% endif %}
@@ -158,11 +158,11 @@
         <form method="POST" action="{{ url_for('upload_custom_cover') }}" enctype="multipart/form-data">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="form-group">
-            <label>Upload New Cover</label>
+            <label>Загрузить новую обложку</label>
             <input type="file" name="cover" accept="image/*" class="form-control">
-            <small class="text-muted">Recommended size: 1200x400px. Formats: PNG, JPG, GIF, WEBP</small>
+            <small class="text-muted">Рекомендуемый размер: 1200x400px. Форматы: PNG, JPG, GIF, WEBP</small>
           </div>
-          <button type="submit" class="btn btn-primary">Upload Cover</button>
+          <button type="submit" class="btn btn-primary">Загрузить обложку</button>
         </form>
       </div>
       {% elif permissions %}
@@ -170,8 +170,8 @@
         <div class="permission-locked">
           <i class="fa-solid fa-lock"></i>
           <div>
-            <strong>Custom Cover Locked</strong>
-            <p>You need 5000 followers to upload your own cover. Current: {{ current_user.follower_count }} followers</p>
+            <strong>Пользовательская обложка заблокирована</strong>
+            <p>Вам нужно 5000 подписчиков, чтобы загрузить свою обложку. Сейчас: {{ current_user.follower_count }} подписчиков</p>
           </div>
         </div>
       </div>
@@ -183,10 +183,10 @@
         <div class="action-banner verification-banner">
           <i class="fa-solid fa-circle-check"></i>
           <div>
-            <h4>Get Verified!</h4>
-            <p>Apply for a verification badge to prove your identity</p>
+            <h4>Получите верификацию!</h4>
+            <p>Подайте заявку на получение значка верификации, чтобы подтвердить свою личность</p>
           </div>
-          <a href="{{ url_for('request_verification') }}" class="btn btn-primary">Apply Now</a>
+          <a href="{{ url_for('request_verification') }}" class="btn btn-primary">Подать заявку</a>
         </div>
       </div>
       {% endif %}
@@ -197,10 +197,10 @@
         <div class="action-banner admin-banner">
           <i class="fa-solid fa-user-tie"></i>
           <div>
-            <h4>Join the Team!</h4>
-            <p>Apply for moderator or administrator position</p>
+            <h4>Присоединяйтесь к команде!</h4>
+            <p>Подайте заявку на позицию модератора или администратора</p>
           </div>
-          <a href="{{ url_for('apply_admin') }}" class="btn btn-primary">Apply Now</a>
+          <a href="{{ url_for('apply_admin') }}" class="btn btn-primary">Подать заявку</a>
         </div>
       </div>
       {% endif %}
@@ -210,38 +210,38 @@
       <div class="edit-fields">
         <!-- Display name -->
         <div class="field-group">
-          <label class="field-label" for="displayName">Display Name</label>
+          <label class="field-label" for="displayName">Отображаемое имя</label>
           <input type="text" id="displayName" name="display_name" class="field-input"
                  value="{{ current_user.display_name or '' }}" maxlength="60"
                  placeholder="{{ current_user.username }}">
-          <span class="field-hint">This is how your name appears on Kildear.</span>
+          <span class="field-hint">Это имя отображается на Kildear.</span>
         </div>
 
         <!-- Bio -->
         <div class="field-group">
-          <label class="field-label" for="bioField">Bio</label>
+          <label class="field-label" for="bioField">О себе</label>
           <textarea id="bioField" name="bio" class="field-textarea" maxlength="300"
-                    placeholder="Tell the world about yourself…" oninput="bioCounter(this)">{{ current_user.bio or '' }}</textarea>
+                    placeholder="Расскажите миру о себе…" oninput="bioCounter(this)">{{ current_user.bio or '' }}</textarea>
           <div class="field-footer"><span id="bioCount">{{ (current_user.bio or '')|length }}</span>/300</div>
         </div>
 
         <!-- Website -->
         <div class="field-group">
-          <label class="field-label" for="websiteField">Website</label>
+          <label class="field-label" for="websiteField">Веб-сайт</label>
           <input type="url" id="websiteField" name="website" class="field-input"
                  value="{{ current_user.website or '' }}" placeholder="https://yoursite.com">
         </div>
 
         <!-- Location -->
         <div class="field-group">
-          <label class="field-label" for="locationField">Location</label>
+          <label class="field-label" for="locationField">Местоположение</label>
           <input type="text" id="locationField" name="location" class="field-input"
-                 value="{{ current_user.location or '' }}" maxlength="100" placeholder="City, Country">
+                 value="{{ current_user.location or '' }}" maxlength="100" placeholder="Город, Страна">
         </div>
 
         <!-- Accent color -->
         <div class="field-group">
-          <label class="field-label">Profile Accent Color</label>
+          <label class="field-label">Акцентный цвет профиля</label>
           <div class="color-picker-row">
             {% set colors = ['#7c6fff','#ff6b9d','#00d4ff','#f7c948','#4ade80','#fb923c','#e879f9','#38bdf8'] %}
             {% for color in colors %}
@@ -252,7 +252,7 @@
                      onchange="updateAccentPreview('{{ color }}')">
             </label>
             {% endfor %}
-            <label class="color-swatch color-custom" title="Custom color">
+            <label class="color-swatch color-custom" title="Свой цвет">
               <input type="color" name="accent_color_custom" value="{{ current_user.accent_color or '#7c6fff' }}"
                      onchange="updateAccentPreview(this.value)">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-8v4h4l-5 8z"/></svg>
@@ -261,17 +261,17 @@
           <div class="accent-preview" id="accentPreview">
             <div class="accent-preview-bar" id="accentPreviewBar"
                  style="background:{{ current_user.accent_color or '#7c6fff' }}"></div>
-            <span>Accent preview</span>
+            <span>Предпросмотр акцента</span>
           </div>
         </div>
 
         <!-- Privacy -->
         <div class="field-group">
-          <label class="field-label">Privacy</label>
+          <label class="field-label">Приватность</label>
           <div class="toggle-row">
             <div class="toggle-info">
-              <span class="toggle-title">Private Account</span>
-              <span class="toggle-desc">Only approved followers can see your posts</span>
+              <span class="toggle-title">Закрытый аккаунт</span>
+              <span class="toggle-desc">Только одобренные подписчики могут видеть ваши посты</span>
             </div>
             <label class="toggle-switch">
               <input type="checkbox" name="is_private" {% if current_user.is_private %}checked{% endif %}>
@@ -282,16 +282,16 @@
 
         <!-- Change password -->
         <div class="field-group">
-          <label class="field-label">Change Password</label>
-          <input type="password" name="current_password" class="field-input" placeholder="Current password" autocomplete="current-password">
+          <label class="field-label">Сменить пароль</label>
+          <input type="password" name="current_password" class="field-input" placeholder="Текущий пароль" autocomplete="current-password">
           <div style="height:.5rem"></div>
-          <input type="password" name="new_password" class="field-input" placeholder="New password (leave blank to keep)" autocomplete="new-password">
+          <input type="password" name="new_password" class="field-input" placeholder="Новый пароль (оставьте пустым, чтобы не менять)" autocomplete="new-password">
         </div>
       </div>
 
       <div class="edit-profile-actions">
-        <a href="{{ url_for('profile', username=current_user.username) }}" class="btn btn-ghost">Cancel</a>
-        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <a href="{{ url_for('profile', username=current_user.username) }}" class="btn btn-ghost">Отмена</a>
+        <button type="submit" class="btn btn-primary">Сохранить изменения</button>
       </div>
     </form>
   </div>
@@ -558,14 +558,14 @@ function selectPresetCover(coverNum){
           <circle cx="8.5" cy="8.5" r="2.5"/>
           <polyline points="21 15 16 10 5 21"/>
         </svg>
-        <span>No cover selected</span>
+        <span>Обложка не выбрана</span>
       </div>
     `;
     document.getElementById('presetCoverInput').value = '';
     document.getElementById('removeCoverInput').value = '1';
   } else {
     const coverUrl = "{{ url_for('static', filename='covers/preset/') }}" + coverNum + "cover.jpg";
-    coverPreview.innerHTML = `<img src="${coverUrl}" alt="Cover" class="cover-image" id="coverImage">`;
+    coverPreview.innerHTML = `<img src="${coverUrl}" alt="Обложка" class="cover-image" id="coverImage">`;
     document.getElementById('presetCoverInput').value = coverNum;
     document.getElementById('removeCoverInput').value = '0';
   }
