@@ -4921,6 +4921,159 @@ def init_app():
             logger.error(f"❌ Ошибка при инициализации: {e}")
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+#  Achievements Routes
+# ──────────────────────────────────────────────────────────────────────────────
+
+class UserAchievement(db.Model):
+    """Модель для отслеживания достижений пользователя"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    achievement_type = db.Column(db.String(50), nullable=False)
+    achieved_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship("User", backref="achievements")
+
+
+@app.route("/achievements")
+@login_required
+def achievements():
+    """Страница достижений пользователя"""
+    from collections import defaultdict
+
+    # Определяем доступные достижения
+    all_achievements = [
+        {"id": "first_post", "name": "First Post", "description": "Create your first post",
+         "icon": "📝", "requirement": "post_count >= 1"},
+        {"id": "popular_post", "name": "Popular Post", "description": "Get 100 likes on a single post",
+         "icon": "❤️", "requirement": "post_likes >= 100"},
+        {"id": "100_followers", "name": "Growing Star", "description": "Reach 100 followers",
+         "icon": "⭐", "requirement": "follower_count >= 100"},
+        {"id": "1000_followers", "name": "Influencer", "description": "Reach 1000 followers",
+         "icon": "🏆", "requirement": "follower_count >= 1000"},
+        {"id": "5000_followers", "name": "Superstar", "description": "Reach 5000 followers",
+         "icon": "👑", "requirement": "follower_count >= 5000"},
+        {"id": "group_member", "name": "Team Player", "description": "Join a group",
+         "icon": "👥", "requirement": "groups_count >= 1"},
+        {"id": "channel_subscriber", "name": "Channel Surfer", "description": "Subscribe to a channel",
+         "icon": "📢", "requirement": "channels_count >= 1"},
+        {"id": "message_sent", "name": "Social Butterfly", "description": "Send 50 messages",
+         "icon": "💬", "requirement": "messages_sent >= 50"},
+    ]
+
+    # Получаем достижения пользователя
+    user_achievements = {a.achievement_type for a in current_user.achievements}
+
+    # Вычисляем прогресс
+    post_count = current_user.post_count
+    follower_count = current_user.follower_count
+    groups_count = current_user.groups.count()
+    channels_count = current_user.subscribed_channels.count()
+    messages_sent = Message.query.filter_by(sender_id=current_user.id).count()
+
+    # Проверяем максимальное количество лайков на постах
+    max_likes = db.session.query(func.max(Post.like_count)).filter_by(user_id=current_user.id).scalar() or 0
+
+    # Обновляем достижения (если нужно)
+    new_achievements = []
+
+    if post_count >= 1 and "first_post" not in user_achievements:
+        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="first_post"))
+
+    if max_likes >= 100 and "popular_post" not in user_achievements:
+        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="popular_post"))
+
+    if follower_count >= 100 and "100_followers" not in user_achievements:
+        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="100_followers"))
+
+    if follower_count >= 1000 and "1000_followers" not in user_achievements:
+        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="1000_followers"))
+
+    if follower_count >= 5000 and "5000_followers" not in user_achievements:
+        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="5000_followers"))
+
+    if groups_count >= 1 and "group_member" not in user_achievements:
+        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="group_member"))
+
+    if channels_count >= 1 and "channel_subscriber" not in user_achievements:
+        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="channel_subscriber"))
+
+    if messages_sent >= 50 and "message_sent" not in user_achievements:
+        new_achievements.append(UserAchievement(user_id=current_user.id, achievement_type="message_sent"))
+
+    if new_achievements:
+        for ach in new_achievements:
+            db.session.add(ach)
+        db.session.commit()
+        user_achievements = {a.achievement_type for a in current_user.achievements}
+
+    # Собираем данные для отображения
+    achievements_data = []
+    for ach in all_achievements:
+        is_achieved = ach["id"] in user_achievements
+
+        # Вычисляем прогресс
+        progress = 0
+        max_value = 1
+
+        if ach["id"] == "first_post":
+            progress = min(100, (post_count / 1) * 100) if is_achieved else min(100, (post_count / 1) * 100)
+            max_value = 1
+            current_value = post_count
+        elif ach["id"] == "popular_post":
+            progress = min(100, (max_likes / 100) * 100)
+            max_value = 100
+            current_value = max_likes
+        elif ach["id"] == "100_followers":
+            progress = min(100, (follower_count / 100) * 100)
+            max_value = 100
+            current_value = follower_count
+        elif ach["id"] == "1000_followers":
+            progress = min(100, (follower_count / 1000) * 100) if follower_count < 1000 else 100
+            max_value = 1000
+            current_value = follower_count
+        elif ach["id"] == "5000_followers":
+            progress = min(100, (follower_count / 5000) * 100) if follower_count < 5000 else 100
+            max_value = 5000
+            current_value = follower_count
+        elif ach["id"] == "group_member":
+            progress = min(100, (groups_count / 1) * 100)
+            max_value = 1
+            current_value = groups_count
+        elif ach["id"] == "channel_subscriber":
+            progress = min(100, (channels_count / 1) * 100)
+            max_value = 1
+            current_value = channels_count
+        elif ach["id"] == "message_sent":
+            progress = min(100, (messages_sent / 50) * 100) if messages_sent < 50 else 100
+            max_value = 50
+            current_value = messages_sent
+        else:
+            progress = 100 if is_achieved else 0
+
+        achievements_data.append({
+            **ach,
+            "is_achieved": is_achieved,
+            "progress": progress,
+            "current_value": current_value,
+            "max_value": max_value,
+            "achieved_at": next((a.achieved_at for a in current_user.achievements if a.achievement_type == ach["id"]),
+                                None)
+        })
+
+    # Сортируем: сначала неполученные, потом полученные
+    achievements_data.sort(key=lambda x: (x["is_achieved"], -x["progress"]))
+
+    # Статистика
+    total_achievements = len(all_achievements)
+    earned_count = len(user_achievements)
+
+    return render_template("achievements.html",
+                           achievements=achievements_data,
+                           total=total_achievements,
+                           earned=earned_count,
+                           percent=(earned_count / total_achievements * 100) if total_achievements > 0 else 0)
+
 if __name__ == "__main__":
     init_app()
 
