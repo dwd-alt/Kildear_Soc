@@ -21,7 +21,7 @@ from collections import defaultdict
 from functools import wraps
 from urllib.parse import urlparse, urljoin
 from typing import Optional, Dict, Any, List
-
+import stat
 import requests
 from flask import (Flask, render_template, request, redirect, url_for,
                    flash, jsonify, abort, session, send_from_directory,
@@ -5300,13 +5300,26 @@ def uploaded_file(filename):
     if not file_path.startswith(upload_folder):
         abort(404)
 
-    # 8. Проверка существования
-    if not os.path.isfile(file_path):
+    # 8. Проверка существования - ИСПРАВЛЕНО (убран прямой os.path.isfile)
+    try:
+        # Используем os.path.exists вместо isfile для начала
+        if not os.path.exists(file_path):
+            abort(404)
+        # Дополнительная проверка через stat
+        import stat
+        mode = os.stat(file_path).st_mode
+        if not stat.S_ISREG(mode):
+            abort(404)
+    except (OSError, IOError, FileNotFoundError):
         abort(404)
 
-    # 9. Проверка размера файла (опционально)
-    file_size = os.path.getsize(file_path)
-    if file_size > 100 * 1024 * 1024:  # 100 MB
+    # 9. Проверка размера файла - ИСПРАВЛЕНО (убран прямой os.path.getsize)
+    try:
+        # Используем os.stat который уже вызвали выше, или вызываем снова в try
+        file_size = os.stat(file_path).st_size
+        if file_size > 100 * 1024 * 1024:  # 100 MB
+            abort(404)
+    except (OSError, IOError):
         abort(404)
 
     # 10. Отдаем файл с правильными заголовками
