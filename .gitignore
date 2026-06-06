@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+env/
+venv/
+.env
+.venv
+
+# Database (важно для безопасности!)
+*.db
+*.sqlite
+*.sqlite3
+kildear.db
+
+# IDE и редакторы
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Логи и временные файлы
+*.log
+*.tmp
+*.temp
+
+# Секреты и ключи (очень важно!)
+*.key
+*.pem
+*.crt
+*.p12
+.secrets
+.env.local
+.env.*.local
+
+# Файлы отчётов
+*.pdf
+security_report_*.html
+
+# GitHub (уже есть, но добавим для порядка)
+.github/
