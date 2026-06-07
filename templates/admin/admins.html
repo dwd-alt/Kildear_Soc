@@ -1,0 +1,179 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Управление администраторами — Kildear Admin{% endblock %}
+{% block header %}👑 Управление администраторами{% endblock %}
+
+{% block content %}
+<style>
+    .admin-table-container {
+        background: #11131f;
+        border: 1px solid #2a2a3a;
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 30px;
+    }
+    .admin-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .admin-table th,
+    .admin-table td {
+        padding: 15px;
+        text-align: left;
+        border-bottom: 1px solid #2a2a3a;
+    }
+    .admin-table th {
+        background: rgba(108, 99, 255, 0.1);
+        color: #6c63ff;
+        font-weight: 600;
+    }
+    .admin-table tr:hover {
+        background: rgba(108, 99, 255, 0.05);
+    }
+    .admin-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .badge-admin {
+        background: rgba(108, 99, 255, 0.2);
+        color: #6c63ff;
+    }
+    .badge-mod {
+        background: rgba(74, 222, 128, 0.2);
+        color: #4ade80;
+    }
+    .admin-btn {
+        padding: 6px 12px;
+        border-radius: 6px;
+        border: none;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        text-decoration: none;
+    }
+    .admin-btn-danger {
+        background: rgba(255, 107, 107, 0.15);
+        color: #ff6b6b;
+        border: 1px solid rgba(255, 107, 107, 0.3);
+    }
+    .admin-btn-danger:hover {
+        background: rgba(255, 107, 107, 0.25);
+    }
+    .admin-btn-warning {
+        background: rgba(251, 146, 60, 0.15);
+        color: #fb923c;
+        border: 1px solid rgba(251, 146, 60, 0.3);
+    }
+    .admin-btn-warning:hover {
+        background: rgba(251, 146, 60, 0.25);
+    }
+    .avatar-sm {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+    .text-muted {
+        color: #7f8c8d;
+    }
+</style>
+
+<div class="admin-table-container">
+    <div style="padding: 20px; border-bottom: 1px solid #2a2a3a; display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="margin: 0;"><i class="fa-solid fa-crown"></i> Список администраторов</h3>
+        <span class="text-muted">Всего: {{ admins|length }}</span>
+    </div>
+    <div style="overflow-x: auto;">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>Пользователь</th>
+                    <th>Email</th>
+                    <th>Роль</th>
+                    <th>Дата регистрации</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for admin in admins %}
+                <tr>
+                    <td>
+                        <img src="{{ admin.avatar_url }}" alt="{{ admin.username }}" class="avatar-sm">
+                    </td>
+                    <td>
+                        <strong>{{ admin.display_name or admin.username }}</strong><br>
+                        <small class="text-muted">@{{ admin.username }}</small>
+                    </td>
+                    <td>{{ admin.email }}</td>
+                    <td>
+                        <span class="admin-badge {% if admin.is_admin %}badge-admin{% endif %}">
+                            {% if admin.is_admin %}👑 Администратор{% else %}🛡️ Модератор{% endif %}
+                        </span>
+                    </td>
+                    <td>{{ admin.created_at.strftime('%d.%m.%Y') }}</td>
+                    <td>
+                        <div style="display: flex; gap: 8px;">
+                            {% if admin.id != current_user.id %}
+                            <form method="POST" action="{{ url_for('admin_toggle_admin', user_id=admin.id) }}" style="display: inline;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="admin-btn admin-btn-warning" onclick="return confirm('Снять права администратора с {{ admin.username }}?')">
+                                    <i class="fa-solid fa-user-minus"></i> Снять права
+                                </button>
+                            </form>
+                            {% else %}
+                            <span class="text-muted"><i class="fa-solid fa-lock"></i> Вы</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 40px;">
+                        <i class="fa-solid fa-users-slash" style="font-size: 48px; color: #7f8c8d; margin-bottom: 15px; display: block;"></i>
+                        <p>Нет администраторов</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="admin-table-container">
+    <div style="padding: 20px; border-bottom: 1px solid #2a2a3a;">
+        <h3 style="margin: 0;"><i class="fa-solid fa-plus-circle"></i> Назначить администратора</h3>
+    </div>
+    <div style="padding: 20px;">
+        <form method="POST" action="{{ url_for('admin_make_admin') }}" style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="username" placeholder="Имя пользователя" required style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #2a2a3a; background: #1a1c2a; color: white;">
+            <select name="role" style="padding: 10px; border-radius: 8px; border: 1px solid #2a2a3a; background: #1a1c2a; color: white;">
+                <option value="admin">Администратор</option>
+                <option value="moderator">Модератор</option>
+            </select>
+            <button type="submit" class="admin-btn" style="background: #6c63ff; color: white; padding: 10px 20px;">
+                <i class="fa-solid fa-user-plus"></i> Назначить
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Подтверждение перед снятием прав
+    document.querySelectorAll('.admin-btn-warning').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            if (!confirm('Вы уверены?')) {
+                e.preventDefault();
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -376,31 +376,14 @@ async function submitInlineComment(e, postId){
       if(list){
         const commentDiv = document.createElement('div');
         commentDiv.className = 'comment-item';
-        // ИСПРАВЛЕНО: используем безопасное создание элементов
-        const img = document.createElement('img');
-        img.src = data.avatar;
-        img.className = 'avatar avatar-xs';
-        img.alt = '';
-        
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'comment-content';
-        
-        const strong = document.createElement('strong');
-        strong.textContent = data.username;
-        
-        const p = document.createElement('p');
-        p.textContent = escapeHtml(data.content);  // безопасное экранирование
-        
-        const small = document.createElement('small');
-        small.textContent = data.created_at;
-        
-        contentDiv.appendChild(strong);
-        contentDiv.appendChild(p);
-        contentDiv.appendChild(small);
-        
-        commentDiv.appendChild(img);
-        commentDiv.appendChild(contentDiv);
-        
+        commentDiv.innerHTML = `
+          <img src="${data.avatar}" class="avatar avatar-xs" alt="">
+          <div class="comment-content">
+            <strong>${data.username}</strong>
+            <p>${escapeHtml(data.content)}</p>
+            <small>${data.created_at}</small>
+          </div>
+        `;
         list.appendChild(commentDiv);
       }
       const countSpan = document.getElementById(`comment-count-${postId}`);
@@ -414,22 +397,10 @@ async function submitInlineComment(e, postId){
   }
 }
 
-// БЕЗОПАСНАЯ функция экранирования HTML
 function escapeHtml(text) {
-  if (!text) return '';
-  const map = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-    '/': '&#x2F;',
-    '`': '&#x60;',
-    '=': '&#x3D;'
-  };
-  return String(text).replace(/[&<>"'`=\/]/g, function(s) {
-    return map[s];
-  });
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 async function likePost(postId){
@@ -467,7 +438,7 @@ async function followUser(username, btn){
       btn.textContent = data.following ? '✓ Подписан' : '+ Подписаться';
       btn.classList.toggle('following', data.following);
     }
-    toast(data.following ? `Вы подписались на ${escapeHtml(username)}!` : `Вы отписались от ${escapeHtml(username)}`, 'success');
+    toast(data.following ? `Вы подписались на ${username}!` : `Вы отписались от ${username}`, 'success');
   } catch(e) {
     toast('Не удалось изменить статус подписки.', 'error');
   }
@@ -511,42 +482,9 @@ function toast(msg, type) {
   }
   const el = document.createElement('div');
   el.className = `flash flash-${type}`;
-  const icon = document.createElement('i');
-  icon.className = `fa-solid fa-${type === 'success' ? 'circle-check' : 'circle-info'}`;
-  const text = document.createTextNode(' ' + msg);
-  el.appendChild(icon);
-  el.appendChild(text);
+  el.innerHTML = `<i class="fa-solid fa-${type === 'success' ? 'circle-check' : 'circle-info'}"></i> ${msg}`;
   container.appendChild(el);
   setTimeout(() => el.remove(), 4000);
-}
-
-function showMyQRCode() {
-  fetch(`/user/${currentUserId}/qrcode`)
-    .then(res => res.json())
-    .then(data => {
-      if(data.success && data.qr_code) {
-        const modal = document.createElement('div');
-        modal.className = 'qr-modal';
-        modal.innerHTML = `
-          <div class="qr-modal-content">
-            <span class="qr-close">&times;</span>
-            <h3>${escapeHtml(data.display_name || data.username)}</h3>
-            <img src="${data.qr_code}" alt="QR Code">
-            <p>@${escapeHtml(data.username)}</p>
-            <button class="btn btn-primary btn-sm" onclick="copyToClipboard('${escapeHtml(data.profile_url)}')">Скопировать ссылку</button>
-          </div>
-        `;
-        document.body.appendChild(modal);
-        modal.querySelector('.qr-close').onclick = () => modal.remove();
-      } else {
-        toast('Не удалось сгенерировать QR-код', 'error');
-      }
-    })
-    .catch(() => toast('Ошибка загрузки QR-кода', 'error'));
-}
-
-function copyToClipboard(text) {
-  navigator.clipboard.writeText(text).then(() => toast('Ссылка скопирована!', 'success'));
 }
 </script>
 {% endblock %}
