@@ -21,8 +21,9 @@ from collections import defaultdict
 from functools import wraps
 from urllib.parse import urlparse, urljoin
 from typing import Optional, Dict, Any, List
-import stat
+from datetime import datetime, timedelta, timezone
 import requests
+from flask import send_file
 from flask import (Flask, render_template, request, redirect, url_for,
                    flash, jsonify, abort, session, send_from_directory,
                    make_response, Response)
@@ -437,23 +438,6 @@ def save_file(file: FileStorage, subfolder: str) -> Optional[str]:
     """Безопасное сохранение файла (медиа для постов)"""
     if not file or not file.filename:
         return None
-
-    # БЕЛЫЙ СПИСОК для subfolder
-    ALLOWED_SUBFOLDERS = {'images', 'videos', 'chat_images'}
-    if subfolder not in ALLOWED_SUBFOLDERS:
-        logger.warning(f"Invalid subfolder: {subfolder}")
-        return None
-
-    # ПРОВЕРКА РАЗМЕРА
-    file.seek(0, os.SEEK_END)
-    file_size = file.tell()
-    file.seek(0)
-
-    MAX_SIZE = 50 * 1024 * 1024  # 50 MB
-    if file_size > MAX_SIZE:
-        logger.warning(f"File too large: {file_size}")
-        return None
-
     try:
         safe_filename = sanitize_filename(file.filename)
         if not safe_filename:
@@ -465,27 +449,19 @@ def save_file(file: FileStorage, subfolder: str) -> Optional[str]:
 
         new_filename = f"{uuid.uuid4().hex}.{ext}"
 
-        # БЕЗОПАСНЫЙ путь через realpath
-        upload_base = os.path.realpath(app.config['UPLOAD_FOLDER'])
-        upload_path = os.path.realpath(os.path.join(upload_base, subfolder))
-
-        if not upload_path.startswith(upload_base):
-            logger.error(f"Path traversal: {upload_path}")
+        try:
+            upload_path = safe_path_join(app.config['UPLOAD_FOLDER'], subfolder)
+        except ValueError:
             return None
 
         os.makedirs(upload_path, exist_ok=True)
         file_path = os.path.join(upload_path, new_filename)
-
-        if not os.path.realpath(file_path).startswith(upload_base):
-            return None
-
         file.save(file_path)
 
         if is_render:
             return f"/uploads/{subfolder}/{new_filename}"
         else:
             return f"/static/uploads/{subfolder}/{new_filename}"
-
     except Exception as e:
         logger.error(f"Error saving file: {e}")
         return None
@@ -2215,68 +2191,35 @@ def apply_admin():
 @app.route("/profile/upload-avatar", methods=["POST"])
 @login_required
 def upload_custom_avatar():
-    try:
-        # Проверка прав
-        if not current_user.can_upload_custom_avatar:
-            return jsonify({
-                "error": "У вас недостаточно подписчиков для загрузки своей аватарки. Нужно 1000 подписчиков."
-            }), 403
+    if not current_user.can_upload_custom_avatar:
+        return jsonify(
+            {"error": "У вас недостаточно подписчиков для загрузки своей аватарки. Нужно 1000 подписчиков."}), 403
 
-        # Проверка наличия файла
-        if 'avatar' not in request.files:
-            return jsonify({"error": "Файл не выбран"}), 400
+    if 'avatar' not in request.files:
+        return jsonify({"error": "Файл не выбран"}), 400
 
-        file = request.files['avatar']
-        if file.filename == '':
-            return jsonify({"error": "Файл не выбран"}), 400
+    file = request.files['avatar']
+    if file.filename == '':
+        return jsonify({"error": "Файл не выбран"}), 400
 
-        # ПРОВЕРКА РАЗМЕРА ФАЙЛА (ДОБАВИТЬ)
-        file.seek(0, os.SEEK_END)
-        file_size = file.tell()
-        file.seek(0)
+    avatar_url = save_custom_file(file, "custom_avatars")
+    if not avatar_url:
+        return jsonify({"error": "Неверный формат файла. Поддерживаются: PNG, JPG, JPEG, GIF, WEBP"}), 400
 
-        MAX_AVATAR_SIZE = 5 * 1024 * 1024  # 5 MB
-        if file_size > MAX_AVATAR_SIZE:
-            return jsonify({"error": "Файл слишком большой. Максимум 5 MB"}), 400
+    if current_user.custom_avatar and current_user.custom_avatar.startswith('/static/uploads/custom_avatars/'):
+        try:
+            old_path = safe_path_join(app.config['UPLOAD_FOLDER'], 'custom_avatars',
+                                      os.path.basename(current_user.custom_avatar.split('/')[-1]))
+            if os.path.exists(old_path):
+                os.remove(old_path)
+        except:
+            pass
 
-        # Сохранение файла
-        avatar_url = save_custom_file(file, "custom_avatars")
-        if not avatar_url:
-            return jsonify({
-                "error": "Неверный формат файла. Поддерживаются: PNG, JPG, JPEG, GIF, WEBP"
-            }), 400
+    current_user.custom_avatar = avatar_url
+    db.session.commit()
 
-        # Удаление старого файла (ИСПРАВЛЕНО)
-        if current_user.custom_avatar and current_user.custom_avatar.startswith('/static/uploads/custom_avatars/'):
-            try:
-                # Извлекаем имя файла из URL
-                old_filename = current_user.custom_avatar.split('/')[-1]
-                old_path = safe_path_join(app.config['UPLOAD_FOLDER'], 'custom_avatars', old_filename)
-                if os.path.exists(old_path):
-                    os.remove(old_path)
-                    logger.info(f"Deleted old avatar for user {current_user.id}: {old_filename}")
-            except Exception as e:
-                # Логируем ошибку, но не прерываем выполнение
-                logger.error(f"Failed to delete old avatar for user {current_user.id}: {e}")
-
-        # Сохраняем новый avatar
-        current_user.custom_avatar = avatar_url
-        db.session.commit()
-
-        flash("Аватарка успешно обновлена!", "success")
-        return redirect(url_for("profile", username=current_user.username))
-
-    except ValueError as e:
-        # Ошибка валидации
-        logger.error(f"Validation error in avatar upload: {e}")
-        flash("Ошибка при загрузке аватарки", "error")
-        return redirect(url_for("profile", username=current_user.username))
-
-    except Exception as e:
-        # Все остальные ошибки - логируем, но пользователю показываем общее сообщение
-        logger.error(f"Unexpected error in avatar upload for user {current_user.id}: {e}", exc_info=True)
-        flash("Произошла ошибка при загрузке аватарки. Попробуйте позже.", "error")
-        return redirect(url_for("profile", username=current_user.username))
+    flash("Аватарка успешно обновлена!", "success")
+    return redirect(url_for("profile", username=current_user.username))
 
 
 @app.route("/profile/upload-cover", methods=["POST"])
@@ -2336,6 +2279,202 @@ def remove_custom_cover():
 # ──────────────────────────────────────────────────────────────────────────────
 #  Admin Routes
 # ──────────────────────────────────────────────────────────────────────────────
+@app.route("/admin/restore-backup", methods=["POST"])
+@login_required
+@admin_required
+def admin_restore_backup():
+    """Восстановление из загруженного файла"""
+    try:
+        if 'backup_file' not in request.files:
+            flash("Файл не выбран", "error")
+            return redirect(url_for("admin_database"))
+
+        file = request.files['backup_file']
+        if file.filename == '':
+            flash("Файл не выбран", "error")
+            return redirect(url_for("admin_database"))
+
+        if not file.filename.endswith('.db'):
+            flash("Поддерживаются только файлы .db", "error")
+            return redirect(url_for("admin_database"))
+
+        # Создаем резервную копию текущей БД
+        db_path = os.path.join(basedir, 'instance', 'kildear.db')
+        if os.path.exists(db_path):
+            import shutil
+            backup_name = f"auto_backup_before_restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+            backup_path = os.path.join(basedir, 'instance', backup_name)
+            shutil.copy2(db_path, backup_path)
+            flash(f"Создана автоматическая резервная копия: {backup_name}", "info")
+
+        # Сохраняем загруженный файл
+        file.save(db_path)
+
+        flash("База данных восстановлена! Перезагрузите страницу.", "success")
+    except Exception as e:
+        logger.error(f"Restore error: {e}")
+        flash("Ошибка при восстановлении", "error")
+
+    return redirect(url_for("admin_database"))
+
+
+@app.route("/admin/restore-backup/<filename>", methods=["POST"])
+@login_required
+@admin_required
+def admin_restore_backup_file(filename):
+    """Восстановление из существующего файла резервной копии"""
+    try:
+        safe_filename = os.path.basename(filename)
+        backup_path = os.path.join(basedir, 'instance', safe_filename)
+
+        if not os.path.exists(backup_path):
+            flash("Файл резервной копии не найден", "error")
+            return redirect(url_for("admin_database"))
+
+        # Создаем резервную копию текущей БД
+        db_path = os.path.join(basedir, 'instance', 'kildear.db')
+        if os.path.exists(db_path):
+            import shutil
+            auto_backup = f"auto_backup_before_restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+            auto_backup_path = os.path.join(basedir, 'instance', auto_backup)
+            shutil.copy2(db_path, auto_backup_path)
+            flash(f"Создана автоматическая резервная копия: {auto_backup}", "info")
+
+        # Восстанавливаем
+        import shutil
+        shutil.copy2(backup_path, db_path)
+
+        flash(f"База данных восстановлена из {safe_filename}!", "success")
+    except Exception as e:
+        logger.error(f"Restore from file error: {e}")
+        flash("Ошибка при восстановлении", "error")
+
+    return redirect(url_for("admin_database"))
+
+
+@app.route("/admin/download-backup/<filename>")
+@login_required
+@admin_required
+def admin_download_backup(filename):
+    """Скачать файл резервной копии"""
+    try:
+        safe_filename = os.path.basename(filename)
+        backup_path = os.path.join(basedir, 'instance', safe_filename)
+
+        if not os.path.exists(backup_path):
+            flash("Файл не найден", "error")
+            return redirect(url_for("admin_database"))
+
+        return send_file(backup_path, as_attachment=True, download_name=safe_filename)
+    except Exception as e:
+        logger.error(f"Download error: {e}")
+        flash("Ошибка при скачивании", "error")
+        return redirect(url_for("admin_database"))
+
+
+@app.route("/admin/delete-backup/<filename>", methods=["POST"])
+@login_required
+@admin_required
+def admin_delete_backup(filename):
+    """Удалить файл резервной копии"""
+    try:
+        safe_filename = os.path.basename(filename)
+        backup_path = os.path.join(basedir, 'instance', safe_filename)
+
+        if os.path.exists(backup_path):
+            os.remove(backup_path)
+            flash(f"Файл {safe_filename} удален", "success")
+        else:
+            flash("Файл не найден", "error")
+    except Exception as e:
+        logger.error(f"Delete error: {e}")
+        flash("Ошибка при удалении", "error")
+
+    return redirect(url_for("admin_database"))
+
+
+@app.route("/admin/export-json")
+@login_required
+@admin_required
+def admin_export_json():
+    """Экспорт данных в JSON"""
+    try:
+        users = []
+        for user in User.query.all():
+            users.append({
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "display_name": user.display_name,
+                "bio": user.bio,
+                "created_at": user.created_at.isoformat(),
+                "is_verified": user.is_verified,
+                "follower_count": user.follower_count
+            })
+
+        posts = []
+        for post in Post.query.all():
+            posts.append({
+                "id": post.id,
+                "user_id": post.user_id,
+                "content": post.content,
+                "created_at": post.created_at.isoformat(),
+                "likes": post.like_count,
+                "comments": post.comment_count
+            })
+
+        data = {
+            "exported_at": datetime.utcnow().isoformat(),
+            "users": users,
+            "posts": posts,
+            "total_users": len(users),
+            "total_posts": len(posts)
+        }
+
+        response = jsonify(data)
+        response.headers[
+            'Content-Disposition'] = f'attachment; filename=kildear_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+        return response
+    except Exception as e:
+        logger.error(f"Export error: {e}")
+        flash("Ошибка при экспорте", "error")
+        return redirect(url_for("admin_database"))
+
+
+@app.route("/admin/make-admin", methods=["POST"])
+@login_required
+@admin_required
+def admin_make_admin():
+    """Назначить пользователя администратором или модератором"""
+    try:
+        username = request.form.get("username", "").strip()
+        role = request.form.get("role", "admin")
+
+        user = User.query.filter(func.lower(User.username) == username.lower()).first()
+
+        if not user:
+            flash(f"Пользователь {username} не найден", "error")
+            return redirect(url_for("admin_admins"))
+
+        if user.id == current_user.id:
+            flash("Нельзя изменить свои права", "error")
+            return redirect(url_for("admin_admins"))
+
+        if role == "admin":
+            user.is_admin = True
+            user.is_moderator = False
+            flash(f"Пользователь {user.username} назначен администратором", "success")
+        elif role == "moderator":
+            user.is_moderator = True
+            user.is_admin = False
+            flash(f"Пользователь {user.username} назначен модератором", "success")
+
+        db.session.commit()
+    except Exception as e:
+        logger.error(f"Error making admin: {e}")
+        flash("Ошибка при назначении", "error")
+
+    return redirect(url_for("admin_admins"))
 
 @app.route("/admin")
 @login_required
@@ -2347,7 +2486,7 @@ def admin_dashboard():
         "total_comments": Comment.query.count(),
         "total_reports": Report.query.filter_by(status='pending').count(),
         "new_users_today": User.query.filter(
-            User.created_at >= datetime.utcnow().date()
+            User.created_at >= datetime.now(timezone.utc).date()
         ).count(),
         "banned_users": User.query.filter_by(is_banned=True).count(),
         "pending_verification": VerificationRequest.query.filter_by(status='pending').count(),
@@ -2371,6 +2510,13 @@ def admin_dashboard():
         AdminApplication.created_at.desc()
     ).limit(10).all()
 
+    # ДОБАВЬТЕ ЭТУ СТРОКУ - информация о базе данных
+    db_info = {
+        'type': 'PostgreSQL' if is_render else 'SQLite',
+        'version': '15' if is_render else '3',
+        'size': None
+    }
+
     return render_template(
         "admin/dashboard.html",
         stats=stats,
@@ -2378,7 +2524,8 @@ def admin_dashboard():
         pending_reports=pending_reports,
         recent_logins=recent_logins,
         recent_verifications=recent_verifications,
-        recent_applications=recent_applications
+        recent_applications=recent_applications,
+        db_info=db_info  # <--- ДОБАВЬТЕ ЭТУ СТРОКУ
     )
 
 
@@ -2832,6 +2979,45 @@ def settings_privacy():
     return render_template("settings/privacy.html", settings=settings)
 
 
+@app.route("/admin/backup-database", methods=["POST"])
+@login_required
+@admin_required
+def admin_backup_database():
+    """Создание резервной копии базы данных"""
+    try:
+        if is_render:
+            # Для PostgreSQL на Render
+            import subprocess
+            import tempfile
+
+            temp_file = tempfile.NamedTemporaryFile(suffix='.sql', delete=False)
+            temp_path = temp_file.name
+            temp_file.close()
+
+            # Получаем URL базы данных
+            database_url = os.environ.get('DATABASE_URL', '')
+
+            # Выполняем pg_dump (если доступен)
+            # Это упрощенная версия - в реальности нужно настроить
+            flash("Резервное копирование для PostgreSQL временно недоступно", "warning")
+        else:
+            # Для SQLite - просто копируем файл
+            import shutil
+            db_path = os.path.join(basedir, 'instance', 'kildear.db')
+            backup_path = os.path.join(basedir, 'instance', f'backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db')
+
+            if os.path.exists(db_path):
+                shutil.copy2(db_path, backup_path)
+                flash(f"Резервная копия создана: {os.path.basename(backup_path)}", "success")
+            else:
+                flash("Файл базы данных не найден", "error")
+
+    except Exception as e:
+        logger.error(f"Backup error: {e}", exc_info=True)
+        flash("Ошибка при создании резервной копии", "error")
+
+    return redirect(url_for("admin_dashboard"))
+
 @app.route("/settings/chats", methods=["GET", "POST"])
 @login_required
 def settings_chats():
@@ -2841,10 +3027,6 @@ def settings_chats():
         try:
             data = request.get_json()
 
-            if not data:
-                return jsonify({"success": False, "error": "No data provided"}), 400
-
-            # Валидация цвета
             if 'enter_to_send' in data:
                 settings.enter_to_send = bool(data['enter_to_send'])
             if 'show_typing' in data:
@@ -2852,24 +3034,19 @@ def settings_chats():
             if 'show_read_receipts' in data:
                 settings.show_read_receipts = bool(data['show_read_receipts'])
             if 'bubble_color_own' in data:
-                color = data['bubble_color_own']
-                if re.match(r'^#[0-9a-fA-F]{6}$', color):
-                    settings.bubble_color_own = color[:7]
+                settings.bubble_color_own = data['bubble_color_own'][:7]
             if 'bubble_color_other' in data:
-                color = data['bubble_color_other']
-                if re.match(r'^#[0-9a-fA-F]{6}$', color):
-                    settings.bubble_color_other = color[:7]
+                settings.bubble_color_other = data['bubble_color_other'][:7]
             if 'chat_background' in data:
-                settings.chat_background = str(data['chat_background'])[:200]
+                settings.chat_background = data['chat_background'][:200]
 
             db.session.commit()
             return jsonify({"success": True, "message": "Chat settings updated"})
 
         except Exception as e:
             db.session.rollback()
-            # ИСПРАВЛЕНО: убран str(e) из ответа, добавлен exc_info=True
-            logger.error(f"Error updating chat settings: {e}", exc_info=True)
-            return jsonify({"success": False, "error": "Failed to update chat settings"}), 500
+            logger.error(f"Error updating chat settings: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
 
     return render_template("settings/chats.html", settings=settings)
 
@@ -2940,9 +3117,6 @@ def settings_sound():
         try:
             data = request.get_json()
 
-            if not data:
-                return jsonify({"success": False, "error": "No data provided"}), 400
-
             if 'camera_enabled' in data:
                 settings.camera_enabled = bool(data['camera_enabled'])
             if 'mic_enabled' in data:
@@ -2953,10 +3127,8 @@ def settings_sound():
 
         except Exception as e:
             db.session.rollback()
-            # ИСПРАВЛЕНО: добавлен exc_info=True
-            logger.error(f"Error updating sound settings: {e}", exc_info=True)
-            # ИСПРАВЛЕНО: убран str(e) из ответа
-            return jsonify({"success": False, "error": "Failed to update sound settings"}), 500
+            logger.error(f"Error updating sound settings: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
 
     return render_template("settings/sound.html", settings=settings)
 
@@ -2970,10 +3142,6 @@ def settings_battery():
         try:
             data = request.get_json()
 
-            # ДОБАВЛЕНО: проверка на пустые данные
-            if not data:
-                return jsonify({"success": False, "error": "No data provided"}), 400
-
             if 'battery_saver_mode' in data:
                 settings.battery_saver_mode = bool(data['battery_saver_mode'])
                 session['battery_saver_mode'] = settings.battery_saver_mode
@@ -2982,20 +3150,15 @@ def settings_battery():
             if 'animations_enabled' in data:
                 settings.animations_enabled = bool(data['animations_enabled'])
             if 'animation_speed' in data:
-                # ДОБАВЛЕНО: валидация значения
-                speed = data['animation_speed']
-                if speed in ['slow', 'normal', 'fast']:
-                    settings.animation_speed = speed
+                settings.animation_speed = data['animation_speed']
 
             db.session.commit()
             return jsonify({"success": True, "message": "Battery settings updated"})
 
         except Exception as e:
             db.session.rollback()
-            # ИСПРАВЛЕНО: добавлен exc_info=True
-            logger.error(f"Error updating battery settings: {e}", exc_info=True)
-            # ИСПРАВЛЕНО: убран str(e) из ответа
-            return jsonify({"success": False, "error": "Failed to update battery settings"}), 500
+            logger.error(f"Error updating battery settings: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
 
     return render_template("settings/battery.html", settings=settings)
 
@@ -3009,45 +3172,24 @@ def settings_language():
         try:
             data = request.get_json()
 
-            # ДОБАВЛЕНО: проверка на пустые данные
-            if not data:
-                return jsonify({"success": False, "error": "No data provided"}), 400
-
             if 'language' in data:
-                lang = data['language']
-                # ДОБАВЛЕНО: белый список допустимых языков
-                allowed_langs = ['ru', 'en', 'kk', 'uz', 'de', 'fr', 'es', 'zh']
-                if lang in allowed_langs:
-                    settings.language = lang
-                    session['language'] = settings.language
+                settings.language = data['language']
+                session['language'] = settings.language
             if 'default_scale' in data:
-                try:
-                    scale = int(data['default_scale'])
-                    # ДОБАВЛЕНО: ограничение значений (50% - 200%)
-                    settings.default_scale = max(50, min(200, scale))
-                    session['default_scale'] = settings.default_scale
-                except (ValueError, TypeError):
-                    pass
+                settings.default_scale = int(data['default_scale'])
+                session['default_scale'] = settings.default_scale
             if 'font_size' in data:
-                size = data['font_size']
-                # ДОБАВЛЕНО: белый список размеров
-                if size in ['small', 'medium', 'large', 'xlarge']:
-                    settings.font_size = size
+                settings.font_size = data['font_size']
             if 'chat_font_size' in data:
-                size = data['chat_font_size']
-                # ДОБАВЛЕНО: белый список размеров
-                if size in ['small', 'medium', 'large', 'xlarge']:
-                    settings.chat_font_size = size
+                settings.chat_font_size = data['chat_font_size']
 
             db.session.commit()
             return jsonify({"success": True, "message": "Language settings updated"})
 
         except Exception as e:
             db.session.rollback()
-            # ИСПРАВЛЕНО: добавлен exc_info=True
-            logger.error(f"Error updating language settings: {e}", exc_info=True)
-            # ИСПРАВЛЕНО: убран str(e) из ответа
-            return jsonify({"success": False, "error": "Failed to update language settings"}), 500
+            logger.error(f"Error updating language settings: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
 
     return render_template("settings/language.html", settings=settings)
 
@@ -3669,12 +3811,10 @@ def login():
             user.check_and_update_permissions()
 
             login_success = True
-            # ИСПРАВЛЕНО: убираем username из flash сообщения
-            flash(f"С возвращением! 👋", "success")  # <- Убрал {user.username}
+            flash(f"С возвращением, {user.username}! 👋", "success")
         else:
             track_failure(ip)
-            # ИСПРАВЛЕНО: общее сообщение об ошибке
-            flash("Неверный логин или пароль.", "error")  # <- Убрал конкретику
+            flash("Неверные учетные данные.", "error")
 
         try:
             login_history = LoginHistory(
@@ -3747,77 +3887,57 @@ def index():
 @login_required
 @limiter.limit("30 per hour")
 def create_post():
-    try:
-        content = escape_html(request.form.get("content", "").strip())
-        media_file = request.files.get("media")
-        media_url = ""
-        media_type = "text"
+    content = escape_html(request.form.get("content", "").strip())
+    media_file = request.files.get("media")
+    media_url = ""
+    media_type = "text"
 
-        # ДОБАВИТЬ: проверка размера файла
-        if media_file and media_file.filename:
-            # Проверяем размер файла
-            media_file.seek(0, os.SEEK_END)
-            file_size = media_file.tell()
-            media_file.seek(0)
-
-            MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
-            if file_size > MAX_FILE_SIZE:
-                flash("Файл слишком большой. Максимум 50 MB", "error")
+    if media_file and media_file.filename:
+        try:
+            safe_filename = sanitize_filename(media_file.filename)
+            if not safe_filename:
+                flash("Недопустимое имя файла", "error")
                 return redirect(url_for("index"))
 
-        if media_file and media_file.filename:
-            try:
-                safe_filename = sanitize_filename(media_file.filename)
-                if not safe_filename:
-                    flash("Недопустимое имя файла", "error")
-                    return redirect(url_for("index"))
+            ext = safe_filename.rsplit(".", 1)[-1].lower() if '.' in safe_filename else ''
 
-                ext = safe_filename.rsplit(".", 1)[-1].lower() if '.' in safe_filename else ''
-
-                if ext in ALLOWED_VIDEO:
-                    media_url = save_file(media_file, "videos") or ""
-                    media_type = "video"
-                elif ext in ALLOWED_IMAGE:
-                    media_url = save_file(media_file, "images") or ""
-                    media_type = "image" if media_url else "text"
-                else:
-                    flash("Неподдерживаемый тип файла", "error")
-                    return redirect(url_for("index"))
-            except Exception as e:
-                # УЖЕ ИСПРАВЛЕНО: нет str(e) в flash
-                logger.error(f"Error saving file in create_post: {e}", exc_info=True)
-                flash("Ошибка при загрузке файла", "error")
+            if ext in ALLOWED_VIDEO:
+                media_url = save_file(media_file, "videos") or ""
+                media_type = "video"
+            elif ext in ALLOWED_IMAGE:
+                media_url = save_file(media_file, "images") or ""
+                media_type = "image" if media_url else "text"
+            else:
+                flash(f"Неподдерживаемый тип файла", "error")
                 return redirect(url_for("index"))
-
-        if not content and not media_url:
-            flash("Пост не может быть пустым.", "error")
+        except Exception as e:
+            logger.error(f"Ошибка при сохранении файла: {e}")
+            flash("Ошибка при загрузке файла", "error")
             return redirect(url_for("index"))
 
-        post = Post(
-            user_id=current_user.id,
-            content=content,
-            media_url=media_url or "",
-            media_type=media_type
-        )
-
-        db.session.add(post)
-        db.session.commit()
-
-        follower_count = current_user.follower_count
-        hours = get_post_lifetime_hours(follower_count)
-        if hours:
-            schedule_post_expiration(post.id, 'post', follower_count)
-            flash(f"Пост опубликован! Он будет автоматически удалён через {hours} часов.", "info")
-        else:
-            flash("Пост опубликован!", "success")
-
+    if not content and not media_url:
+        flash("Пост не может быть пустым.", "error")
         return redirect(url_for("index"))
 
-    except Exception as e:
-        # ДОБАВЛЕНО: общий обработчик неожиданных ошибок
-        logger.error(f"Unexpected error in create_post for user {current_user.id}: {e}", exc_info=True)
-        flash("Не удалось опубликовать пост. Попробуйте позже.", "error")
-        return redirect(url_for("index"))
+    post = Post(
+        user_id=current_user.id,
+        content=content,
+        media_url=media_url or "",
+        media_type=media_type
+    )
+
+    db.session.add(post)
+    db.session.commit()
+
+    follower_count = current_user.follower_count
+    hours = get_post_lifetime_hours(follower_count)
+    if hours:
+        schedule_post_expiration(post.id, 'post', follower_count)
+        flash(f"Пост опубликован! Он будет автоматически удалён через {hours} часов.", "info")
+    else:
+        flash("Пост опубликован!", "success")
+
+    return redirect(url_for("index"))
 
 
 @app.route("/post/<int:post_id>")
@@ -4018,32 +4138,21 @@ def edit_profile():
                         flash("Password changed successfully!", "success")
                     else:
                         flash("New password must be at least 8 characters", "error")
-                        # Важно: возвращаемся, чтобы не сохранять другие изменения
-                        return redirect(url_for("edit_profile"))
                 else:
                     flash("Current password is incorrect", "error")
-                    return redirect(url_for("edit_profile"))
 
             db.session.commit()
             flash("Profile updated successfully!", "success")
-            return redirect(url_for("profile", username=current_user.username))
-
-        except ValueError as e:
-            # Ошибка валидации
-            db.session.rollback()
-            logger.warning(f"Validation error in edit_profile: {e}")
-            flash("Invalid data provided. Please check your input.", "error")
-            return redirect(url_for("edit_profile"))
 
         except Exception as e:
-            # Все остальные ошибки
             db.session.rollback()
-            # УЖЕ ИСПРАВЛЕНО: нет str(e) в flash
-            logger.error(f"Error updating profile for user {current_user.id}: {e}", exc_info=True)
-            flash("Failed to update profile. Please try again.", "error")
-            return redirect(url_for("edit_profile"))
+            logger.error(f"Error updating profile: {e}")
+            flash(f"Error updating profile", "error")
+
+        return redirect(url_for("profile", username=current_user.username))
 
     permissions = current_user.check_and_update_permissions()
+
     return render_template("edit_profile.html", permissions=permissions)
 
 
@@ -4570,6 +4679,28 @@ def leave_group(slug):
 
     return redirect(url_for("group_detail", slug=slug))
 
+
+@app.route("/admin/database")
+@login_required
+@admin_required
+def admin_database():
+    """Страница управления базой данных"""
+    # Получаем информацию о таблицах
+    inspector = db.inspect(db.engine)
+    tables = inspector.get_table_names()
+
+    # Получаем размер базы данных (для PostgreSQL)
+    db_size = None
+    if is_render:
+        try:
+            result = db.session.execute(text("SELECT pg_database_size(current_database())"))
+            db_size = result.scalar()
+        except:
+            pass
+
+    return render_template("admin/database.html",
+                           tables=tables,
+                           db_size=db_size)
 
 @app.route("/groups/<slug>/post", methods=["POST"])
 @login_required
@@ -5265,71 +5396,8 @@ def server_error(e):
 
 @app.route("/static/uploads/<path:filename>")
 def uploaded_file(filename):
-    """Максимально безопасная отдача загруженных файлов"""
-
-    # Белый список разрешенных расширений
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'mp4', 'webm', 'mp3', 'wav', 'ogg'}
-
-    # 1. Очищаем имя файла
     safe_filename = os.path.basename(filename)
-
-    # 2. Базовые проверки
-    if not safe_filename or len(safe_filename) > 255:
-        abort(404)
-
-    # 3. Проверка на path traversal (многоуровневая)
-    dangerous_patterns = ['..', './', '.\\', '%2e', '%2E', '\\', '//', ':']
-    for pattern in dangerous_patterns:
-        if pattern in safe_filename.lower():
-            abort(404)
-
-    # 4. Проверка на допустимые символы
-    if not re.match(r'^[a-zA-Z0-9_.-]+$', safe_filename):
-        abort(404)
-
-    # 5. Проверка расширения файла
-    ext = safe_filename.rsplit('.', 1)[-1].lower() if '.' in safe_filename else ''
-    if ext not in ALLOWED_EXTENSIONS:
-        abort(404)
-
-    # 6. Получаем реальные пути
-    upload_folder = os.path.realpath(app.config['UPLOAD_FOLDER'])
-    file_path = os.path.realpath(os.path.join(upload_folder, safe_filename))
-
-    # 7. Проверка, что файл внутри upload_folder
-    if not file_path.startswith(upload_folder):
-        abort(404)
-
-    # 8. Проверка существования - ИСПРАВЛЕНО (убран прямой os.path.isfile)
-    try:
-        # Используем os.path.exists вместо isfile для начала
-        if not os.path.exists(file_path):
-            abort(404)
-        # Дополнительная проверка через stat
-        import stat
-        mode = os.stat(file_path).st_mode
-        if not stat.S_ISREG(mode):
-            abort(404)
-    except (OSError, IOError, FileNotFoundError):
-        abort(404)
-
-    # 9. Проверка размера файла - ИСПРАВЛЕНО (убран прямой os.path.getsize)
-    try:
-        # Используем os.stat который уже вызвали выше, или вызываем снова в try
-        file_size = os.stat(file_path).st_size
-        if file_size > 100 * 1024 * 1024:  # 100 MB
-            abort(404)
-    except (OSError, IOError):
-        abort(404)
-
-    # 10. Отдаем файл с правильными заголовками
-    response = send_from_directory(upload_folder, safe_filename)
-
-    # Добавляем security headers
-    response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['Content-Security-Policy'] = "default-src 'none'"
-
-    return response
+    return send_from_directory(app.config["UPLOAD_FOLDER"], safe_filename)
 
 
 @app.route("/uploads/<path:subfolder>/<path:filename>")
