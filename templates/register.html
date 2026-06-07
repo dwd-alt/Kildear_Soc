@@ -132,7 +132,6 @@
     }
     .toggle-pw:hover { color: var(--text-muted); }
 
-    /* Password strength */
     .strength-bar { display: flex; gap: 4px; margin-top: 6px; }
     .strength-seg { height: 3px; flex: 1; border-radius: 99px; background: var(--border); transition: background 0.3s; }
     .strength-seg.weak   { background: var(--danger);  }
@@ -140,11 +139,40 @@
     .strength-seg.strong { background: var(--success); }
     .strength-label { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
 
-    /* Field hint */
     .hint { font-size: 11px; color: var(--text-dim); margin-top: 5px; }
 
-    .terms { font-size: 12px; color: var(--text-muted); margin-bottom: 18px; line-height: 1.6; }
-    .terms a { color: var(--primary); }
+    /* Блок согласия с политикой — такой же, как на логине */
+    .consent-box {
+      margin: 16px 0 18px 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      background: rgba(124,111,255,0.05);
+      padding: 10px 12px;
+      border-radius: 12px;
+      border-left: 2px solid var(--primary);
+    }
+    .consent-box input {
+      margin-top: 2px;
+      accent-color: var(--primary);
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+    .consent-box label {
+      line-height: 1.4;
+      cursor: pointer;
+    }
+    .consent-box a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .consent-box a:hover {
+      text-decoration: underline;
+    }
 
     .btn-submit {
       width: 100%; padding: 13px;
@@ -247,11 +275,13 @@
           </div>
         </div>
 
-        <p class="terms">
-          Создавая аккаунт, вы соглашаетесь с нашими
-          <a href="#">Условиями использования</a> и <a href="#">Политикой конфиденциальности</a>.
-          Вам должно быть не менее 13 лет для использования Kildear.
-        </p>
+        <!-- НОВЫЙ БЛОК: обязательное согласие с политикой конфиденциальности -->
+        <div class="consent-box">
+          <input type="checkbox" id="privacyConsent" name="privacy_consent" value="1" required>
+          <label for="privacyConsent">
+            Я принимаю <a href="https://kildear-polit.onrender.com/" target="_blank">Политику конфиденциальности</a> и соглашаюсь на обработку моих данных
+          </label>
+        </div>
 
         <button type="submit" class="btn-submit" id="submitBtn">Создать аккаунт</button>
       </form>
@@ -275,7 +305,6 @@
     const segs = [document.getElementById('s1'), document.getElementById('s2'),
                   document.getElementById('s3'), document.getElementById('s4')];
     const lbl  = document.getElementById('strengthLabel');
-    const levels = ['', 'weak', 'fair', 'fair', 'strong'];
     const labels = ['Введите пароль', 'Слишком слабый', 'Неплохо…', 'Почти надёжный', '✓ Надёжный пароль'];
 
     pwEl.addEventListener('input', () => {
@@ -286,13 +315,13 @@
       if (/[0-9]/.test(v)) score++;
       if (/[^A-Za-z0-9]/.test(v)) score++;
       segs.forEach((s, i) => {
-        s.className = 'strength-seg' + (i < score ? ' ' + levels[score] : '');
+        s.className = 'strength-seg' + (i < score ? ' ' + ['weak','fair','fair','strong'][score-1] : '');
       });
       lbl.textContent = labels[score];
       lbl.style.color = score >= 4 ? 'var(--success)' : score >= 2 ? 'var(--warning)' : 'var(--danger)';
     });
 
-    // Match check
+    // Password match check
     const confirmEl = document.getElementById('confirm');
     confirmEl.addEventListener('input', () => {
       confirmEl.className = 'form-control ' +
@@ -305,9 +334,19 @@
     unEl.addEventListener('input', () => {
       const ok = /^[a-zA-Z0-9_]{3,40}$/.test(unEl.value);
       unEl.className = 'form-control ' + (unEl.value.length < 3 ? '' : ok ? 'valid' : 'invalid');
+      if (unHint) unHint.style.color = ok ? 'var(--success)' : 'var(--danger)';
     });
 
-    // Form submit guard
+    // Consent checkbox — блокировка кнопки регистрации
+    const consentCheckbox = document.getElementById('privacyConsent');
+    const submitBtn = document.getElementById('submitBtn');
+    function updateSubmitButton() {
+      submitBtn.disabled = !consentCheckbox.checked;
+    }
+    consentCheckbox.addEventListener('change', updateSubmitButton);
+    updateSubmitButton();
+
+    // Form submit guard (пароли совпадают)
     document.getElementById('regForm').addEventListener('submit', e => {
       const pw = pwEl.value, cf = confirmEl.value;
       if (pw !== cf) { e.preventDefault(); alert('Пароли не совпадают.'); }
