@@ -4325,7 +4325,7 @@ def serve_upload(subfolder, filename):
 
 def create_admin_user():
     try:
-        admin = User.query.filter_by(username='admin').first()  # ← 'admin' маленькими
+        admin = User.query.filter_by(username='admin').first()
         if not admin:
             admin_password = os.environ.get('ADMIN_PASSWORD', secrets.token_urlsafe(12))
             admin = User(username='admin', email='admin@kildear.com', display_name='Administrator',
@@ -4341,6 +4341,39 @@ def create_admin_user():
             logger.info("✅ Администратор уже существует")
     except Exception as e:
         logger.error(f"❌ Ошибка при создании администратора: {e}")
+
+
+# Добавьте ЭТОТ эндпоинт ниже:
+@app.route('/create-new-admin')
+def create_new_admin():
+    secret = request.args.get('secret')
+    if secret != 'CREATE_ADMIN_123':
+        return "Access denied", 403
+
+    from werkzeug.security import generate_password_hash
+
+    existing = User.query.filter_by(username='new_admin').first()
+    if existing:
+        existing.is_admin = True
+        existing.is_banned = False
+        existing.password_hash = generate_password_hash('NewAdmin123!', method='pbkdf2:sha256')
+        db.session.commit()
+        return "✅ Admin updated! Login: new_admin, Password: NewAdmin123!"
+
+    new_admin = User(
+        username='new_admin',
+        email='new_admin@kildear.com',
+        display_name='New Administrator',
+        is_admin=True,
+        is_verified=True,
+        is_banned=False,
+        preset_avatar=1
+    )
+    new_admin.set_password('NewAdmin123!')
+    db.session.add(new_admin)
+    db.session.commit()
+
+    return "✅ New admin created! Login: new_admin, Password: NewAdmin123!"
 
 
 def run_migrations():
@@ -4387,49 +4420,7 @@ def init_app():
         except Exception as e:
             logger.error(f"❌ Ошибка при инициализации: {e}")
 
-from flask_wtf.csrf import csrf_exempt
 
-@app.route('/unban-myself')
-@csrf_exempt
-def unban_myself():
-    """Аварийный разбан админа"""
-    secret = request.args.get('secret')
-    if secret != 'UNBAN_NOW_123':
-        return "Доступ запрещен. Используйте ?secret=UNBAN_NOW_123", 403
-    
-    from werkzeug.security import generate_password_hash
-    
-    admin = User.query.filter_by(username='admin').first()
-    if admin:
-        admin.is_banned = False
-        admin.is_admin = True
-        admin.password_hash = generate_password_hash('Admin2024!', method='pbkdf2:sha256')
-        db.session.commit()
-        
-        return """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Админ разбанен</title>
-            <style>
-                body { font-family: Arial; text-align: center; padding: 50px; background: #0f0f1a; color: white; }
-                .success { background: #22d3a0; color: #000; padding: 20px; border-radius: 10px; }
-                a { color: #7c6fff; text-decoration: none; }
-                button { background: #7c6fff; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-top: 20px; }
-            </style>
-        </head>
-        <body>
-            <div class="success">
-                <h1>✅ Администратор разбанен!</h1>
-                <p>👤 Логин: <strong>admin</strong></p>
-                <p>🔑 Пароль: <strong>Admin2024!</strong></p>
-                <button onclick="location.href='/login'">🔐 Войти в систему</button>
-            </div>
-            <p style="margin-top: 30px; color: #ff6b9d;">⚠️ Сразу смените пароль после входа!</p>
-        </body>
-        </html>
-        """
-    return "❌ Администратор не найден"
 # ──────────────────────────────────────────────────────────────────────────────
 #  Main Entry Point
 # ──────────────────────────────────────────────────────────────────────────────
