@@ -4,102 +4,121 @@
 
 {% block head %}
 <style>
-  .messages-container {
-    max-width: 1000px;
+  .messages-layout {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 1.5rem;
+    height: calc(100vh - 80px);
+    max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
   }
 
-  .messages-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 24px;
+  @media (max-width: 700px) {
+    .messages-layout {
+      grid-template-columns: 1fr;
+    }
+    .messages-empty-panel {
+      display: none;
+    }
   }
 
-  .messages-header h1 {
-    font-size: 1.8rem;
+  .conversations-panel {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--card);
+    border-radius: 1rem;
+    border: 1px solid var(--border);
+  }
+
+  .conv-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.25rem 0.75rem;
+  }
+
+  .conv-panel-header h2 {
+    font-size: 1.2rem;
     font-weight: 700;
     display: flex;
     align-items: center;
-    gap: 12px;
-  }
-
-  .new-msg-btn {
-    background: var(--primary);
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 30px;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
     gap: 8px;
-    transition: transform 0.2s;
   }
 
-  .new-msg-btn:hover {
-    transform: scale(1.02);
+  .conv-panel-header h2 i {
+    color: var(--primary);
   }
 
-  .conv-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    overflow: hidden;
+  .conv-search-wrap {
+    position: relative;
+    padding: 0 1rem 0.75rem;
   }
 
-  .conv-search {
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .conv-search input {
-    width: 100%;
-    padding: 12px 16px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid var(--border);
-    border-radius: 30px;
-    color: var(--text);
+  .conv-search-icon {
+    position: absolute;
+    left: 1.7rem;
+    top: 50%;
+    transform: translateY(-60%);
+    color: var(--text-muted);
     font-size: 0.9rem;
   }
 
-  .conv-search input:focus {
+  .conv-search {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 2rem;
+    padding: 0.6rem 0.75rem 0.6rem 2.5rem;
+    color: var(--text);
+    font-size: 0.9rem;
+    transition: all 0.2s;
+  }
+
+  .conv-search:focus {
     outline: none;
     border-color: var(--primary);
+    background: rgba(124,111,255,0.05);
   }
 
   .conv-list {
-    max-height: calc(100vh - 250px);
+    flex: 1;
     overflow-y: auto;
+    padding: 0.25rem 0;
   }
 
   .conv-item {
     display: flex;
     align-items: center;
-    gap: 16px;
-    padding: 16px 20px;
+    gap: 0.85rem;
+    padding: 0.85rem 1.25rem;
     text-decoration: none;
-    transition: background 0.2s;
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
+    transition: all 0.2s;
+    border-left: 3px solid transparent;
   }
 
   .conv-item:hover {
-    background: rgba(255,255,255,0.03);
+    background: rgba(255,255,255,0.05);
   }
 
-  .conv-avatar {
+  .conv-item.unread {
+    border-left-color: var(--primary);
+    background: rgba(124,111,255,0.05);
+  }
+
+  .conv-avatar-wrap {
     position: relative;
     flex-shrink: 0;
   }
 
-  .conv-avatar img {
-    width: 56px;
-    height: 56px;
+  .conv-avatar-wrap img {
+    width: 50px;
+    height: 50px;
     border-radius: 50%;
     object-fit: cover;
+    border: 2px solid var(--border);
   }
 
   .online-dot {
@@ -110,7 +129,7 @@
     height: 12px;
     background: #4ade80;
     border-radius: 50%;
-    border: 2px solid var(--card);
+    border: 2px solid var(--surface);
   }
 
   .conv-info {
@@ -118,25 +137,41 @@
     min-width: 0;
   }
 
-  .conv-top {
+  .conv-name-row {
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 6px;
+    align-items: center;
+    margin-bottom: 0.3rem;
   }
 
   .conv-name {
-    font-weight: 700;
-    font-size: 1rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     display: flex;
     align-items: center;
-    gap: 6px;
-    color: var(--text);
+    gap: 4px;
+  }
+
+  .verified-icon {
+    color: var(--primary);
+    font-size: 0.8rem;
   }
 
   .conv-time {
     font-size: 0.7rem;
     color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .conv-preview-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
   }
 
   .conv-preview {
@@ -145,10 +180,17 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    max-width: 180px;
   }
 
   .conv-preview i {
-    margin-right: 4px;
+    margin-right: 3px;
+  }
+
+  .conv-preview.empty {
+    font-style: italic;
+    color: var(--text-muted);
+    opacity: 0.7;
   }
 
   .unread-badge {
@@ -156,33 +198,65 @@
     color: white;
     font-size: 0.7rem;
     font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 20px;
-    min-width: 24px;
+    padding: 0.2rem 0.5rem;
+    border-radius: 1rem;
+    min-width: 1.5rem;
     text-align: center;
+    flex-shrink: 0;
   }
 
-  .empty-state {
-    text-align: center;
-    padding: 60px 20px;
+  .voice-unread-badge {
+    background: rgba(255, 179, 71, 0.2);
+    color: #ffb347;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 1rem;
+    flex-shrink: 0;
   }
 
-  .empty-icon {
-    font-size: 4rem;
-    margin-bottom: 16px;
+  .conv-empty {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    color: var(--text-muted);
+  }
+
+  .conv-empty-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
     opacity: 0.5;
   }
 
-  .empty-state h3 {
-    margin-bottom: 8px;
+  .messages-empty-panel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--card);
+    border-radius: 1rem;
+    border: 1px solid var(--border);
   }
 
-  .empty-state p {
+  .messages-empty-content {
+    text-align: center;
+    padding: 2rem;
+  }
+
+  .messages-empty-icon {
+    margin-bottom: 1.5rem;
     color: var(--text-muted);
-    margin-bottom: 24px;
+    opacity: 0.5;
   }
 
-  /* Modal */
+  .messages-empty-content h3 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .messages-empty-content p {
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+  }
+
   .modal-overlay {
     position: fixed;
     inset: 0;
@@ -201,170 +275,313 @@
   .modal-card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 20px;
+    border-radius: 1.25rem;
     width: 480px;
     max-width: 95vw;
     max-height: 90vh;
     overflow-y: auto;
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
   }
 
   .modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 20px 24px;
+    padding: 1.25rem 1.5rem;
     border-bottom: 1px solid var(--border);
   }
 
   .modal-header h3 {
     font-size: 1.2rem;
     font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
-  .modal-close {
+  .modal-close-btn {
     background: none;
     border: none;
     color: var(--text-muted);
     font-size: 1.2rem;
     cursor: pointer;
-    padding: 8px;
+    padding: 0.5rem;
     border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
   }
 
-  .modal-close:hover {
+  .modal-close-btn:hover {
     background: rgba(255,255,255,0.1);
+    color: var(--text);
   }
 
   .modal-body {
-    padding: 24px;
+    padding: 1.5rem;
+  }
+
+  .user-search-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
   }
 
   .search-input-wrapper {
     position: relative;
-    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
   }
 
   .search-icon {
     position: absolute;
-    left: 16px;
-    top: 50%;
-    transform: translateY(-50%);
+    left: 1rem;
     color: var(--text-muted);
+    font-size: 0.9rem;
+    z-index: 1;
   }
 
   .user-search-input {
     width: 100%;
-    padding: 14px 16px 14px 42px;
+    padding: 0.85rem 1rem 0.85rem 2.5rem;
     background: rgba(255,255,255,0.05);
     border: 2px solid var(--border);
-    border-radius: 40px;
+    border-radius: 1rem;
     color: var(--text);
-    font-size: 1rem;
+    font-size: 0.95rem;
+    transition: all 0.2s;
   }
 
   .user-search-input:focus {
     outline: none;
     border-color: var(--primary);
+    background: rgba(124,111,255,0.05);
   }
 
-  .search-results {
-    max-height: 400px;
-    overflow-y: auto;
-  }
-
-  .search-result-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px;
-    cursor: pointer;
-    border-radius: 12px;
-    transition: background 0.2s;
-  }
-
-  .search-result-item:hover {
-    background: rgba(255,255,255,0.05);
-  }
-
-  .search-result-avatar img {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    object-fit: cover;
-  }
-
-  .search-result-info {
-    flex: 1;
-  }
-
-  .search-result-name {
-    font-weight: 600;
-    margin-bottom: 4px;
-  }
-
-  .search-result-username {
-    font-size: 0.8rem;
+  .clear-search-btn {
+    position: absolute;
+    right: 1rem;
+    background: none;
+    border: none;
     color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.5rem;
+    z-index: 1;
+  }
+
+  .clear-search-btn:hover {
+    color: var(--text);
+    background: rgba(255,255,255,0.1);
+  }
+
+  .user-search-results {
+    max-height: 350px;
+    overflow-y: auto;
+    border-radius: 1rem;
+    background: rgba(0,0,0,0.2);
   }
 
   .search-hint {
     text-align: center;
-    padding: 40px;
+    padding: 3rem 1rem;
     color: var(--text-muted);
   }
 
-  .loading {
-    text-align: center;
-    padding: 40px;
+  .search-hint i {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.5;
+  }
+
+  .user-result {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    text-decoration: none;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    transition: background 0.2s;
+    cursor: pointer;
+  }
+
+  .user-result:last-child {
+    border-bottom: none;
+  }
+
+  .user-result:hover {
+    background: rgba(124,111,255,0.1);
+  }
+
+  .user-result-avatar {
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .user-result-avatar img {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  .user-result-online {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 10px;
+    height: 10px;
+    background: #4ade80;
+    border-radius: 50%;
+    border: 2px solid var(--surface);
+  }
+
+  .user-result-info {
+    flex: 1;
+  }
+
+  .user-result-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 0.25rem;
+    color: var(--text);
+  }
+
+  .user-result-username {
+    font-size: 0.8rem;
     color: var(--text-muted);
   }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="messages-container">
-  <div class="messages-header">
-    <h1>
-      <i class="fa-regular fa-comments"></i>
-      Messages
-    </h1>
-    <button class="new-msg-btn" onclick="openNewMessageModal()">
-      <i class="fa-solid fa-plus"></i>
-      New message
-    </button>
+<div class="messages-layout">
+  <!-- CONVERSATION LIST -->
+  <div class="conversations-panel card">
+    <div class="conv-panel-header">
+      <h2><i class="fa-regular fa-comments"></i> Messages</h2>
+      <button class="btn btn-primary btn-sm" onclick="openNewMessageModal()">
+        <i class="fa-solid fa-plus"></i> New
+      </button>
+    </div>
+
+    <div class="conv-search-wrap">
+      <i class="fa-solid fa-magnifying-glass conv-search-icon"></i>
+      <input type="text" placeholder="Search conversations..." class="conv-search" id="convSearch" oninput="filterConvs(this.value)">
+    </div>
+
+    <div class="conv-list" id="convList">
+      {% if conversations %}
+        {% for convo in conversations %}
+        <a href="{{ url_for('chat', username=convo.user.username) }}"
+           class="conv-item {% if convo.unread > 0 %}unread{% endif %}"
+           data-name="{{ convo.user.display_name or convo.user.username }}"
+           data-username="{{ convo.user.username }}">
+          <div class="conv-avatar-wrap">
+            <img src="{{ convo.user.avatar_url or '/static/default_avatar.png' }}"
+                 class="avatar avatar-md"
+                 alt="{{ convo.user.username }}"
+                 onerror="this.src='/static/default_avatar.png'">
+            {% if convo.user.is_online %}
+            <span class="online-dot"></span>
+            {% endif %}
+          </div>
+          <div class="conv-info">
+            <div class="conv-name-row">
+              <span class="conv-name">
+                {{ convo.user.display_name or convo.user.username }}
+                {% if convo.user.is_verified %}
+                <i class="fa-solid fa-circle-check verified-icon"></i>
+                {% endif %}
+              </span>
+              {% if convo.last %}
+              <span class="conv-time">{{ convo.last.created_at.strftime('%H:%M') if convo.last else '' }}</span>
+              {% endif %}
+            </div>
+            <div class="conv-preview-row">
+              <span class="conv-preview">
+                {% if convo.is_voice_last %}
+                  <i class="fa-solid fa-microphone"></i> Voice message
+                {% elif convo.last %}
+                  {% if convo.last.sender_id == current_user.id %}
+                    <i class="fa-regular fa-check"></i> You:
+                  {% endif %}
+                  {% if convo.last.content %}
+                    {{ convo.last.content[:50] }}{% if convo.last.content|length > 50 %}…{% endif %}
+                  {% elif convo.last.media_url %}
+                    <i class="fa-regular fa-image"></i> Photo
+                  {% endif %}
+                {% else %}
+                  <span class="empty">No messages yet</span>
+                {% endif %}
+              </span>
+              {% if convo.unread > 0 %}
+              <span class="unread-badge">{{ convo.unread }}</span>
+              {% endif %}
+              {% if convo.voice_unread > 0 %}
+              <span class="voice-unread-badge">🎤</span>
+              {% endif %}
+            </div>
+          </div>
+        </a>
+        {% endfor %}
+      {% else %}
+        <div class="conv-empty">
+          <div class="conv-empty-icon">💬</div>
+          <p>No conversations yet</p>
+          <button class="btn btn-primary btn-sm" onclick="openNewMessageModal()">Start a chat</button>
+        </div>
+      {% endif %}
+    </div>
   </div>
 
-  <div class="conv-card">
-    <div class="conv-search">
-      <input type="text" id="searchInput" placeholder="Search conversations..." onkeyup="filterConversations()">
-    </div>
-    <div class="conv-list" id="conversationsList">
-      <div class="loading">
-        <i class="fa-solid fa-spinner fa-spin"></i>
-        <p>Loading conversations...</p>
+  <!-- EMPTY STATE / SELECT CONVERSATION -->
+  <div class="messages-empty-panel card">
+    <div class="messages-empty-content">
+      <div class="messages-empty-icon">
+        <i class="fa-regular fa-message fa-3x"></i>
       </div>
+      <h3>Your Messages</h3>
+      <p>Select a conversation or start a new one.</p>
+      <button class="btn btn-primary" onclick="openNewMessageModal()">
+        <i class="fa-regular fa-pen-to-square"></i> New Message
+      </button>
     </div>
   </div>
 </div>
 
-<!-- New Message Modal -->
-<div class="modal-overlay hidden" id="newMessageModal">
+<!-- NEW MESSAGE MODAL -->
+<div class="modal-overlay hidden" id="newMsgModal">
   <div class="modal-card">
     <div class="modal-header">
-      <h3><i class="fa-regular fa-pen-to-square"></i> New message</h3>
-      <button class="modal-close" onclick="closeNewMessageModal()">
+      <h3><i class="fa-regular fa-pen-to-square"></i> New Message</h3>
+      <button class="modal-close-btn" onclick="closeNewMessageModal()">
         <i class="fa-solid fa-times"></i>
       </button>
     </div>
     <div class="modal-body">
-      <div class="search-input-wrapper">
-        <i class="fa-solid fa-magnifying-glass search-icon"></i>
-        <input type="text" class="user-search-input" id="userSearch" placeholder="Search by username..." oninput="searchUsers(this.value)" autofocus>
-      </div>
-      <div class="search-results" id="searchResults">
-        <div class="search-hint">
-          <i class="fa-regular fa-user"></i>
-          <p>Type a username to start searching</p>
+      <div class="user-search-container">
+        <div class="search-input-wrapper">
+          <i class="fa-solid fa-magnifying-glass search-icon"></i>
+          <input type="text"
+                 id="userSearchInput"
+                 class="user-search-input"
+                 placeholder="Search users by username..."
+                 oninput="searchUsers(this.value)"
+                 autocomplete="off"
+                 autofocus>
+          <button class="clear-search-btn" onclick="clearSearch()" style="display: none;">✕</button>
+        </div>
+        <div id="userSearchResults" class="user-search-results">
+          <div class="search-hint">
+            <i class="fa-regular fa-keyboard"></i>
+            <p>Type a username to start searching</p>
+          </div>
         </div>
       </div>
     </div>
@@ -372,109 +589,85 @@
 </div>
 
 <script>
-let searchTimeout;
+// ============================================================
+// CONVERSATION FILTERING
+// ============================================================
 
-// Load conversations on page load
-document.addEventListener('DOMContentLoaded', function() {
-  loadConversations();
-
-  // Poll for new messages every 5 seconds
-  setInterval(loadConversations, 5000);
-});
-
-async function loadConversations() {
-  try {
-    const response = await fetch('/api/conversations');
-    const data = await response.json();
-
-    const container = document.getElementById('conversationsList');
-
-    if (!data.conversations || data.conversations.length === 0) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">💬</div>
-          <h3>No messages yet</h3>
-          <p>Start a conversation with someone!</p>
-          <button class="btn btn-primary" onclick="openNewMessageModal()">Send first message</button>
-        </div>
-      `;
-      return;
-    }
-
-    container.innerHTML = data.conversations.map(conv => `
-      <div class="conv-item" onclick="location.href='/chat/${conv.username}'" data-name="${conv.display_name.toLowerCase()} ${conv.username.toLowerCase()}">
-        <div class="conv-avatar">
-          <img src="${conv.avatar || '/static/default_avatar.png'}" alt="${conv.display_name}" onerror="this.src='/static/default_avatar.png'">
-          ${conv.is_online ? '<span class="online-dot"></span>' : ''}
-        </div>
-        <div class="conv-info">
-          <div class="conv-top">
-            <div class="conv-name">
-              ${escapeHtml(conv.display_name)}
-              ${conv.is_verified ? '<i class="fa-solid fa-circle-check" style="color: var(--primary); font-size: 0.8rem;"></i>' : ''}
-            </div>
-            ${conv.last_message ? `<div class="conv-time">${conv.last_message.time || ''}</div>` : ''}
-          </div>
-          <div class="conv-preview">
-            ${conv.last_message ? `
-              ${conv.last_message.is_own ? '<i class="fa-regular fa-check"></i> You: ' : ''}
-              ${conv.last_message.content || '📷 Photo'}
-            ` : '<i class="fa-regular fa-circle"></i> No messages yet'}
-          </div>
-        </div>
-        ${conv.unread_count > 0 ? `<div class="unread-badge">${conv.unread_count > 9 ? '9+' : conv.unread_count}</div>` : ''}
-      </div>
-    `).join('');
-  } catch (error) {
-    console.error('Error loading conversations:', error);
-    document.getElementById('conversationsList').innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">⚠️</div>
-        <h3>Error loading messages</h3>
-        <p>Please refresh the page</p>
-      </div>
-    `;
-  }
-}
-
-function filterConversations() {
-  const search = document.getElementById('searchInput').value.toLowerCase();
-  const items = document.querySelectorAll('.conv-item');
-
-  items.forEach(item => {
-    const name = item.getAttribute('data-name') || '';
-    item.style.display = name.includes(search) ? 'flex' : 'none';
+function filterConvs(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('.conv-item').forEach(el => {
+    const name = (el.getAttribute('data-name') || '').toLowerCase();
+    const username = (el.getAttribute('data-username') || '').toLowerCase();
+    el.style.display = (name.includes(q) || username.includes(q)) ? 'flex' : 'none';
   });
 }
 
-// New Message Modal
+// ============================================================
+// NEW MESSAGE MODAL
+// ============================================================
+
 function openNewMessageModal() {
-  const modal = document.getElementById('newMessageModal');
-  modal.classList.remove('hidden');
-  document.body.style.overflow = 'hidden';
-  document.getElementById('userSearch').value = '';
-  document.getElementById('userSearch').focus();
-  document.getElementById('searchResults').innerHTML = `
-    <div class="search-hint">
-      <i class="fa-regular fa-user"></i>
-      <p>Type a username to start searching</p>
-    </div>
-  `;
+  const modal = document.getElementById('newMsgModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => {
+      const input = document.getElementById('userSearchInput');
+      if (input) input.focus();
+    }, 100);
+  }
 }
 
 function closeNewMessageModal() {
-  const modal = document.getElementById('newMessageModal');
-  modal.classList.add('hidden');
-  document.body.style.overflow = '';
+  const modal = document.getElementById('newMsgModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    document.body.style.overflow = '';
+
+    const input = document.getElementById('userSearchInput');
+    if (input) input.value = '';
+
+    document.getElementById('userSearchResults').innerHTML = `
+      <div class="search-hint">
+        <i class="fa-regular fa-keyboard"></i>
+        <p>Type a username to start searching</p>
+      </div>
+    `;
+
+    const clearBtn = document.querySelector('.clear-search-btn');
+    if (clearBtn) clearBtn.style.display = 'none';
+  }
 }
 
-async function searchUsers(query) {
-  clearTimeout(searchTimeout);
+function clearSearch() {
+  const input = document.getElementById('userSearchInput');
+  if (input) {
+    input.value = '';
+    input.focus();
+    searchUsers('');
+  }
+}
 
-  const resultsContainer = document.getElementById('searchResults');
+// ============================================================
+// USER SEARCH
+// ============================================================
 
-  if (!query || query.length < 2) {
-    resultsContainer.innerHTML = `
+let searchTimer;
+
+async function searchUsers(q) {
+  clearTimeout(searchTimer);
+  const results = document.getElementById('userSearchResults');
+  if (!results) return;
+
+  let searchQuery = q.trim();
+  if (searchQuery.startsWith('@')) searchQuery = searchQuery.substring(1);
+
+  // Show/hide clear button
+  const clearBtn = document.querySelector('.clear-search-btn');
+  if (clearBtn) clearBtn.style.display = q ? 'flex' : 'none';
+
+  if (!searchQuery || searchQuery.length < 2) {
+    results.innerHTML = `
       <div class="search-hint">
         <i class="fa-regular fa-keyboard"></i>
         <p>Type at least 2 characters to search</p>
@@ -483,18 +676,20 @@ async function searchUsers(query) {
     return;
   }
 
-  resultsContainer.innerHTML = `
-    <div class="loading">
+  results.innerHTML = `
+    <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
       <i class="fa-solid fa-spinner fa-spin"></i>
       <p>Searching...</p>
     </div>
   `;
 
-  searchTimeout = setTimeout(async () => {
+  searchTimer = setTimeout(async () => {
     try {
-      const response = await fetch(`/search?q=${encodeURIComponent(query)}&ajax=1`, {
+      const response = await fetch(`/search?q=${encodeURIComponent(searchQuery)}&ajax=1`, {
         headers: { 'X-Requested-With': 'XMLHttpRequest' }
       });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const data = await response.json();
 
@@ -503,37 +698,40 @@ async function searchUsers(query) {
         const filteredUsers = data.users.filter(u => u.username !== currentUsername);
 
         if (filteredUsers.length > 0) {
-          resultsContainer.innerHTML = filteredUsers.map(user => `
-            <div class="search-result-item" onclick="startChat('${user.username}')">
-              <div class="search-result-avatar">
-                <img src="${user.avatar || '/static/default_avatar.png'}" alt="${user.username}" onerror="this.src='/static/default_avatar.png'">
+          results.innerHTML = filteredUsers.map(user => `
+            <div class="user-result" onclick="startChat('${user.username}')">
+              <div class="user-result-avatar">
+                <img src="${user.avatar || '/static/default_avatar.png'}"
+                     alt="${user.username}"
+                     onerror="this.src='/static/default_avatar.png'">
+                ${user.is_online ? '<span class="user-result-online"></span>' : ''}
               </div>
-              <div class="search-result-info">
-                <div class="search-result-name">${escapeHtml(user.display_name || user.username)}</div>
-                <div class="search-result-username">@${escapeHtml(user.username)}</div>
+              <div class="user-result-info">
+                <div class="user-result-name">${escapeHtml(user.display_name || user.username)}</div>
+                <div class="user-result-username">@${escapeHtml(user.username)}</div>
               </div>
               <i class="fa-solid fa-chevron-right" style="color: var(--text-muted);"></i>
             </div>
           `).join('');
         } else {
-          resultsContainer.innerHTML = `
+          results.innerHTML = `
             <div class="search-hint">
-              <i class="fa-regular fa-user-slash"></i>
+              <i class="fa-regular fa-user"></i>
               <p>No other users found</p>
             </div>
           `;
         }
       } else {
-        resultsContainer.innerHTML = `
+        results.innerHTML = `
           <div class="search-hint">
             <i class="fa-regular fa-user-slash"></i>
-            <p>No users found matching "${escapeHtml(query)}"</p>
+            <p>No users found matching "${escapeHtml(searchQuery)}"</p>
           </div>
         `;
       }
     } catch (error) {
       console.error('Search error:', error);
-      resultsContainer.innerHTML = `
+      results.innerHTML = `
         <div class="search-hint">
           <i class="fa-regular fa-circle-exclamation"></i>
           <p>Error searching users. Please try again.</p>
@@ -554,18 +752,21 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// Close modal on escape
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') {
-    closeNewMessageModal();
-  }
-});
+// ============================================================
+// CLOSE MODAL ON ESCAPE AND OUTSIDE CLICK
+// ============================================================
 
-// Close modal on overlay click
-document.getElementById('newMessageModal').addEventListener('click', function(e) {
-  if (e.target === this) {
-    closeNewMessageModal();
+document.addEventListener('DOMContentLoaded', function() {
+  const modal = document.getElementById('newMsgModal');
+  if (modal) {
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) closeNewMessageModal();
+    });
   }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeNewMessageModal();
+  });
 });
 </script>
 {% endblock %}
