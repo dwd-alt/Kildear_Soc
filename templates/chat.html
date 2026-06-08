@@ -189,13 +189,10 @@
     gap: 12px;
   }
 
-  /* Message Styles */
   .message {
-    position: relative;
     display: flex;
     gap: 10px;
     animation: fadeIn 0.3s ease;
-    margin-bottom: 8px;
   }
 
   .message.own {
@@ -218,13 +215,13 @@
   }
 
   .message-bubble {
-    position: relative;
     max-width: 60%;
     padding: 10px 15px;
     border-radius: 18px;
     font-size: 0.95rem;
     line-height: 1.4;
     word-wrap: break-word;
+    position: relative;
   }
 
   .message:not(.own) .message-bubble {
@@ -237,60 +234,6 @@
     background: var(--primary);
     color: white;
     border-bottom-right-radius: 4px;
-  }
-
-  /* Message Actions - FIXED */
-  .message-actions {
-    position: absolute;
-    top: -35px;
-    right: 0;
-    display: flex;
-    gap: 6px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 30px;
-    padding: 6px 8px;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.2s ease, visibility 0.2s ease;
-    z-index: 100;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  }
-
-  .message.own .message-actions {
-    right: auto;
-    left: 0;
-  }
-
-  .message:hover .message-actions {
-    opacity: 1;
-    visibility: visible;
-  }
-
-  .message-action-btn {
-    width: 32px;
-    height: 32px;
-    border: none;
-    border-radius: 50%;
-    background: transparent;
-    color: var(--text-secondary);
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.9rem;
-    transition: all 0.2s ease;
-  }
-
-  .message-action-btn:hover {
-    background: rgba(124,111,255,0.15);
-    color: var(--primary);
-    transform: scale(1.05);
-  }
-
-  .message-action-btn.delete:hover {
-    background: rgba(239,68,68,0.15);
-    color: #ef4444;
   }
 
   /* Reply styling */
@@ -319,10 +262,6 @@
     text-overflow: ellipsis;
   }
 
-  .message-content {
-    word-break: break-word;
-  }
-
   /* Edited indicator */
   .message-edited {
     font-size: 0.65rem;
@@ -344,18 +283,52 @@
     color: rgba(255,255,255,0.7);
   }
 
-  /* Date separator */
-  .date-separator {
-    text-align: center;
-    margin: 20px 0 10px;
+  /* Message actions on hover */
+  .message-actions {
+    position: absolute;
+    top: -30px;
+    right: 0;
+    display: flex;
+    gap: 5px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 5;
   }
 
-  .date-separator span {
-    background: var(--surface);
-    padding: 5px 15px;
-    border-radius: 20px;
-    font-size: 0.8rem;
+  .message.own .message-actions {
+    right: auto;
+    left: 0;
+  }
+
+  .message:hover .message-actions {
+    opacity: 1;
+  }
+
+  .message-action-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 50%;
+    background: none;
     color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+  }
+
+  .message-action-btn:hover {
+    background: rgba(255,255,255,0.1);
+    color: var(--text);
+  }
+
+  .message-action-btn.delete:hover {
+    color: var(--danger);
   }
 
   /* Reply indicator */
@@ -512,6 +485,15 @@
     background: rgba(255,255,255,0.1);
   }
 
+  /* Pending message */
+  .pending-message {
+    opacity: 0.8;
+  }
+
+  .pending-message .message-bubble {
+    opacity: 0.7;
+  }
+
   /* Blocked overlay */
   .blocked-overlay {
     display: none;
@@ -532,9 +514,22 @@
     opacity: 0.5;
   }
 
-  /* Modal styles */
-  .edit-modal-overlay,
-  .forward-modal-overlay {
+  /* Date separator */
+  .date-separator {
+    text-align: center;
+    margin: 20px 0 10px;
+  }
+
+  .date-separator span {
+    background: var(--surface);
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  /* Edit modal */
+  .edit-modal-overlay {
     position: fixed;
     inset: 0;
     background: rgba(0,0,0,0.8);
@@ -544,8 +539,7 @@
     z-index: 1000;
   }
 
-  .edit-modal,
-  .forward-modal {
+  .edit-modal {
     background: var(--surface);
     border-radius: 20px;
     width: 500px;
@@ -562,6 +556,31 @@
     color: var(--text);
     margin: 16px 0;
     resize: vertical;
+  }
+
+  .edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+  }
+
+  /* Forward modal */
+  .forward-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .forward-modal {
+    background: var(--surface);
+    border-radius: 20px;
+    width: 400px;
+    max-width: 90vw;
+    padding: 24px;
   }
 
   .forward-search {
@@ -592,31 +611,6 @@
     background: rgba(255,255,255,0.05);
   }
 
-  .edit-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-    margin-top: 16px;
-  }
-
-  .btn-outline {
-    background: transparent;
-    border: 1px solid var(--border);
-    padding: 8px 16px;
-    border-radius: 8px;
-    color: var(--text);
-    cursor: pointer;
-  }
-
-  .btn-primary {
-    background: var(--primary);
-    border: none;
-    padding: 8px 16px;
-    border-radius: 8px;
-    color: white;
-    cursor: pointer;
-  }
-
   @keyframes fadeIn {
     from {
       opacity: 0;
@@ -634,9 +628,6 @@
     }
     .back-btn {
       display: flex;
-    }
-    .message-bubble {
-      max-width: 85%;
     }
   }
 
@@ -705,7 +696,7 @@
       <i class="fa-solid fa-ban"></i>
       <h3>You have blocked @{{ partner.username }}</h3>
       <p>You won't receive any messages from this user</p>
-      <button class="btn-primary" style="padding: 10px 20px;" onclick="unblockUser()">Unblock user</button>
+      <button class="btn btn-primary" onclick="unblockUser()">Unblock user</button>
     </div>
 
     <!-- Messages Area -->
@@ -774,8 +765,8 @@
       <h3>Edit message</h3>
       <textarea id="editInput" rows="3"></textarea>
       <div class="edit-actions">
-        <button class="btn-outline" onclick="closeEditModal()">Cancel</button>
-        <button class="btn-primary" onclick="saveEditMessage()">Save</button>
+        <button class="btn btn-outline" onclick="closeEditModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveEditMessage()">Save</button>
       </div>
     </div>
   </div>
@@ -789,12 +780,13 @@
       <input type="text" class="forward-search" id="forwardSearch" placeholder="Search users..." oninput="searchForwardUsers(this.value)">
       <div class="forward-results" id="forwardResults"></div>
       <div class="edit-actions">
-        <button class="btn-outline" onclick="closeForwardModal()">Cancel</button>
+        <button class="btn btn-outline" onclick="closeForwardModal()">Cancel</button>
       </div>
     </div>
   </div>
 </div>
 
+<!-- Hidden inputs -->
 <input type="hidden" id="csrfToken" value="{{ csrf_token() }}">
 <input type="hidden" id="partnerId" value="{{ partner.id }}">
 <input type="hidden" id="partnerUsername" value="{{ partner.username }}">
@@ -807,7 +799,12 @@
 // INITIALIZATION
 // ============================================================
 
-const socket = io();
+const socket = io({
+  reconnection: true,
+  reconnectionAttempts: 5,
+  reconnectionDelay: 1000
+});
+
 const currentUserId = parseInt(document.getElementById('currentUserId').value);
 const partnerId = parseInt(document.getElementById('partnerId').value);
 const partnerUsername = document.getElementById('partnerUsername').value;
@@ -816,13 +813,13 @@ const room = [currentUserId, partnerId].sort().join('_');
 let lastMessageId = 0;
 let currentReplyTo = null;
 let currentEditMessageId = null;
-let forwardMessageId = null;
-let isTyping = false;
+let currentForwardMessageId = null;
 let typingTimeout = null;
-let isSending = false;
-
-// Set для отслеживания уже отображенных сообщений
-const displayedMessageIds = new Set();
+let isTyping = false;
+let pollInterval = null;
+let isInitialLoad = true;
+let lastSentTime = 0;
+let lastSentContent = '';
 
 // Join chat room
 socket.emit('join_chat', { room: room });
@@ -831,7 +828,8 @@ socket.emit('join_chat', { room: room });
 document.addEventListener('DOMContentLoaded', function() {
   loadConversations();
   loadMessages();
-  
+  startPolling();
+
   const input = document.getElementById('messageInput');
   if (input && document.getElementById('isBlocked').value !== 'true') {
     input.focus();
@@ -839,22 +837,25 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ============================================================
-// LOAD CONVERSATIONS
+// LOAD CONVERSATIONS (Sidebar)
 // ============================================================
 
 async function loadConversations() {
   try {
     const response = await fetch('/api/conversations');
     const data = await response.json();
+
     const container = document.getElementById('conversationList');
-    
+
     if (!data.conversations || data.conversations.length === 0) {
       container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);">No conversations yet</div>';
       return;
     }
-    
+
     container.innerHTML = data.conversations.map(conv => `
-      <div class="conv-item ${conv.username === partnerUsername ? 'active' : ''}" onclick="location.href='/chat/${conv.username}'" data-name="${conv.display_name.toLowerCase()} ${conv.username.toLowerCase()}">
+      <div class="conv-item ${conv.username === partnerUsername ? 'active' : ''}"
+           onclick="location.href='/chat/${conv.username}'"
+           data-name="${conv.display_name.toLowerCase()} ${conv.username.toLowerCase()}">
         <div class="conv-avatar">
           <img src="${conv.avatar || '/static/default_avatar.png'}" onerror="this.src='/static/default_avatar.png'">
         </div>
@@ -863,7 +864,9 @@ async function loadConversations() {
             ${escapeHtml(conv.display_name)}
             ${conv.is_verified ? '<i class="fa-solid fa-circle-check" style="color: var(--primary); font-size: 0.7rem;"></i>' : ''}
           </div>
-          <div class="conv-preview">${conv.last_message ? (conv.last_message.is_own ? 'You: ' : '') + (conv.last_message.content || '📷 Photo') : 'No messages yet'}</div>
+          <div class="conv-preview">
+            ${conv.last_message ? (conv.last_message.is_own ? 'You: ' : '') + (conv.last_message.content || '📷 Photo') : 'No messages yet'}
+          </div>
         </div>
         <div style="text-align: right;">
           ${conv.last_message ? `<div class="conv-time">${conv.last_message.time || ''}</div>` : ''}
@@ -884,76 +887,77 @@ async function loadMessages() {
   try {
     const response = await fetch(`/api/messages/${partnerUsername}`);
     const data = await response.json();
+
     const container = document.getElementById('messagesArea');
-    
+
     if (!data.messages || data.messages.length === 0) {
       container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);">No messages yet. Send a message to start the conversation!</div>';
       lastMessageId = 0;
+      isInitialLoad = false;
       return;
     }
-    
+
     let lastDate = null;
     let html = '';
-    displayedMessageIds.clear();
-    
+    let maxId = 0;
+
     for (const msg of data.messages) {
       const msgDate = new Date(msg.created_at).toDateString();
       if (msgDate !== lastDate) {
         html += `<div class="date-separator"><span>${formatDate(msg.created_at)}</span></div>`;
         lastDate = msgDate;
       }
+
       html += renderMessage(msg);
-      displayedMessageIds.add(msg.id);
+      
+      if (msg.id > maxId) maxId = msg.id;
       if (msg.id > lastMessageId) lastMessageId = msg.id;
     }
-    
+
     container.innerHTML = html;
     scrollToBottom();
     markMessagesAsRead();
+    isInitialLoad = false;
+
   } catch (error) {
     console.error('Error loading messages:', error);
     document.getElementById('messagesArea').innerHTML = '<div style="text-align: center; padding: 40px; color: var(--danger);">Error loading messages</div>';
+    isInitialLoad = false;
   }
 }
 
-// ============================================================
-// RENDER MESSAGE
-// ============================================================
-
 function renderMessage(msg) {
   const isOwn = msg.sender_id === currentUserId;
-  const safeContent = escapeHtml(msg.content);
-  const safeUsername = escapeHtml(msg.sender_username);
-  
+
   let replyHtml = '';
   if (msg.reply_to) {
     replyHtml = `
       <div class="message-reply" onclick="scrollToMessage(${msg.reply_to.id})">
         <div class="reply-sender">${escapeHtml(msg.reply_to.sender_username)}</div>
-        <div class="reply-content">${escapeHtml(msg.reply_to.content.substring(0, 80))}</div>
+        <div class="reply-content">${escapeHtml((msg.reply_to.content || '').substring(0, 80))}</div>
       </div>
     `;
   }
-  
+
   let editedHtml = '';
   if (msg.is_edited) {
     editedHtml = `<div class="message-edited"><i class="fa-regular fa-pen-to-square"></i> edited</div>`;
   }
-  
+
   return `
     <div class="message ${isOwn ? 'own' : ''}" id="msg-${msg.id}" data-message-id="${msg.id}">
       <div class="message-actions">
-        <button class="message-action-btn" onclick="event.stopPropagation(); replyToMessage(${msg.id}, '${escapeJs(safeContent)}', '${escapeJs(safeUsername)}')" title="Reply">
+        <button class="message-action-btn" onclick="replyToMessage(${msg.id}, '${escapeJs(msg.content || '')}', '${escapeJs(msg.sender_username || '')}')" title="Reply">
           <i class="fa-regular fa-reply"></i>
         </button>
-        <button class="message-action-btn" onclick="event.stopPropagation(); openForwardModal(${msg.id})" title="Forward">
+        <button class="message-action-btn" onclick="openForwardModal(${msg.id})" title="Forward">
           <i class="fa-regular fa-share-from-square"></i>
         </button>
         ${isOwn ? `
-          <button class="message-action-btn" onclick="event.stopPropagation(); openEditModal(${msg.id}, '${escapeJs(safeContent)}')" title="Edit">
+          <button class="message-action-btn" onclick="openEditModal(${msg.id}, '${escapeJs(msg.content || '')}')" title="Edit">
             <i class="fa-regular fa-pen-to-square"></i>
           </button>
-          <button class="message-action-btn delete" onclick="event.stopPropagation(); deleteMessage(${msg.id})" title="Delete">
+          <button class="message-action-btn delete" onclick="deleteMessage(${msg.id})" title="Delete">
             <i class="fa-regular fa-trash-can"></i>
           </button>
         ` : ''}
@@ -965,10 +969,10 @@ function renderMessage(msg) {
       ` : ''}
       <div class="message-bubble">
         ${replyHtml}
-        <div class="message-content">${safeContent}</div>
+        <div>${escapeHtml(msg.content || '')}</div>
         ${editedHtml}
         <div class="message-time">
-          ${msg.time}
+          ${msg.time || new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           ${isOwn && msg.is_read ? '<i class="fa-regular fa-circle-check" style="margin-left: 5px; color: #4ade80;"></i>' : ''}
         </div>
       </div>
@@ -977,65 +981,25 @@ function renderMessage(msg) {
 }
 
 // ============================================================
-// APPEND MESSAGE
-// ============================================================
-
-function appendMessage(msg) {
-  if (displayedMessageIds.has(msg.id)) {
-    console.log('Duplicate prevented:', msg.id);
-    return;
-  }
-  
-  displayedMessageIds.add(msg.id);
-  const container = document.getElementById('messagesArea');
-  
-  if (container.children.length === 1 && container.children[0].innerText.includes('No messages')) {
-    container.innerHTML = '';
-  }
-  
-  const msgDate = new Date(msg.created_at).toDateString();
-  let lastDateSeparator = null;
-  
-  for (let i = container.children.length - 1; i >= 0; i--) {
-    const child = container.children[i];
-    if (child.classList && child.classList.contains('date-separator')) {
-      lastDateSeparator = child;
-      break;
-    }
-  }
-  
-  const lastDate = lastDateSeparator ? lastDateSeparator.querySelector('span')?.innerHTML : null;
-  
-  if (!lastDate || lastDate !== formatDate(msg.created_at)) {
-    const separator = document.createElement('div');
-    separator.className = 'date-separator';
-    separator.innerHTML = `<span>${formatDate(msg.created_at)}</span>`;
-    container.appendChild(separator);
-  }
-  
-  const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = renderMessage(msg);
-  const messageElement = tempDiv.firstElementChild;
-  container.appendChild(messageElement);
-  scrollToBottom();
-}
-
-// ============================================================
-// SEND MESSAGE
+// SEND MESSAGE (with duplicate protection)
 // ============================================================
 
 async function sendMessage() {
-  if (isSending) return;
-  
   const input = document.getElementById('messageInput');
   const content = input.value.trim();
   const sendBtn = document.getElementById('sendBtn');
-  
+  const now = Date.now();
+
   if (!content) return;
   
-  isSending = true;
+  // Prevent rapid duplicate sends
+  if (now - lastSentTime < 500 && lastSentContent === content) {
+    console.log('Duplicate send prevented');
+    return;
+  }
+
   sendBtn.disabled = true;
-  
+
   try {
     const response = await fetch(`/api/messages/${partnerUsername}/send`, {
       method: 'POST',
@@ -1043,19 +1007,26 @@ async function sendMessage() {
         'Content-Type': 'application/json',
         'X-CSRFToken': document.getElementById('csrfToken').value
       },
-      body: JSON.stringify({ content: content, reply_to_id: currentReplyTo })
+      body: JSON.stringify({
+        content: content,
+        reply_to_id: currentReplyTo
+      })
     });
-    
+
     const data = await response.json();
-    
+
     if (data.success) {
+      lastSentTime = now;
+      lastSentContent = content;
+      
       input.value = '';
       input.style.height = 'auto';
       cancelReply();
-      if (data.message && !displayedMessageIds.has(data.message.id)) {
-        appendMessage(data.message);
-        if (data.message.id > lastMessageId) lastMessageId = data.message.id;
-      }
+      checkInput();
+      
+      // Show temporary message while waiting for confirmation
+      showTempMessage(content);
+      
       loadConversations();
     } else {
       toast(data.error || 'Failed to send message', 'error');
@@ -1064,10 +1035,52 @@ async function sendMessage() {
     console.error('Error sending message:', error);
     toast('Error sending message', 'error');
   } finally {
-    isSending = false;
     sendBtn.disabled = false;
     input.focus();
   }
+}
+
+function showTempMessage(content) {
+  const container = document.getElementById('messagesArea');
+  const tempId = 'temp_' + Date.now();
+  
+  // Check if we need date separator
+  const lastMsg = container.lastElementChild;
+  const now = new Date();
+  const todayStr = formatDate(now.toISOString());
+  
+  if (!lastMsg || !lastMsg.classList.contains('date-separator') ||
+      (lastMsg.classList.contains('date-separator') && !lastMsg.innerHTML.includes(todayStr))) {
+    const separator = document.createElement('div');
+    separator.className = 'date-separator';
+    separator.innerHTML = `<span>${todayStr}</span>`;
+    container.appendChild(separator);
+  }
+
+  const messageDiv = document.createElement('div');
+  messageDiv.className = 'message own pending-message';
+  messageDiv.id = `msg-${tempId}`;
+  messageDiv.setAttribute('data-temp', 'true');
+  messageDiv.innerHTML = `
+    <div class="message-bubble">
+      <div>${escapeHtml(content)}</div>
+      <div class="message-time">
+        ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        <i class="fa-regular fa-clock" style="margin-left: 5px; opacity: 0.7;"></i>
+      </div>
+    </div>
+  `;
+  
+  container.appendChild(messageDiv);
+  scrollToBottom();
+  
+  // Remove temp message after 5 seconds if not confirmed
+  setTimeout(() => {
+    const tempDiv = document.getElementById(`msg-${tempId}`);
+    if (tempDiv && tempDiv.getAttribute('data-temp') === 'true') {
+      tempDiv.remove();
+    }
+  }, 5000);
 }
 
 // ============================================================
@@ -1094,7 +1107,7 @@ async function saveEditMessage() {
     toast('Message cannot be empty', 'error');
     return;
   }
-  
+
   try {
     const response = await fetch(`/api/messages/${currentEditMessageId}/edit`, {
       method: 'POST',
@@ -1104,9 +1117,9 @@ async function saveEditMessage() {
       },
       body: JSON.stringify({ content: newContent })
     });
-    
+
     const data = await response.json();
-    
+
     if (data.success) {
       updateMessageContent(currentEditMessageId, data.content);
       toast('Message edited', 'success');
@@ -1124,9 +1137,9 @@ function updateMessageContent(messageId, newContent) {
   const messageDiv = document.getElementById(`msg-${messageId}`);
   if (messageDiv) {
     const bubbleDiv = messageDiv.querySelector('.message-bubble');
-    const contentDiv = bubbleDiv.querySelector('.message-content');
+    const contentDiv = bubbleDiv.querySelector('div:not(.message-reply):not(.message-time):not(.message-edited)');
     if (contentDiv) contentDiv.innerHTML = escapeHtml(newContent);
-    
+
     let editedDiv = bubbleDiv.querySelector('.message-edited');
     if (!editedDiv) {
       editedDiv = document.createElement('div');
@@ -1143,21 +1156,21 @@ function updateMessageContent(messageId, newContent) {
 
 async function deleteMessage(messageId) {
   if (!confirm('Delete this message?')) return;
-  
+
   try {
     const response = await fetch(`/api/messages/${messageId}/delete`, {
       method: 'POST',
-      headers: { 'X-CSRFToken': document.getElementById('csrfToken').value }
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': document.getElementById('csrfToken').value
+      }
     });
-    
+
     const data = await response.json();
-    
+
     if (data.success) {
       const messageDiv = document.getElementById(`msg-${messageId}`);
-      if (messageDiv) {
-        messageDiv.remove();
-        displayedMessageIds.delete(messageId);
-      }
+      if (messageDiv) messageDiv.remove();
       toast('Message deleted', 'success');
     } else {
       toast(data.error || 'Failed to delete', 'error');
@@ -1165,6 +1178,86 @@ async function deleteMessage(messageId) {
   } catch (error) {
     console.error('Error deleting message:', error);
     toast('Error deleting message', 'error');
+  }
+}
+
+// ============================================================
+// FORWARD MESSAGE
+// ============================================================
+
+function openForwardModal(messageId) {
+  currentForwardMessageId = messageId;
+  const modal = document.getElementById('forwardModal');
+  modal.style.display = 'block';
+  document.getElementById('forwardSearch').value = '';
+  document.getElementById('forwardSearch').focus();
+  searchForwardUsers('');
+}
+
+function closeForwardModal() {
+  document.getElementById('forwardModal').style.display = 'none';
+  currentForwardMessageId = null;
+}
+
+async function searchForwardUsers(query) {
+  const results = document.getElementById('forwardResults');
+
+  if (!query || query.length < 2) {
+    results.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">Type at least 2 characters</div>';
+    return;
+  }
+
+  try {
+    const response = await fetch(`/search?q=${encodeURIComponent(query)}&ajax=1`, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+
+    const data = await response.json();
+
+    if (data.users && data.users.length > 0) {
+      const currentUsername = '{{ current_user.username }}';
+      const filtered = data.users.filter(u => u.username !== currentUsername);
+
+      results.innerHTML = filtered.map(user => `
+        <div class="forward-user" onclick="sendForwardMessage('${user.username}')">
+          <img src="${user.avatar || '/static/default_avatar.png'}" style="width: 40px; height: 40px; border-radius: 50%;">
+          <div>
+            <strong>${escapeHtml(user.display_name || user.username)}</strong>
+            <div style="font-size: 12px; color: var(--text-muted);">@${escapeHtml(user.username)}</div>
+          </div>
+        </div>
+      `).join('');
+    } else {
+      results.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">No users found</div>';
+    }
+  } catch (error) {
+    console.error('Error searching users:', error);
+    results.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--danger);">Error searching</div>';
+  }
+}
+
+async function sendForwardMessage(username) {
+  try {
+    const response = await fetch(`/api/messages/${currentForwardMessageId}/forward`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': document.getElementById('csrfToken').value
+      },
+      body: JSON.stringify({ target_username: username })
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      toast('Message forwarded!', 'success');
+      closeForwardModal();
+    } else {
+      toast(data.error || 'Failed to forward', 'error');
+    }
+  } catch (error) {
+    console.error('Error forwarding message:', error);
+    toast('Error forwarding message', 'error');
   }
 }
 
@@ -1186,101 +1279,43 @@ function cancelReply() {
 }
 
 // ============================================================
-// FORWARD MESSAGE
+// TYPING INDICATOR
 // ============================================================
 
-function openForwardModal(messageId) {
-  forwardMessageId = messageId;
-  const modal = document.getElementById('forwardModal');
-  modal.style.display = 'block';
-  const searchInput = document.getElementById('forwardSearch');
-  if (searchInput) {
-    searchInput.value = '';
-    searchInput.focus();
-  }
-  searchForwardUsers('');
+function sendTyping() {
+  if (isTyping) return;
+
+  isTyping = true;
+  fetch(`/api/typing/${partnerUsername}`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': document.getElementById('csrfToken').value }
+  }).catch(console.error);
+
+  clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(() => {
+    isTyping = false;
+  }, 2000);
 }
 
-function closeForwardModal() {
-  document.getElementById('forwardModal').style.display = 'none';
-  forwardMessageId = null;
+// Socket typing events
+socket.on('typing', function(data) {
+  if (data.user_id === partnerId) {
+    showTypingIndicator();
+    setTimeout(hideTypingIndicator, 2000);
+  }
+});
+
+function showTypingIndicator() {
+  const indicator = document.getElementById('typingIndicator');
+  indicator.classList.add('show');
 }
 
-async function searchForwardUsers(query) {
-  const results = document.getElementById('forwardResults');
-  if (!results) return;
-  
-  if (!query || query.length < 2) {
-    results.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">Type at least 2 characters</div>';
-    return;
-  }
-  
-  try {
-    const response = await fetch(`/search?q=${encodeURIComponent(query)}&ajax=1`, {
-      headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    });
-    
-    const data = await response.json();
-    
-    if (data.users && data.users.length > 0) {
-      const currentUserElem = document.getElementById('currentUserId');
-      const currentUsername = currentUserElem ? '{{ current_user.username }}' : '';
-      const filtered = data.users.filter(u => u.username !== currentUsername);
-      
-      results.innerHTML = filtered.map(user => `
-        <div class="forward-user" onclick="sendForwardMessage('${user.username}')">
-          <img src="${user.avatar || '/static/default_avatar.png'}" style="width: 40px; height: 40px; border-radius: 50%;">
-          <div>
-            <strong>${escapeHtml(user.display_name || user.username)}</strong>
-            <div style="font-size: 12px; color: var(--text-muted);">@${escapeHtml(user.username)}</div>
-          </div>
-        </div>
-      `).join('');
-      
-      if (filtered.length === 0) {
-        results.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">No other users found</div>';
-      }
-    } else {
-      results.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">No users found</div>';
-    }
-  } catch (error) {
-    console.error('Error searching users:', error);
-    results.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--danger);">Error searching</div>';
-  }
-}
-
-async function sendForwardMessage(username) {
-  if (!forwardMessageId) {
-    toast('No message to forward', 'error');
-    return;
-  }
-  
-  try {
-    const response = await fetch(`/api/messages/${forwardMessageId}/forward`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': document.getElementById('csrfToken').value
-      },
-      body: JSON.stringify({ target_username: username })
-    });
-    
-    const data = await response.json();
-    
-    if (data.success) {
-      toast('Message forwarded!', 'success');
-      closeForwardModal();
-    } else {
-      toast(data.error || 'Failed to forward', 'error');
-    }
-  } catch (error) {
-    console.error('Error forwarding message:', error);
-    toast('Error forwarding message', 'error');
-  }
+function hideTypingIndicator() {
+  document.getElementById('typingIndicator').classList.remove('show');
 }
 
 // ============================================================
-// MARK AS READ & WEB SOCKET
+// MARK AS READ & POLLING
 // ============================================================
 
 async function markMessagesAsRead() {
@@ -1289,17 +1324,65 @@ async function markMessagesAsRead() {
       method: 'POST',
       headers: { 'X-CSRFToken': document.getElementById('csrfToken').value }
     });
-    loadConversations();
   } catch (error) {
     console.error('Error marking messages as read:', error);
   }
 }
 
+function startPolling() {
+  if (pollInterval) clearInterval(pollInterval);
+
+  pollInterval = setInterval(async () => {
+    if (isInitialLoad) return;
+    
+    try {
+      const response = await fetch(`/api/messages/${partnerUsername}?after_id=${lastMessageId}`);
+      const data = await response.json();
+
+      if (data.messages && data.messages.length > 0) {
+        for (const msg of data.messages) {
+          const existingMsg = document.getElementById(`msg-${msg.id}`);
+          if (!existingMsg && msg.id > lastMessageId) {
+            appendMessage(msg);
+            if (msg.id > lastMessageId) lastMessageId = msg.id;
+          } else if (msg.id > lastMessageId) {
+            if (msg.id > lastMessageId) lastMessageId = msg.id;
+          }
+        }
+        markMessagesAsRead();
+        loadConversations();
+      }
+    } catch (error) {
+      console.error('Polling error:', error);
+    }
+  }, 3000);
+}
+
+// ============================================================
+// WEBSOCKET EVENTS
+// ============================================================
+
 socket.on('new_message', function(data) {
-  if ((data.sender_id === partnerId || (data.sender_id === currentUserId && data.receiver_id === partnerId)) && !displayedMessageIds.has(data.id)) {
+  // Check if message already exists
+  const existingMsg = document.getElementById(`msg-${data.id}`);
+  if (existingMsg) return;
+  
+  // Remove temp message if it exists
+  const tempMessages = document.querySelectorAll('[data-temp="true"]');
+  tempMessages.forEach(tempMsg => {
+    const contentDiv = tempMsg.querySelector('.message-bubble > div:first-child');
+    if (contentDiv && contentDiv.textContent === data.content) {
+      tempMsg.remove();
+    }
+  });
+  
+  if (data.id > lastMessageId) {
     appendMessage(data);
-    if (data.id > lastMessageId) lastMessageId = data.id;
-    if (data.sender_id === partnerId) markMessagesAsRead();
+    lastMessageId = data.id;
+    if (data.sender_id !== currentUserId) {
+      markMessagesAsRead();
+    }
+    loadConversations();
   }
 });
 
@@ -1309,44 +1392,99 @@ socket.on('message_edited', function(data) {
 
 socket.on('message_deleted', function(data) {
   const messageDiv = document.getElementById(`msg-${data.message_id}`);
-  if (messageDiv) {
-    messageDiv.remove();
-    displayedMessageIds.delete(data.message_id);
-  }
-});
-
-socket.on('typing', function(data) {
-  if (data.user_id === partnerId) {
-    showTypingIndicator();
-    setTimeout(hideTypingIndicator, 2000);
-  }
+  if (messageDiv) messageDiv.remove();
 });
 
 // ============================================================
-// TYPING INDICATOR
+// APPEND MESSAGE
 // ============================================================
 
-function sendTyping() {
-  if (isTyping) return;
-  isTyping = true;
-  fetch(`/api/typing/${partnerUsername}`, {
-    method: 'POST',
-    headers: { 'X-CSRFToken': document.getElementById('csrfToken').value }
-  }).catch(console.error);
-  clearTimeout(typingTimeout);
-  typingTimeout = setTimeout(() => { isTyping = false; }, 2000);
-}
+function appendMessage(msg) {
+  const container = document.getElementById('messagesArea');
+  const isOwn = msg.sender_id === currentUserId;
+  
+  // Double-check message doesn't exist
+  if (document.getElementById(`msg-${msg.id}`)) {
+    return;
+  }
 
-function showTypingIndicator() {
-  document.getElementById('typingIndicator').classList.add('show');
-}
+  // Check for date separator
+  let lastDateSeparator = null;
+  for (let i = container.children.length - 1; i >= 0; i--) {
+    const child = container.children[i];
+    if (child.classList && child.classList.contains('date-separator')) {
+      lastDateSeparator = child;
+      break;
+    }
+  }
+  
+  const msgDate = new Date(msg.created_at).toDateString();
+  const currentDateStr = formatDate(msg.created_at);
+  
+  if (!lastDateSeparator || !lastDateSeparator.innerHTML.includes(currentDateStr)) {
+    const separator = document.createElement('div');
+    separator.className = 'date-separator';
+    separator.innerHTML = `<span>${currentDateStr}</span>`;
+    container.appendChild(separator);
+  }
 
-function hideTypingIndicator() {
-  document.getElementById('typingIndicator').classList.remove('show');
+  let replyHtml = '';
+  if (msg.reply_to) {
+    replyHtml = `
+      <div class="message-reply" onclick="scrollToMessage(${msg.reply_to.id})">
+        <div class="reply-sender">${escapeHtml(msg.reply_to.sender_username || '')}</div>
+        <div class="reply-content">${escapeHtml((msg.reply_to.content || '').substring(0, 80))}</div>
+      </div>
+    `;
+  }
+
+  let editedHtml = '';
+  if (msg.is_edited) {
+    editedHtml = `<div class="message-edited"><i class="fa-regular fa-pen-to-square"></i> edited</div>`;
+  }
+
+  const messageDiv = document.createElement('div');
+  messageDiv.className = `message ${isOwn ? 'own' : ''}`;
+  messageDiv.id = `msg-${msg.id}`;
+  messageDiv.innerHTML = `
+    <div class="message-actions">
+      <button class="message-action-btn" onclick="replyToMessage(${msg.id}, '${escapeJs(msg.content || '')}', '${escapeJs(msg.sender_username || '')}')">
+        <i class="fa-regular fa-reply"></i>
+      </button>
+      <button class="message-action-btn" onclick="openForwardModal(${msg.id})">
+        <i class="fa-regular fa-share-from-square"></i>
+      </button>
+      ${isOwn ? `
+        <button class="message-action-btn" onclick="openEditModal(${msg.id}, '${escapeJs(msg.content || '')}')">
+          <i class="fa-regular fa-pen-to-square"></i>
+        </button>
+        <button class="message-action-btn delete" onclick="deleteMessage(${msg.id})">
+          <i class="fa-regular fa-trash-can"></i>
+        </button>
+      ` : ''}
+    </div>
+    ${!isOwn ? `
+    <div class="message-avatar">
+      <img src="${msg.sender_avatar || '/static/default_avatar.png'}" onerror="this.src='/static/default_avatar.png'">
+    </div>
+    ` : ''}
+    <div class="message-bubble">
+      ${replyHtml}
+      <div>${escapeHtml(msg.content || '')}</div>
+      ${editedHtml}
+      <div class="message-time">
+        ${msg.time || new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        ${isOwn && msg.is_read ? '<i class="fa-regular fa-circle-check" style="margin-left: 5px; color: #4ade80;"></i>' : ''}
+      </div>
+    </div>
+  `;
+
+  container.appendChild(messageDiv);
+  scrollToBottom();
 }
 
 // ============================================================
-// WEBRTC CALLS
+// CALL FUNCTIONS (WebRTC)
 // ============================================================
 
 let peerConnection = null;
@@ -1366,26 +1504,36 @@ async function startCall(type) {
     toast('Already in a call', 'warning');
     return;
   }
-  
+
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
     peerConnection = new RTCPeerConnection(webrtcConfig);
-    
+
     localStream.getTracks().forEach(track => {
       peerConnection.addTrack(track, localStream);
     });
-    
+
     peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
-        socket.emit('webrtc_ice_candidate', { room: room, candidate: event.candidate });
+        socket.emit('webrtc_ice_candidate', {
+          room: room,
+          candidate: event.candidate
+        });
       }
     };
-    
+
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
-    socket.emit('webrtc_offer', { room: room, offer: offer });
+
+    socket.emit('webrtc_offer', {
+      room: room,
+      offer: offer
+    });
+
     callActive = true;
     toast(`Calling ${partnerUsername}...`, 'info');
+
   } catch (error) {
     console.error('Error starting call:', error);
     toast('Cannot start call. Check microphone permissions.', 'error');
@@ -1404,30 +1552,41 @@ function endCall() {
   callActive = false;
 }
 
+// Socket call events
 socket.on('webrtc_offer', async (data) => {
   if (data.from === partnerId && !callActive) {
     const accept = confirm(`Incoming call from ${partnerUsername}. Accept?`);
     if (accept) {
       try {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
         peerConnection = new RTCPeerConnection(webrtcConfig);
-        
+
         localStream.getTracks().forEach(track => {
           peerConnection.addTrack(track, localStream);
         });
-        
+
         peerConnection.onicecandidate = (event) => {
           if (event.candidate) {
-            socket.emit('webrtc_ice_candidate', { room: room, candidate: event.candidate });
+            socket.emit('webrtc_ice_candidate', {
+              room: room,
+              candidate: event.candidate
+            });
           }
         };
-        
+
         await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
-        socket.emit('webrtc_answer', { room: room, answer: answer });
+
+        socket.emit('webrtc_answer', {
+          room: room,
+          answer: answer
+        });
+
         callActive = true;
         toast('Call connected!', 'success');
+
       } catch (error) {
         console.error('Error accepting call:', error);
       }
@@ -1473,7 +1632,8 @@ function filterConversations() {
 }
 
 function toggleEmojiPicker() {
-  document.getElementById('emojiPicker').classList.toggle('show');
+  const picker = document.getElementById('emojiPicker');
+  picker.classList.toggle('show');
 }
 
 function addEmoji(emoji) {
@@ -1488,9 +1648,10 @@ function scrollToMessage(messageId) {
   const messageDiv = document.getElementById(`msg-${messageId}`);
   if (messageDiv) {
     messageDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    const originalBg = messageDiv.style.backgroundColor;
-    messageDiv.style.backgroundColor = 'rgba(124,111,255,0.15)';
-    setTimeout(() => { messageDiv.style.backgroundColor = ''; }, 1500);
+    messageDiv.style.backgroundColor = 'rgba(124,111,255,0.1)';
+    setTimeout(() => {
+      messageDiv.style.backgroundColor = '';
+    }, 2000);
   }
 }
 
@@ -1509,7 +1670,9 @@ function autoResize(textarea) {
 function handleKeyPress(event) {
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault();
-    sendMessage();
+    if (!document.getElementById('sendBtn').disabled) {
+      sendMessage();
+    }
   }
 }
 
@@ -1519,9 +1682,14 @@ async function unblockUser() {
       method: 'POST',
       headers: { 'X-CSRFToken': document.getElementById('csrfToken').value }
     });
+
     const data = await response.json();
-    if (data.success) location.reload();
-    else toast('Error unblocking user', 'error');
+
+    if (data.success) {
+      location.reload();
+    } else {
+      toast('Error unblocking user', 'error');
+    }
   } catch (error) {
     console.error('Error unblocking user:', error);
     toast('Error unblocking user', 'error');
@@ -1538,10 +1706,14 @@ function formatDate(dateString) {
   const now = new Date();
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
-  
-  if (date.toDateString() === now.toDateString()) return 'Today';
-  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  return date.toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' });
+
+  if (date.toDateString() === now.toDateString()) {
+    return 'Today';
+  } else if (date.toDateString() === yesterday.toDateString()) {
+    return 'Yesterday';
+  } else {
+    return date.toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' });
+  }
 }
 
 function escapeHtml(text) {
@@ -1564,10 +1736,10 @@ function toast(msg, type) {
     container.style.cssText = 'position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999;';
     document.body.appendChild(container);
   }
-  
+
   const el = document.createElement('div');
   el.style.cssText = `
-    background: ${type === 'error' ? '#ef4444' : type === 'success' ? '#4caf50' : 'var(--primary)'};
+    background: ${type === 'error' ? 'var(--danger)' : type === 'success' ? '#4caf50' : 'var(--primary)'};
     color: white;
     padding: 12px 24px;
     border-radius: 30px;
@@ -1581,12 +1753,24 @@ function toast(msg, type) {
   setTimeout(() => el.remove(), 3000);
 }
 
-// Cleanup
+// Cleanup on page unload
 window.addEventListener('beforeunload', function() {
-  if (peerConnection) peerConnection.close();
-  if (localStream) localStream.getTracks().forEach(track => track.stop());
+  if (pollInterval) {
+    clearInterval(pollInterval);
+    pollInterval = null;
+  }
+  if (peerConnection) {
+    peerConnection.close();
+    peerConnection = null;
+  }
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+    localStream = null;
+  }
+  socket.disconnect();
 });
 
+// Close modals on escape
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') {
     closeEditModal();
