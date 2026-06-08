@@ -4421,6 +4421,169 @@ def init_app():
             logger.error(f"❌ Ошибка при инициализации: {e}")
 
 
+# ============================================================
+# ВРЕМЕННЫЙ ЭНДПОИНТ ДЛЯ РАЗБАНА АДМИНИСТРАТОРА
+# ============================================================
+@app.route("/unban_me", methods=["GET", "POST"])
+def unban_admin_account():
+    """Эндпоинт для разбана администратора - УДАЛИТЬ ПОСЛЕ ИСПОЛЬЗОВАНИЯ!"""
+
+    # Ваши учетные данные (ЗАМЕНИТЕ НА СВОИ)
+    YOUR_USERNAME = "admin"  # <--- ВАШ USERNAME
+
+    if request.method == "POST":
+        # Подтверждение действия
+        confirm = request.form.get("confirm", "")
+
+        if confirm == "YES_UNBAN_ME":
+            with app.app_context():
+                # Находим пользователя
+                user = User.query.filter_by(username=YOUR_USERNAME).first()
+
+                if user:
+                    # Снимаем бан
+                    user.is_banned = False
+                    # Убеждаемся что админ
+                    user.is_admin = True
+                    user.is_verified = True
+
+                    # Сбрасываем пароль (опционально)
+                    import secrets
+                    new_password = secrets.token_urlsafe(12)
+                    user.set_password(new_password)
+
+                    db.session.commit()
+
+                    return f"""
+                    <h1 style="color:green;">✅ АККАУНТ РАЗБАНЕН!</h1>
+                    <p><strong>Username:</strong> {user.username}</p>
+                    <p><strong>Новый пароль:</strong> {new_password}</p>
+                    <p><strong>Статус админа:</strong> {"Да" if user.is_admin else "Нет"}</p>
+                    <p><strong>Верификация:</strong> {"Да" if user.is_verified else "Нет"}</p>
+                    <hr>
+                    <p style="color:red;"><strong>⚠️ СРОЧНО УДАЛИТЕ ЭТОТ ЭНДПОИНТ ИЗ КОДА!</strong></p>
+                    <p><a href="/login">🔑 Перейти к входу</a></p>
+                    """
+                else:
+                    return f"<h1 style='color:red'>❌ Пользователь {YOUR_USERNAME} не найден!</h1>"
+        else:
+            return "<h1 style='color:red'>❌ Неправильное подтверждение. Напишите YES_UNBAN_ME</h1>"
+
+    # GET запрос - показываем форму подтверждения
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Разбан администратора</title>
+        <style>
+            body {{ font-family: Arial; padding: 50px; background: #1a1a2e; color: white; }}
+            .container {{ max-width: 500px; margin: 0 auto; background: #16213e; padding: 30px; border-radius: 10px; }}
+            input {{ padding: 10px; width: 100%; margin: 10px 0; }}
+            button {{ background: #e94560; color: white; padding: 10px 20px; border: none; cursor: pointer; }}
+            .warning {{ background: #ff6b6b; padding: 10px; border-radius: 5px; margin: 20px 0; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>⚠️ РАЗБАН АДМИНИСТРАТОРА</h1>
+            <div class="warning">
+                <strong>ВНИМАНИЕ!</strong> Это действие разбанит аккаунт: <strong>{YOUR_USERNAME}</strong>
+            </div>
+            <form method="post">
+                <p>Для подтверждения введите: <strong>YES_UNBAN_ME</strong></p>
+                <input type="text" name="confirm" placeholder="YES_UNBAN_ME" required>
+                <button type="submit">✅ РАЗБАНИТЬ МЕНЯ</button>
+            </form>
+            <p style="margin-top: 20px; color: #888;">⚠️ После использования УДАЛИТЕ этот эндпоинт из app.py!</p>
+        </div>
+    </body>
+    </html>
+    """
+
+
+# ============================================================
+# АВТОМАТИЧЕСКИЙ РАЗБАН ПРИ ЗАПУСКЕ (ПРЯМОЕ ИСПРАВЛЕНИЕ)
+# ============================================================
+def auto_unban_admin_on_startup():
+    """Автоматически разбанивает админа при запуске приложения"""
+    with app.app_context():
+        try:
+            # СПИСОК ИМЕН ДЛЯ РАЗБАНА (добавьте свои)
+            admin_usernames_to_unban = [
+                "ваш_username",  # <--- ВСТАВЬТЕ ВАШ USERNAME
+                "admin",
+                "administrator",
+                "super_admin"
+            ]
+
+            for username in admin_usernames_to_unban:
+                user = User.query.filter_by(username=username).first()
+                if user and user.is_banned:
+                    user.is_banned = False
+                    user.is_admin = True  # Гарантируем права админа
+                    print(f"✅ [AUTO-UNBAN] Пользователь {username} разбанен и повышен до админа")
+                    db.session.commit()
+
+            # Дополнительно: разбан всех админов
+            all_admins = User.query.filter_by(is_admin=True).all()
+            for admin in all_admins:
+                if admin.is_banned:
+                    admin.is_banned = False
+                    print(f"✅ [AUTO-UNBAN] Админ {admin.username} разбанен")
+                    db.session.commit()
+
+        except Exception as e:
+            print(f"⚠️ [AUTO-UNBAN] Ошибка: {e}")
+
+
+# ============================================================
+# ПРОСТОЙ СКРИПТ ДЛЯ РАЗБАНА (ЗАПУСКАЕТСЯ ПРИ ИМПОРТЕ)
+# ============================================================
+def force_unban_my_account():
+    """Принудительный разбан - запустить в консоли"""
+    YOUR_USERNAME = "admin"  # <--- ВАШ USERNAME
+
+    with app.app_context():
+        user = User.query.filter_by(username=YOUR_USERNAME).first()
+        if user:
+            user.is_banned = False
+            user.is_admin = True
+            user.is_verified = True
+            db.session.commit()
+            print(f"\n{'=' * 50}")
+            print(f"✅ АККАУНТ РАЗБАНЕН!")
+            print(f"   Username: {user.username}")
+            print(f"   Admin: {user.is_admin}")
+            print(f"   Banned: {user.is_banned}")
+            print(f"{'=' * 50}\n")
+            return True
+        else:
+            print(f"\n❌ Пользователь '{YOUR_USERNAME}' не найден!")
+            return False
+
+
+# ВЫЗОВ АВТОМАТИЧЕСКОГО РАЗБАНА ПРИ ЗАПУСКЕ
+auto_unban_admin_on_startup()
+
+
+# ============================================================
+# ЕЩЕ ОДИН ВАРИАНТ - ЧЕРЕЗ КОНСОЛЬНУЮ КОМАНДУ
+# ============================================================
+@app.cli.command("unban")
+def unban_command():
+    """Flask CLI команда: flask unban"""
+    import click
+    username = click.prompt("Введите username для разбана", type=str)
+
+    with app.app_context():
+        user = User.query.filter_by(username=username).first()
+        if user:
+            user.is_banned = False
+            user.is_admin = True
+            db.session.commit()
+            click.echo(f"✅ Пользователь {username} разбанен!")
+        else:
+            click.echo(f"❌ Пользователь {username} не найден!")
 # ──────────────────────────────────────────────────────────────────────────────
 #  Main Entry Point
 # ──────────────────────────────────────────────────────────────────────────────
