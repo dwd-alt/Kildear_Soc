@@ -247,6 +247,7 @@
             border-radius: 20px;
             font-size: 11px;
             font-weight: 600;
+            display: inline-block;
         }
 
         .badge-success {
@@ -324,6 +325,93 @@
             background: rgba(251, 146, 60, 0.25);
         }
 
+        /* Forms */
+        .admin-form-group {
+            margin-bottom: 20px;
+        }
+
+        .admin-form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #b4b4c0;
+            font-weight: 500;
+        }
+
+        .admin-form-group input,
+        .admin-form-group textarea,
+        .admin-form-group select {
+            width: 100%;
+            padding: 12px;
+            background: #11131f;
+            border: 1px solid #2a2a3a;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .admin-form-group input:focus,
+        .admin-form-group textarea:focus,
+        .admin-form-group select:focus {
+            outline: none;
+            border-color: #6c63ff;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #11131f;
+            border: 1px solid #2a2a3a;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #2a2a3a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-footer {
+            padding: 20px;
+            border-top: 1px solid #2a2a3a;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: #b4b4c0;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
         /* Alerts */
         .alert {
             padding: 12px 16px;
@@ -344,7 +432,7 @@
             color: #fb923c;
         }
 
-        .alert-error {
+        .alert-error, .alert-danger {
             background: rgba(255, 107, 107, 0.1);
             border-color: rgba(255, 107, 107, 0.3);
             color: #ff6b6b;
@@ -417,6 +505,19 @@
             border-color: #6c63ff;
         }
 
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #7f8c8d;
+        }
+
+        .empty-state i {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .admin-sidebar {
@@ -448,7 +549,9 @@
                     <a href="{{ url_for('admin_users') }}" class="admin-nav-link {% if request.endpoint == 'admin_users' %}active{% endif %}">
                         <i class="fa-solid fa-users"></i>
                         <span>Пользователи</span>
-                        <span class="admin-badge">{{ stats.total_users if stats else 0 }}</span>
+                        {% if stats and stats.total_users %}
+                        <span class="admin-badge">{{ stats.total_users }}</span>
+                        {% endif %}
                     </a>
                 </li>
                 <li class="admin-nav-item">
@@ -461,11 +564,20 @@
                     </a>
                 </li>
                 <li class="admin-nav-item">
-                    <a href="{{ url_for('admin_verification') }}" class="admin-nav-link {% if request.endpoint == 'admin_verification' %}active{% endif %}">
+                    <a href="{{ url_for('admin_verification_requests') }}" class="admin-nav-link {% if request.endpoint == 'admin_verification_requests' %}active{% endif %}">
                         <i class="fa-solid fa-check-circle"></i>
                         <span>Верификация</span>
                         {% if stats and stats.pending_verification %}
                         <span class="admin-badge">{{ stats.pending_verification }}</span>
+                        {% endif %}
+                    </a>
+                </li>
+                <li class="admin-nav-item">
+                    <a href="{{ url_for('admin_applications') }}" class="admin-nav-link {% if request.endpoint == 'admin_applications' %}active{% endif %}">
+                        <i class="fa-solid fa-file-signature"></i>
+                        <span>Заявки</span>
+                        {% if stats and stats.pending_admin_apps %}
+                        <span class="admin-badge">{{ stats.pending_admin_apps }}</span>
                         {% endif %}
                     </a>
                 </li>
@@ -479,12 +591,32 @@
                     </a>
                 </li>
                 <li class="admin-nav-item">
+                    <a href="{{ url_for('admin_admins') }}" class="admin-nav-link {% if request.endpoint == 'admin_admins' %}active{% endif %}">
+                        <i class="fa-solid fa-user-shield"></i>
+                        <span>Администраторы</span>
+                    </a>
+                </li>
+                <li class="admin-nav-item">
+                    <a href="{{ url_for('admin_banners') }}" class="admin-nav-link {% if request.endpoint == 'admin_banners' %}active{% endif %}">
+                        <i class="fa-solid fa-rectangle-ad"></i>
+                        <span>Баннеры</span>
+                        {% if stats and stats.active_banners %}
+                        <span class="admin-badge">{{ stats.active_banners }}</span>
+                        {% endif %}
+                    </a>
+                </li>
+                <li class="admin-nav-item">
                     <a href="{{ url_for('admin_logs') }}" class="admin-nav-link {% if request.endpoint == 'admin_logs' %}active{% endif %}">
                         <i class="fa-solid fa-history"></i>
                         <span>История входов</span>
                     </a>
                 </li>
-                <!-- НОВЫЙ ПУНКТ МЕНЮ ДЛЯ УПРАВЛЕНИЯ БАЗОЙ ДАННЫХ -->
+                <li class="admin-nav-item">
+                    <a href="{{ url_for('admin_preset_avatars') }}" class="admin-nav-link {% if request.endpoint == 'admin_preset_avatars' %}active{% endif %}">
+                        <i class="fa-solid fa-images"></i>
+                        <span>Preset аватары</span>
+                    </a>
+                </li>
                 <li class="admin-nav-item">
                     <a href="{{ url_for('admin_database') }}" class="admin-nav-link {% if request.endpoint == 'admin_database' %}active{% endif %}">
                         <i class="fa-solid fa-database"></i>
@@ -517,7 +649,7 @@
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
-                        <div class="alert alert-{{ category }}">
+                        <div class="alert alert-{{ category if category != 'message' else 'info' }}">
                             <i class="fa-solid fa-circle-info"></i> {{ message }}
                         </div>
                     {% endfor %}

@@ -206,13 +206,13 @@
         <h3 style="margin: 0;"><i class="fa-solid fa-cloud-arrow-down"></i> Восстановить из файла</h3>
     </div>
     <div style="padding: 20px;">
-        <form method="POST" action="{{ url_for('admin_upload_backup') }}" enctype="multipart/form-data" id="uploadForm">
+        <form method="POST" action="{{ url_for('admin_backup_database') }}" enctype="multipart/form-data" id="uploadForm">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <label for="backup_file" class="upload-area" id="uploadArea">
                 <i class="fa-solid fa-folder-open" style="font-size: 48px; color: #6c63ff; margin-bottom: 15px; display: block;"></i>
                 <p style="margin: 0;">Нажмите или перетащите файл сюда</p>
-                <small style="color: #7f8c8d;">Поддерживаются форматы: .db (SQLite) и .sql (PostgreSQL)</small>
-                <input type="file" id="backup_file" name="backup_file" accept=".db,.sql" style="display: none;">
+                <small style="color: #7f8c8d;">Поддерживаются форматы: .db (SQLite)</small>
+                <input type="file" id="backup_file" name="backup_file" accept=".db" style="display: none;">
             </label>
             <div id="selectedFile" style="display: none; margin-top: 15px; padding: 10px; background: rgba(108, 99, 255, 0.1); border-radius: 8px;">
                 <i class="fa-solid fa-file"></i> <span id="fileName"></span>
@@ -258,16 +258,10 @@
             {% for backup in backups %}
             <div class="backup-item">
                 <div class="backup-info">
-                    <i class="fa-solid {% if backup.type == 'sqlite' %}fa-database{% else %}fa-cloud{% endif %}"></i>
+                    <i class="fa-solid fa-database"></i>
                     <div>
                         <div class="backup-name">{{ backup.filename }}</div>
-                        <div class="backup-size">{{ backup.size_mb }} MB |
-                            {% if backup.type == 'sqlite' %}
-                            <span style="color: #4ade80;">SQLite</span>
-                            {% else %}
-                            <span style="color: #fb923c;">PostgreSQL</span>
-                            {% endif %}
-                        </div>
+                        <div class="backup-size">{{ backup.size_mb }} MB | SQLite</div>
                     </div>
                     <div class="backup-date">
                         <i class="fa-regular fa-calendar"></i> {{ backup.created.strftime('%Y-%m-%d %H:%M:%S') }}
@@ -277,7 +271,7 @@
                     <a href="{{ url_for('admin_download_backup', filename=backup.filename) }}" class="admin-btn admin-btn-primary btn-sm">
                         <i class="fa-solid fa-download"></i> Скачать
                     </a>
-                    <form method="POST" action="{{ url_for('admin_restore_backup', filename=backup.filename) }}" style="display: inline;">
+                    <form method="POST" action="{{ url_for('admin_restore_backup_file', filename=backup.filename) }}" style="display: inline;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="admin-btn admin-btn-warning btn-sm" onclick="return confirm('Восстановить базу данных из этой резервной копии? Текущие данные будут перезаписаны!')">
                             <i class="fa-solid fa-rotate-left"></i> Восстановить
@@ -355,8 +349,8 @@
         const fileName = file.name;
         const fileExt = fileName.split('.').pop().toLowerCase();
 
-        if (fileExt !== 'db' && fileExt !== 'sql') {
-            alert('Пожалуйста, выберите файл с расширением .db или .sql');
+        if (fileExt !== 'db') {
+            alert('Пожалуйста, выберите файл с расширением .db');
             clearFile();
             return;
         }

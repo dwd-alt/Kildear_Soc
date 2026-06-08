@@ -398,18 +398,11 @@ document.getElementById('qrFileInput').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // ИСПРАВЛЕНО: безопасное чтение файла через FileReader
     const preview = document.getElementById('previewImage');
-    
-    // Вместо URL.createObjectURL используем FileReader
-    const reader = new FileReader();
-    reader.onload = function(event) {
-        preview.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
-    
+    preview.src = URL.createObjectURL(file);
     document.getElementById('previewArea').style.display = 'block';
     document.getElementById('scanArea').style.display = 'none';
+
     document.getElementById('resultArea').innerHTML = '<div class="loader"></div>';
     document.getElementById('resultArea').style.display = 'block';
 
