@@ -4325,10 +4325,10 @@ def serve_upload(subfolder, filename):
 
 def create_admin_user():
     try:
-        admin = User.query.filter_by(username='admin').first()
+        admin = User.query.filter_by(username='Admin').first()
         if not admin:
             admin_password = os.environ.get('ADMIN_PASSWORD', secrets.token_urlsafe(12))
-            admin = User(username='admin', email='admin@kildear.com', display_name='Administrator',
+            admin = User(username='admin', email='Admin@kildear.com', display_name='Administrator',
                          is_admin=True, is_verified=True, preset_avatar=1)
             admin.set_password(admin_password)
             db.session.add(admin)
