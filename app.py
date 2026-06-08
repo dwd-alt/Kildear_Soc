@@ -771,13 +771,23 @@ class User(UserMixin, db.Model):
             return None
 
     def set_password(self, pw: str) -> None:
+        """Установка пароля с принудительным использованием pbkdf2:sha256"""
         if pw and safe_validate_password(pw):
-            self.password_hash = generate_password_hash(pw)
+            self.password_hash = generate_password_hash(pw, method='pbkdf2:sha256')
 
     def check_password(self, pw: str) -> bool:
+        """Проверка пароля с автоматической конвертацией из scrypt"""
         if not self.password_hash:
             return False
-        return check_password_hash(self.password_hash, pw)
+
+        # Проверяем пароль
+        if check_password_hash(self.password_hash, pw):
+            # Если это старый scrypt хеш - конвертируем в pbkdf2
+            if 'scrypt' in self.password_hash:
+                self.set_password(pw)  # Пересохраняем новым методом
+                db.session.commit()
+            return True
+        return False
 
     def is_following(self, user) -> bool:
         return self.following.filter(follows.c.followed_id == user.id).count() > 0
