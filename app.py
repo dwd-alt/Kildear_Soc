@@ -454,11 +454,10 @@ def save_file(file: FileStorage, subfolder: str) -> Optional[str]:
 # НАЧАЛО_ДОБАВЛЕНО_ФУНКЦИИ_ФИЛЬТРАЦИИ
 # ================================================================
 
-def is_new_user(user: User) -> bool:
+def is_new_user(user) -> bool:
     """Проверяет, является ли пользователь новым (менее 7 дней или мало постов)"""
     if not user:
         return False
-    # Если пользователь зарегистрирован менее 7 дней назад ИЛИ имеет менее 10 постов
     days_since_join = (datetime.utcnow() - user.created_at).days
     return days_since_join < 7 or user.post_count < 10
 
