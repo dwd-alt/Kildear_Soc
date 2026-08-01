@@ -569,6 +569,32 @@
     <i class="fa-solid fa-satellite-dish"></i> Каналы
   </a>
 
+  <!-- ================================================================ -->
+  <!-- НАЧАЛО_ДОБАВЛЕНО_ССЫЛКА_МОДЕРАТОР -->
+  <!-- ================================================================ -->
+  {% if current_user.is_authenticated and (current_user.is_moderator or current_user.is_admin) %}
+  <span class="nav-section">Модерация</span>
+  <a href="{{ url_for('moderator_dashboard') }}" class="nav-item {% if 'moderator' in request.endpoint %}active{% endif %}" style="color: var(--warning);">
+    <i class="fa-solid fa-shield-alt"></i> Панель модератора
+    {% set pending_reports = stats.total_reports if stats and stats.total_reports else 0 %}
+    {% if pending_reports > 0 %}
+      <span class="nav-badge" style="background: var(--danger);">{{ pending_reports }}</span>
+    {% endif %}
+  </a>
+  <a href="{{ url_for('moderator_reports') }}" class="nav-item {% if request.endpoint == 'moderator_reports' %}active{% endif %}">
+    <i class="fa-solid fa-flag"></i> Жалобы
+  </a>
+  <a href="{{ url_for('moderator_pending_posts') }}" class="nav-item {% if request.endpoint == 'moderator_pending_posts' %}active{% endif %}">
+    <i class="fa-solid fa-file-alt"></i> Посты на проверке
+  </a>
+  <a href="{{ url_for('moderator_spam_patterns') }}" class="nav-item {% if request.endpoint == 'moderator_spam_patterns' %}active{% endif %}">
+    <i class="fa-solid fa-ban"></i> Спам-паттерны
+  </a>
+  {% endif %}
+  <!-- ================================================================ -->
+  <!-- КОНЕЦ_ДОБАВЛЕНО_ССЫЛКА_МОДЕРАТОР -->
+  <!-- ================================================================ -->
+
   {% if current_user.is_authenticated and current_user.is_admin %}
   <span class="nav-section">Администрирование</span>
   <a href="{{ url_for('admin_dashboard') }}" class="nav-item {% if 'admin' in request.endpoint %}active{% endif %}" style="color: var(--primary); font-weight: 600;">

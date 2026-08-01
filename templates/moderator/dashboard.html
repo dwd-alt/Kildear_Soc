@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Панель модератора — Kildear</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #07070f;
+            --surface: #0f0f1a;
+            --card: rgba(255,255,255,0.04);
+            --border: rgba(255,255,255,0.08);
+            --border-hover: rgba(255,255,255,0.16);
+            --primary: #7c6fff;
+            --primary-glow: rgba(124,111,255,0.25);
+            --secondary: #ff6b9d;
+            --accent: #00d4ff;
+            --text: #e4e4f0;
+            --text-muted: #7070a0;
+            --text-dim: #4a4a70;
+            --danger: #ff4757;
+            --success: #22d3a0;
+            --warning: #fbbf24;
+            --font-head: 'Syne', sans-serif;
+            --font-body: 'DM Sans', sans-serif;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-family: var(--font-head);
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header h1 i {
+            color: var(--primary);
+        }
+
+        .back-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .back-link:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .stat-card:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+        }
+
+        .stat-number {
+            font-family: var(--font-head);
+            font-size: 36px;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .stat-warning .stat-number { color: var(--warning); }
+        .stat-info .stat-number { color: var(--accent); }
+        .stat-primary .stat-number { color: var(--primary); }
+        .stat-secondary .stat-number { color: var(--text-muted); }
+        .stat-danger .stat-number { color: var(--danger); }
+        .stat-success .stat-number { color: var(--success); }
+
+        .section {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-family: var(--font-head);
+            font-size: 18px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title i {
+            color: var(--primary);
+        }
+
+        .report-item, .post-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .report-item:last-child, .post-item:last-child {
+            border-bottom: none;
+        }
+
+        .report-info, .post-info {
+            flex: 1;
+        }
+
+        .report-reason {
+            font-weight: 600;
+        }
+
+        .report-meta {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-pending {
+            background: rgba(251, 191, 36, 0.2);
+            color: var(--warning);
+        }
+
+        .badge-approved {
+            background: rgba(34, 211, 160, 0.2);
+            color: var(--success);
+        }
+
+        .badge-rejected {
+            background: rgba(255, 71, 87, 0.2);
+            color: var(--danger);
+        }
+
+        .btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 8px;
+            font-family: var(--font-body);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: #9b8fff;
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: #fff;
+        }
+
+        .btn-danger:hover {
+            background: #ff6b7a;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: #fff;
+        }
+
+        .btn-success:hover {
+            background: #34d9a8;
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: #000;
+        }
+
+        .btn-warning:hover {
+            background: #fcd34d;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .quick-actions .btn {
+            padding: 10px 20px;
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .report-item, .post-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-shield-alt"></i> Панель модератора</h1>
+            <a href="{{ url_for('index') }}" class="back-link">
+                <i class="fas fa-arrow-left"></i> На главную
+            </a>
+        </div>
+
+        <!-- Статистика -->
+        <div class="stats-grid">
+            <div class="stat-card stat-warning">
+                <div class="stat-number">{{ pending_reports }}</div>
+                <div class="stat-label"><i class="fas fa-flag"></i> Жалоб ожидает</div>
+            </div>
+            <div class="stat-card stat-info">
+                <div class="stat-number">{{ pending_posts }}</div>
+                <div class="stat-label"><i class="fas fa-file-alt"></i> Постов на проверке</div>
+            </div>
+            <div class="stat-card stat-primary">
+                <div class="stat-number">{{ pending_comments }}</div>
+                <div class="stat-label"><i class="fas fa-comment"></i> Комментариев на проверке</div>
+            </div>
+            <div class="stat-card stat-secondary">
+                <div class="stat-number">{{ total_reports }}</div>
+                <div class="stat-label"><i class="fas fa-list"></i> Всего жалоб</div>
+            </div>
+        </div>
+
+        <!-- Быстрые действия -->
+        <div class="section">
+            <div class="section-title">
+                <i class="fas fa-bolt"></i> Быстрые действия
+            </div>
+            <div class="quick-actions">
+                <a href="{{ url_for('moderator_reports') }}" class="btn btn-primary">
+                    <i class="fas fa-flag"></i> Все жалобы
+                </a>
+                <a href="{{ url_for('moderator_pending_posts') }}" class="btn btn-warning">
+                    <i class="fas fa-file-alt"></i> Посты на проверке
+                </a>
+                <a href="{{ url_for('moderator_spam_patterns') }}" class="btn btn-danger">
+                    <i class="fas fa-ban"></i> Спам-паттерны
+                </a>
+            </div>
+        </div>
+
+        <!-- Последние жалобы -->
+        <div class="section">
+            <div class="section-title">
+                <i class="fas fa-clock"></i> Последние жалобы
+            </div>
+            {% if recent_reports %}
+                {% for report in recent_reports %}
+                <div class="report-item">
+                    <div class="report-info">
+                        <div class="report-reason">
+                            <i class="fas fa-user"></i>
+                            {{ report.reporter.username }}
+                            <i class="fas fa-arrow-right" style="margin: 0 8px; color: var(--text-dim);"></i>
+                            {% if report.reported_user %}
+                                {{ report.reported_user.username }}
+                            {% elif report.post_id %}
+                                Пост #{{ report.post_id }}
+                            {% elif report.comment_id %}
+                                Комментарий #{{ report.comment_id }}
+                            {% endif %}
+                        </div>
+                        <div class="report-meta">
+                            <span class="badge badge-{{ report.status }}">
+                                {{ report.status }}
+                            </span>
+                            {{ report.reason }}
+                            • {{ report.created_at|timeago }}
+                        </div>
+                    </div>
+                    <a href="{{ url_for('moderator_report_detail', report_id=report.id) }}" class="btn btn-primary">
+                        <i class="fas fa-eye"></i>
+                    </a>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-check-circle"></i>
+                    <p>Нет новых жалоб</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Посты на модерации -->
+        <div class="section">
+            <div class="section-title">
+                <i class="fas fa-file-alt"></i> Посты на модерации
+            </div>
+            {% if pending_posts_list %}
+                {% for post in pending_posts_list %}
+                <div class="post-item">
+                    <div class="post-info">
+                        <div>
+                            <strong>{{ post.user.username }}</strong>
+                            <span class="badge badge-pending">На проверке</span>
+                        </div>
+                        <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+                            {{ post.content[:100] }}{% if post.content|length > 100 %}...{% endif %}
+                        </div>
+                        <div class="report-meta">
+                            {{ post.created_at|timeago }}
+                            {% if post.media_url %}
+                                <i class="fas fa-image" style="margin-left: 8px;"></i>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <a href="{{ url_for('moderator_pending_posts') }}" class="btn btn-primary">
+                        <i class="fas fa-eye"></i>
+                    </a>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-check-circle"></i>
+                    <p>Нет постов на модерации</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

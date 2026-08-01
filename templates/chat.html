@@ -909,7 +909,7 @@ async function loadMessages() {
       }
 
       html += renderMessage(msg);
-      
+
       if (msg.id > maxId) maxId = msg.id;
       if (msg.id > lastMessageId) lastMessageId = msg.id;
     }
@@ -991,7 +991,7 @@ async function sendMessage() {
   const now = Date.now();
 
   if (!content) return;
-  
+
   // Prevent rapid duplicate sends
   if (now - lastSentTime < 500 && lastSentContent === content) {
     console.log('Duplicate send prevented');
@@ -1018,15 +1018,15 @@ async function sendMessage() {
     if (data.success) {
       lastSentTime = now;
       lastSentContent = content;
-      
+
       input.value = '';
       input.style.height = 'auto';
       cancelReply();
       checkInput();
-      
+
       // Show temporary message while waiting for confirmation
       showTempMessage(content);
-      
+
       loadConversations();
     } else {
       toast(data.error || 'Failed to send message', 'error');
@@ -1043,12 +1043,12 @@ async function sendMessage() {
 function showTempMessage(content) {
   const container = document.getElementById('messagesArea');
   const tempId = 'temp_' + Date.now();
-  
+
   // Check if we need date separator
   const lastMsg = container.lastElementChild;
   const now = new Date();
   const todayStr = formatDate(now.toISOString());
-  
+
   if (!lastMsg || !lastMsg.classList.contains('date-separator') ||
       (lastMsg.classList.contains('date-separator') && !lastMsg.innerHTML.includes(todayStr))) {
     const separator = document.createElement('div');
@@ -1070,10 +1070,10 @@ function showTempMessage(content) {
       </div>
     </div>
   `;
-  
+
   container.appendChild(messageDiv);
   scrollToBottom();
-  
+
   // Remove temp message after 5 seconds if not confirmed
   setTimeout(() => {
     const tempDiv = document.getElementById(`msg-${tempId}`);
@@ -1334,7 +1334,7 @@ function startPolling() {
 
   pollInterval = setInterval(async () => {
     if (isInitialLoad) return;
-    
+
     try {
       const response = await fetch(`/api/messages/${partnerUsername}?after_id=${lastMessageId}`);
       const data = await response.json();
@@ -1366,7 +1366,7 @@ socket.on('new_message', function(data) {
   // Check if message already exists
   const existingMsg = document.getElementById(`msg-${data.id}`);
   if (existingMsg) return;
-  
+
   // Remove temp message if it exists
   const tempMessages = document.querySelectorAll('[data-temp="true"]');
   tempMessages.forEach(tempMsg => {
@@ -1375,7 +1375,7 @@ socket.on('new_message', function(data) {
       tempMsg.remove();
     }
   });
-  
+
   if (data.id > lastMessageId) {
     appendMessage(data);
     lastMessageId = data.id;
@@ -1402,7 +1402,7 @@ socket.on('message_deleted', function(data) {
 function appendMessage(msg) {
   const container = document.getElementById('messagesArea');
   const isOwn = msg.sender_id === currentUserId;
-  
+
   // Double-check message doesn't exist
   if (document.getElementById(`msg-${msg.id}`)) {
     return;
@@ -1417,10 +1417,10 @@ function appendMessage(msg) {
       break;
     }
   }
-  
+
   const msgDate = new Date(msg.created_at).toDateString();
   const currentDateStr = formatDate(msg.created_at);
-  
+
   if (!lastDateSeparator || !lastDateSeparator.innerHTML.includes(currentDateStr)) {
     const separator = document.createElement('div');
     separator.className = 'date-separator';

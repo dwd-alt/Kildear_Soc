@@ -1,6 +1,8 @@
 """
 Kildear Social Network — Полная версия с исправленным мессенджером
 Добавлены: ответ на сообщение, редактирование, удаление, пересылка, эмодзи
+А также: система жалоб, модераторский интерфейс, IP-блокировка, фильтр спама,
+премодерация для новых пользователей, упоминания, кнопки "Поделиться".
 """
 
 import os
@@ -447,6 +449,104 @@ def save_file(file: FileStorage, subfolder: str) -> Optional[str]:
         logger.error(f"Error saving file: {e}")
         return None
 
+
+# ================================================================
+# НАЧАЛО_ДОБАВЛЕНО_ФУНКЦИИ_ФИЛЬТРАЦИИ
+# ================================================================
+
+def is_new_user(user: User) -> bool:
+    """Проверяет, является ли пользователь новым (менее 7 дней или мало постов)"""
+    if not user:
+        return False
+    # Если пользователь зарегистрирован менее 7 дней назад ИЛИ имеет менее 10 постов
+    days_since_join = (datetime.utcnow() - user.created_at).days
+    return days_since_join < 7 or user.post_count < 10
+
+def is_spam(content: str) -> bool:
+    """Проверяет текст на спам по сохранённым паттернам"""
+    if not content:
+        return False
+    patterns = SpamPattern.query.all()
+    for p in patterns:
+        if p.is_regex:
+            import re
+            if re.search(p.pattern, content, re.IGNORECASE):
+                return True
+        else:
+            if p.pattern.lower() in content.lower():
+                return True
+    return False
+
+def extract_mentions(text: str) -> List[str]:
+    """Извлекает все упоминания @username из текста"""
+    if not text:
+        return []
+    import re
+    # Находит слова, начинающиеся с @, за которым буквы/цифры/подчёркивание
+    return re.findall(r'@([A-Za-z0-9_]{3,40})', text)
+
+def notify_mentions(text: str, author: User, post_id: int = None, comment_id: int = None, type: str = 'mention'):
+    """Отправляет уведомления всем упомянутым пользователям"""
+    if not text:
+        return
+    usernames = extract_mentions(text)
+    for username in usernames:
+        mentioned = User.query.filter(func.lower(User.username) == username.lower()).first()
+        if mentioned and mentioned.id != author.id:
+            if mentioned.is_blocked(author):
+                continue
+            notif = Notification(
+                user_id=mentioned.id,
+                from_user_id=author.id,
+                type=type,
+                post_id=post_id,
+                text=f"{author.username} упомянул вас в {'посте' if type=='mention' else 'комментарии'}"
+            )
+            db.session.add(notif)
+            send_notification(mentioned.id, {
+                "type": type,
+                "from_user": {"id": author.id, "username": author.username, "avatar": author.avatar_url},
+                "post_id": post_id,
+                "text": f"{author.username} упомянул вас в {'посте' if type=='mention' else 'комментарии'}"
+            })
+    db.session.commit()
+
+def check_ip_block(ip: str) -> bool:
+    """Проверяет, заблокирован ли IP-адрес"""
+    if not ip:
+        return False
+    now = datetime.utcnow()
+    ban = IPBan.query.filter(IPBan.ip_address == ip, IPBan.is_active == True).first()
+    if ban:
+        if ban.expires_at and ban.expires_at < now:
+            ban.is_active = False
+            db.session.commit()
+            return False
+        return True
+    return False
+
+def block_ip(ip: str, reason: str = "", duration_hours: int = 24):
+    """Блокирует IP-адрес на указанное время"""
+    if not ip:
+        return
+    existing = IPBan.query.filter_by(ip_address=ip).first()
+    if existing:
+        existing.is_active = True
+        existing.expires_at = datetime.utcnow() + timedelta(hours=duration_hours) if duration_hours > 0 else None
+        existing.reason = reason
+    else:
+        ban = IPBan(
+            ip_address=ip,
+            reason=reason,
+            expires_at=datetime.utcnow() + timedelta(hours=duration_hours) if duration_hours > 0 else None,
+            is_active=True
+        )
+        db.session.add(ban)
+    db.session.commit()
+
+# ================================================================
+# КОНЕЦ_ДОБАВЛЕНО_ФУНКЦИИ_ФИЛЬТРАЦИИ
+# ================================================================
 
 def ensure_upload_folders() -> None:
     """Создание всех необходимых папок для загрузок"""
@@ -1201,6 +1301,65 @@ class UserAchievement(db.Model):
     user = db.relationship("User", backref="achievements")
 
 
+# ================================================================
+# НАЧАЛО_ДОБАВЛЕНО_НОВЫЕ_МОДЕЛИ
+# ================================================================
+
+class IPBan(db.Model):
+    """Блокировка IP-адресов для борьбы с мультиаккаунтами"""
+    __tablename__ = 'ip_ban'
+    id = db.Column(db.Integer, primary_key=True)
+    ip_address = db.Column(db.String(45), nullable=False, unique=True)
+    reason = db.Column(db.String(200), default="")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=True)
+    is_active = db.Column(db.Boolean, default=True)
+
+class SpamPattern(db.Model):
+    """Спам-слова и регулярные выражения для автоматической фильтрации"""
+    __tablename__ = 'spam_pattern'
+    id = db.Column(db.Integer, primary_key=True)
+    pattern = db.Column(db.String(200), nullable=False, unique=True)
+    is_regex = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class PendingPost(db.Model):
+    """Посты, ожидающие премодерации (для новых пользователей)"""
+    __tablename__ = 'pending_post'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    content = db.Column(db.Text, default="")
+    media_url = db.Column(db.String(300), default="")
+    media_type = db.Column(db.String(20), default="text")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), default='pending')  # pending, approved, rejected
+    moderated_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    moderated_at = db.Column(db.DateTime, nullable=True)
+    moderation_comment = db.Column(db.String(300), default="")
+    user = db.relationship('User', foreign_keys=[user_id])
+    moderator = db.relationship('User', foreign_keys=[moderated_by])
+
+class PendingComment(db.Model):
+    """Комментарии, ожидающие премодерации"""
+    __tablename__ = 'pending_comment'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), default='pending')
+    moderated_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    moderated_at = db.Column(db.DateTime, nullable=True)
+    moderation_comment = db.Column(db.String(300), default="")
+    user = db.relationship('User', foreign_keys=[user_id])
+    post = db.relationship('Post', foreign_keys=[post_id])
+    moderator = db.relationship('User', foreign_keys=[moderated_by])
+
+# ================================================================
+# КОНЕЦ_ДОБАВЛЕНО_НОВЫЕ_МОДЕЛИ
+# ================================================================
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 #  Template Filters
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1300,6 +1459,15 @@ _fail_log: Dict[str, List[float]] = defaultdict(list)
 @app.before_request
 def ddos_shield():
     ip = get_client_ip()
+    # ================================================================
+    # НАЧАЛО_ДОБАВЛЕНО_IP_BAN_CHECK
+    # ================================================================
+    # Проверка IP-бана
+    if check_ip_block(ip):
+        abort(403, description="Ваш IP-адрес заблокирован")
+    # ================================================================
+    # КОНЕЦ_ДОБАВЛЕНО_IP_BAN_CHECK
+    # ================================================================
     if ip in _blocked_ips:
         abort(429)
     now = time.time()
@@ -1348,6 +1516,25 @@ def admin_required(f):
         return f(*args, **kwargs)
 
     return decorated_function
+
+
+# ================================================================
+# НАЧАЛО_ДОБАВЛЕНО_МОДЕРАТОРСКИЙ_ДЕКОРАТОР
+# ================================================================
+
+def moderator_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            abort(401)
+        if not (current_user.is_moderator or current_user.is_admin):
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated_function
+
+# ================================================================
+# КОНЕЦ_ДОБАВЛЕНО_МОДЕРАТОРСКИЙ_ДЕКОРАТОР
+# ================================================================
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -2399,7 +2586,7 @@ def admin_verification():
 
 @app.route("/admin/banned")
 @login_required
-@ admin_required
+@admin_required
 def admin_banned():
     page = request.args.get("page", 1, type=int)
     users = User.query.filter_by(is_banned=True).order_by(User.last_seen.desc()).paginate(page=page, per_page=20)
@@ -2429,6 +2616,176 @@ def admin_logs():
 def admin_preset_avatars():
     return render_template("admin/preset_avatars.html", group_avatars=PRESET_GROUP_AVATARS,
                            channel_avatars=PRESET_CHANNEL_AVATARS)
+
+
+# ================================================================
+# НАЧАЛО_ДОБАВЛЕНО_МОДЕРАТОРСКИЙ_ИНТЕРФЕЙС
+# ================================================================
+
+@app.route("/moderator")
+@login_required
+@moderator_required
+def moderator_dashboard():
+    """Панель модератора: сводка по жалобам и спорным постам"""
+    pending_reports = Report.query.filter_by(status='pending').count()
+    pending_posts = PendingPost.query.filter_by(status='pending').count()
+    pending_comments = PendingComment.query.filter_by(status='pending').count()
+    total_reports = Report.query.count()
+    recent_reports = Report.query.order_by(Report.created_at.desc()).limit(20).all()
+    pending_posts_list = PendingPost.query.filter_by(status='pending').order_by(PendingPost.created_at.asc()).limit(20).all()
+    return render_template(
+        "moderator/dashboard.html",
+        pending_reports=pending_reports,
+        pending_posts=pending_posts,
+        pending_comments=pending_comments,
+        total_reports=total_reports,
+        recent_reports=recent_reports,
+        pending_posts_list=pending_posts_list
+    )
+
+@app.route("/moderator/reports")
+@login_required
+@moderator_required
+def moderator_reports():
+    status = request.args.get('status', 'pending')
+    query = Report.query
+    if status != 'all':
+        query = query.filter_by(status=status)
+    reports = query.order_by(Report.created_at.desc()).paginate(per_page=20, error_out=False)
+    return render_template("moderator/reports.html", reports=reports, current_status=status)
+
+@app.route("/moderator/report/<int:report_id>", methods=["GET", "POST"])
+@login_required
+@moderator_required
+def moderator_report_detail(report_id):
+    report = Report.query.get_or_404(report_id)
+    if request.method == "POST":
+        action = request.form.get("action")
+        comment = escape_html(request.form.get("comment", "").strip())
+        if action == "approve":
+            report.status = "reviewed"
+            if report.reported_user_id:
+                user = User.query.get(report.reported_user_id)
+                if user:
+                    user.is_banned = True
+                    # Блокируем IP нарушителя
+                    ip_history = LoginHistory.query.filter_by(user_id=user.id).order_by(LoginHistory.created_at.desc()).first()
+                    if ip_history:
+                        block_ip(ip_history.ip_address, reason=f"Бан за жалобу #{report.id}", duration_hours=72)
+            elif report.post_id:
+                post = Post.query.get(report.post_id)
+                if post:
+                    db.session.delete(post)
+            elif report.comment_id:
+                comment_obj = Comment.query.get(report.comment_id)
+                if comment_obj:
+                    db.session.delete(comment_obj)
+            flash("Жалоба принята, контент удалён/пользователь забанен", "success")
+        elif action == "dismiss":
+            report.status = "dismissed"
+            flash("Жалоба отклонена", "info")
+        elif action == "warn":
+            report.status = "reviewed"
+            if report.reported_user_id:
+                user = User.query.get(report.reported_user_id)
+                if user:
+                    notif = Notification(
+                        user_id=user.id,
+                        from_user_id=current_user.id,
+                        type="warning",
+                        text=f"Модератор вынес предупреждение: {comment or 'Нарушение правил'}"
+                    )
+                    db.session.add(notif)
+                    db.session.commit()
+            flash("Предупреждение отправлено", "success")
+        report.reviewed_at = datetime.utcnow()
+        report.reviewed_by = current_user.id
+        db.session.commit()
+        return redirect(url_for("moderator_reports"))
+    return render_template("moderator/report_detail.html", report=report)
+
+@app.route("/moderator/pending-posts")
+@login_required
+@moderator_required
+def moderator_pending_posts():
+    posts = PendingPost.query.filter_by(status='pending').order_by(PendingPost.created_at.asc()).paginate(per_page=20, error_out=False)
+    return render_template("moderator/pending_posts.html", posts=posts)
+
+@app.route("/moderator/pending-post/<int:post_id>", methods=["POST"])
+@login_required
+@moderator_required
+def moderator_review_pending_post(post_id):
+    pending = PendingPost.query.get_or_404(post_id)
+    action = request.form.get("action")
+    comment = escape_html(request.form.get("comment", "").strip())
+    if action == "approve":
+        post = Post(
+            user_id=pending.user_id,
+            content=pending.content,
+            media_url=pending.media_url,
+            media_type=pending.media_type
+        )
+        db.session.add(post)
+        pending.status = "approved"
+        flash("Пост опубликован", "success")
+        notif = Notification(
+            user_id=pending.user_id,
+            from_user_id=current_user.id,
+            type="moderation",
+            text=f"Ваш пост прошёл модерацию и опубликован"
+        )
+        db.session.add(notif)
+        db.session.commit()
+    elif action == "reject":
+        pending.status = "rejected"
+        pending.moderation_comment = comment
+        flash("Пост отклонён", "warning")
+        notif = Notification(
+            user_id=pending.user_id,
+            from_user_id=current_user.id,
+            type="moderation",
+            text=f"Ваш пост отклонён модератором: {comment if comment else 'Нарушение правил'}"
+        )
+        db.session.add(notif)
+        db.session.commit()
+    pending.moderated_at = datetime.utcnow()
+    pending.moderated_by = current_user.id
+    db.session.commit()
+    return redirect(url_for("moderator_pending_posts"))
+
+@app.route("/moderator/spam-patterns", methods=["GET", "POST"])
+@login_required
+@moderator_required
+def moderator_spam_patterns():
+    if request.method == "POST":
+        pattern = escape_html(request.form.get("pattern", "").strip())
+        is_regex = bool(request.form.get("is_regex"))
+        if pattern:
+            existing = SpamPattern.query.filter_by(pattern=pattern).first()
+            if not existing:
+                sp = SpamPattern(pattern=pattern, is_regex=is_regex)
+                db.session.add(sp)
+                db.session.commit()
+                flash("Паттерн добавлен", "success")
+            else:
+                flash("Такой паттерн уже существует", "warning")
+        return redirect(url_for("moderator_spam_patterns"))
+    patterns = SpamPattern.query.order_by(SpamPattern.created_at.desc()).all()
+    return render_template("moderator/spam_patterns.html", patterns=patterns)
+
+@app.route("/moderator/spam-pattern/<int:pattern_id>/delete", methods=["POST"])
+@login_required
+@moderator_required
+def moderator_delete_spam_pattern(pattern_id):
+    pattern = SpamPattern.query.get_or_404(pattern_id)
+    db.session.delete(pattern)
+    db.session.commit()
+    flash("Паттерн удалён", "success")
+    return redirect(url_for("moderator_spam_patterns"))
+
+# ================================================================
+# КОНЕЦ_ДОБАВЛЕНО_МОДЕРАТОРСКИЙ_ИНТЕРФЕЙС
+# ================================================================
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -3289,6 +3646,18 @@ def register():
             if password != confirm:
                 flash("Пароли не совпадают", "error")
                 return render_template("register.html")
+
+            # ================================================================
+            # НАЧАЛО_ДОБАВЛЕНО_IP_CHECK_REGISTER
+            # ================================================================
+            # Проверка, не заблокирован ли IP
+            if check_ip_block(get_client_ip()):
+                flash("Ваш IP-адрес заблокирован, регистрация невозможна.", "error")
+                return render_template("register.html")
+            # ================================================================
+            # КОНЕЦ_ДОБАВЛЕНО_IP_CHECK_REGISTER
+            # ================================================================
+
             existing_user = User.query.filter((User.username == username) | (User.email == email)).first()
             if existing_user:
                 if existing_user.username == username:
@@ -3424,9 +3793,46 @@ def create_post():
     if not content and not media_url:
         flash("Пост не может быть пустым.", "error")
         return redirect(url_for("index"))
+
+    # ================================================================
+    # НАЧАЛО_ДОБАВЛЕНО_СПАМ_ФИЛЬТР
+    # ================================================================
+    # Проверка на спам
+    if content and is_spam(content):
+        flash("Ваш пост содержит спам и не был опубликован.", "error")
+        return redirect(url_for("index"))
+
+    # Премодерация для новых пользователей
+    if is_new_user(current_user):
+        # Сохраняем в таблицу ожидания
+        pending = PendingPost(
+            user_id=current_user.id,
+            content=content,
+            media_url=media_url or "",
+            media_type=media_type
+        )
+        db.session.add(pending)
+        db.session.commit()
+        flash("Ваш пост отправлен на модерацию и будет опубликован после проверки.", "info")
+        return redirect(url_for("index"))
+    # ================================================================
+    # КОНЕЦ_ДОБАВЛЕНО_СПАМ_ФИЛЬТР
+    # ================================================================
+
     post = Post(user_id=current_user.id, content=content, media_url=media_url or "", media_type=media_type)
     db.session.add(post)
     db.session.commit()
+
+    # ================================================================
+    # НАЧАЛО_ДОБАВЛЕНО_УПОМИНАНИЯ_ПОСТ
+    # ================================================================
+    # Обработка упоминаний в посте
+    if content:
+        notify_mentions(content, current_user, post_id=post.id, type='mention')
+    # ================================================================
+    # КОНЕЦ_ДОБАВЛЕНО_УПОМИНАНИЯ_ПОСТ
+    # ================================================================
+
     follower_count = current_user.follower_count
     hours = get_post_lifetime_hours(follower_count)
     if hours:
@@ -3484,8 +3890,41 @@ def add_comment(post_id):
     content = escape_html(request.form.get("content", "").strip())
     if not content:
         return jsonify({"error": "Comment cannot be empty."}), 400
+
+    # ================================================================
+    # НАЧАЛО_ДОБАВЛЕНО_СПАМ_ФИЛЬТР_КОММЕНТ
+    # ================================================================
+    # Проверка на спам
+    if content and is_spam(content):
+        return jsonify({"error": "Комментарий содержит спам"}), 400
+
+    # Премодерация комментариев для новых пользователей
+    if is_new_user(current_user):
+        pending = PendingComment(
+            user_id=current_user.id,
+            post_id=post.id,
+            content=content
+        )
+        db.session.add(pending)
+        db.session.commit()
+        return jsonify({"message": "Комментарий отправлен на модерацию"}), 202
+    # ================================================================
+    # КОНЕЦ_ДОБАВЛЕНО_СПАМ_ФИЛЬТР_КОММЕНТ
+    # ================================================================
+
     c = Comment(post_id=post.id, user_id=current_user.id, content=content)
     db.session.add(c)
+
+    # ================================================================
+    # НАЧАЛО_ДОБАВЛЕНО_УПОМИНАНИЯ_КОММЕНТАРИЙ
+    # ================================================================
+    # Обработка упоминаний в комментарии
+    if content:
+        notify_mentions(content, current_user, post_id=post.id, type='mention')
+    # ================================================================
+    # КОНЕЦ_ДОБАВЛЕНО_УПОМИНАНИЯ_КОММЕНТАРИЙ
+    # ================================================================
+
     if post.user_id != current_user.id:
         n = Notification(user_id=post.user_id, from_user_id=current_user.id, type="comment",
                          post_id=post.id, text=f"{current_user.username} commented on your post.")
@@ -4063,6 +4502,32 @@ def debug_uploads():
     return jsonify(result)
 
 
+# ================================================================
+# НАЧАЛО_ДОБАВЛЕНО_ШАРИНГ
+# ================================================================
+
+@app.route("/share/<int:post_id>")
+@login_required
+def share_post(post_id):
+    post = Post.query.get_or_404(post_id)
+    base_url = f"{request.scheme}://{request.host}"
+    post_url = url_for('view_post', post_id=post.id, _external=True)
+    text = f"Посмотрите пост от @{post.author.username}: {post.content[:100]}"
+    share_links = {
+        "telegram": f"https://t.me/share/url?url={post_url}&text={text}",
+        "vkontakte": f"https://vk.com/share.php?url={post_url}&title={text}",
+        "facebook": f"https://www.facebook.com/sharer/sharer.php?u={post_url}&quote={text}",
+        "twitter": f"https://twitter.com/intent/tweet?url={post_url}&text={text}",
+        "whatsapp": f"https://api.whatsapp.com/send?text={text}%20{post_url}",
+        "reddit": f"https://www.reddit.com/submit?url={post_url}&title={text}"
+    }
+    return jsonify(share_links)
+
+# ================================================================
+# КОНЕЦ_ДОБАВЛЕНО_ШАРИНГ
+# ================================================================
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 #  Achievements Routes
 # ──────────────────────────────────────────────────────────────────────────────
@@ -4343,7 +4808,6 @@ def create_admin_user():
         logger.error(f"❌ Ошибка при создании администратора: {e}")
 
 
-# Добавьте ЭТОТ эндпоинт ниже:
 @app.route('/create-new-admin')
 def create_new_admin():
     secret = request.args.get('secret')
@@ -4380,6 +4844,8 @@ def run_migrations():
     try:
         inspector = db.inspect(db.engine)
         tables = inspector.get_table_names()
+
+        # --- Миграция для таблицы message (было) ---
         if 'message' in tables:
             columns = [col['name'] for col in inspector.get_columns('message')]
             if 'is_edited' not in columns:
@@ -4392,6 +4858,17 @@ def run_migrations():
                     db.session.execute(text('ALTER TABLE message ADD COLUMN edit_count INTEGER DEFAULT 0'))
                     db.session.execute(text('ALTER TABLE message ADD COLUMN updated_at TIMESTAMP'))
                 logger.info("➕ Добавлены колонки is_edited, edit_count, updated_at в message")
+
+        # --- НОВАЯ МИГРАЦИЯ для таблицы ip_ban ---
+        if 'ip_ban' in tables:
+            columns = [col['name'] for col in inspector.get_columns('ip_ban')]
+            if 'is_active' not in columns:
+                # SQLite поддерживает ALTER TABLE ADD COLUMN с DEFAULT
+                db.session.execute(text('ALTER TABLE ip_ban ADD COLUMN is_active BOOLEAN DEFAULT 1'))
+                logger.info("➕ Добавлена колонка is_active в ip_ban")
+            # также можно проверить и добавить другие колонки, если нужно
+        # Если таблицы ip_ban нет, она будет создана при следующем db.create_all()
+
         db.session.commit()
         logger.info("🎉 Миграция базы данных завершена успешно!")
     except Exception as e:
@@ -4414,6 +4891,22 @@ def init_app():
                 logger.info("✅ Временная папка доступна для записи")
             except Exception as e:
                 logger.warning(f"⚠️ Временная папка может быть недоступна: {e}")
+            # ================================================================
+            # НАЧАЛО_ДОБАВЛЕНО_ИНИЦИАЛИЗАЦИЯ_СПАМ_ПАТТЕРНОВ
+            # ================================================================
+            # Добавляем базовые спам-паттерны, если их нет
+            if SpamPattern.query.count() == 0:
+                default_patterns = [
+                    "купить подписчиков", "накрутка", "бесплатный даром", "заработок в интернете",
+                    "ссылка на мошеннический сайт", "viagra", "казино", "бинарные опционы"
+                ]
+                for p in default_patterns:
+                    db.session.add(SpamPattern(pattern=p, is_regex=False))
+                db.session.commit()
+                logger.info("✅ Добавлены базовые спам-паттерны")
+            # ================================================================
+            # КОНЕЦ_ДОБАВЛЕНО_ИНИЦИАЛИЗАЦИЯ_СПАМ_ПАТТЕРНОВ
+            # ================================================================
             create_admin_user()
             start_background_tasks()
             logger.info("🎉 Инициализация приложения завершена!")
@@ -4584,6 +5077,8 @@ def unban_command():
             click.echo(f"✅ Пользователь {username} разбанен!")
         else:
             click.echo(f"❌ Пользователь {username} не найден!")
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 #  Main Entry Point
 # ──────────────────────────────────────────────────────────────────────────────
@@ -4607,6 +5102,14 @@ if __name__ == "__main__":
     print("   ✅ Аудиозвонки (WebRTC)")
     print("   ✅ Индикатор набора текста")
     print("   ✅ Статус прочтения")
+    print("=" * 70)
+    print("📝 ДОПОЛНИТЕЛЬНЫЙ ФУНКЦИОНАЛ:")
+    print("   ✅ Система жалоб на контент")
+    print("   ✅ Модераторский интерфейс")
+    print("   ✅ Блокировка по IP")
+    print("   ✅ Фильтр спама и премодерация для новых пользователей")
+    print("   ✅ Упоминания @username с уведомлениями")
+    print("   ✅ Кнопки 'Поделиться' в соцсети")
     print("=" * 70)
     print("📝 Для остановки нажмите Ctrl+C")
     print("=" * 70 + "\n")

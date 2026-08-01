@@ -298,58 +298,6 @@
       cursor: not-allowed;
     }
 
-    .social-buttons {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-top: 20px;
-    }
-    .social-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      width: 100%;
-      padding: 12px;
-      border-radius: 12px;
-      font-weight: 600;
-      font-size: 14px;
-      text-decoration: none;
-      transition: all 0.2s;
-    }
-    .btn-yandex {
-      background: var(--yandex);
-      color: #fff;
-    }
-    .btn-yandex:hover {
-      background: #e63510;
-      transform: translateY(-1px);
-    }
-    .btn-vk {
-      background: var(--vk);
-      color: #fff;
-    }
-    .btn-vk:hover {
-      background: #0066cc;
-      transform: translateY(-1px);
-    }
-
-    .divider {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin: 20px 0;
-      font-size: 12px;
-      color: var(--text-dim);
-    }
-    .divider::before,
-    .divider::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
-    }
-
     .auth-footer {
       text-align: center;
       margin-top: 20px;
@@ -382,7 +330,6 @@
       <div class="auth-title">Добро пожаловать</div>
       <div class="auth-sub">Войдите, чтобы продолжить</div>
 
-      <!-- Обычная HTML-форма -->
       <form method="POST" action="{{ url_for('login') }}" id="loginForm">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
@@ -414,7 +361,6 @@
           <a href="#" class="forgot">Забыли пароль?</a>
         </div>
 
-        <!-- НОВЫЙ БЛОК: согласие с политикой конфиденциальности -->
         <div class="consent-box">
           <input type="checkbox" id="privacyConsent" name="privacy_consent" value="1" required>
           <label for="privacyConsent">
@@ -424,17 +370,6 @@
 
         <button type="submit" class="btn-submit" id="submitBtn">Войти</button>
       </form>
-
-      <div class="divider">или</div>
-
-      <div class="social-buttons">
-        <a href="{{ url_for('login_yandex') }}" class="social-btn btn-yandex">
-          <i class="fa-brands fa-yandex"></i> Продолжить с Яндекс
-        </a>
-        <a href="{{ url_for('login_vk') }}" class="social-btn btn-vk">
-          <i class="fa-brands fa-vk"></i> Продолжить с VK
-        </a>
-      </div>
 
       <div class="auth-footer">
         Нет аккаунта? <a href="{{ url_for('register') }}">Создать →</a>
@@ -455,7 +390,6 @@
       }
     }
 
-    // Блокировка кнопки входа, пока не принята политика
     const consentCheckbox = document.getElementById('privacyConsent');
     const submitBtn = document.getElementById('submitBtn');
 
@@ -464,7 +398,7 @@
     }
 
     consentCheckbox.addEventListener('change', updateSubmitButton);
-    updateSubmitButton(); // начальное состояние
+    updateSubmitButton();
   </script>
 </body>
 </html>

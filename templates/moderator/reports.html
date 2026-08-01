@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Жалобы — Kildear</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #07070f;
+            --surface: #0f0f1a;
+            --card: rgba(255,255,255,0.04);
+            --border: rgba(255,255,255,0.08);
+            --border-hover: rgba(255,255,255,0.16);
+            --primary: #7c6fff;
+            --primary-glow: rgba(124,111,255,0.25);
+            --secondary: #ff6b9d;
+            --accent: #00d4ff;
+            --text: #e4e4f0;
+            --text-muted: #7070a0;
+            --text-dim: #4a4a70;
+            --danger: #ff4757;
+            --success: #22d3a0;
+            --warning: #fbbf24;
+            --font-head: 'Syne', sans-serif;
+            --font-body: 'DM Sans', sans-serif;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .header h1 {
+            font-family: var(--font-head);
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header h1 i {
+            color: var(--danger);
+        }
+
+        .back-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .back-link:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .filters {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
+        }
+
+        .filter-btn {
+            padding: 6px 16px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: var(--font-body);
+            font-size: 13px;
+        }
+
+        .filter-btn:hover {
+            border-color: var(--primary);
+            color: var(--text);
+        }
+
+        .filter-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #fff;
+        }
+
+        .report-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            transition: all 0.2s;
+        }
+
+        .report-card:hover {
+            border-color: var(--border-hover);
+        }
+
+        .report-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .report-user {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .report-user .avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .report-user .username {
+            font-weight: 600;
+        }
+
+        .report-user .arrow {
+            color: var(--text-dim);
+            margin: 0 4px;
+        }
+
+        .badge {
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-pending {
+            background: rgba(251, 191, 36, 0.2);
+            color: var(--warning);
+        }
+
+        .badge-reviewed {
+            background: rgba(34, 211, 160, 0.2);
+            color: var(--success);
+        }
+
+        .badge-dismissed {
+            background: rgba(255, 71, 87, 0.2);
+            color: var(--danger);
+        }
+
+        .report-reason {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .report-description {
+            font-size: 13px;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+        }
+
+        .report-meta {
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        .report-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 8px;
+            font-family: var(--font-body);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: #9b8fff;
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: #fff;
+        }
+
+        .btn-danger:hover {
+            background: #ff6b7a;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: #fff;
+        }
+
+        .btn-success:hover {
+            background: #34d9a8;
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: #000;
+        }
+
+        .btn-warning:hover {
+            background: #fcd34d;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 24px;
+        }
+
+        .pagination a {
+            padding: 6px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .pagination a:hover {
+            border-color: var(--primary);
+            color: var(--text);
+        }
+
+        .pagination a.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #fff;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .report-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-flag"></i> Жалобы</h1>
+            <a href="{{ url_for('moderator_dashboard') }}" class="back-link">
+                <i class="fas fa-arrow-left"></i> Назад
+            </a>
+        </div>
+
+        <div class="filters">
+            <a href="{{ url_for('moderator_reports', status='all') }}" class="filter-btn {% if current_status == 'all' %}active{% endif %}">Все</a>
+            <a href="{{ url_for('moderator_reports', status='pending') }}" class="filter-btn {% if current_status == 'pending' %}active{% endif %}">Ожидают</a>
+            <a href="{{ url_for('moderator_reports', status='reviewed') }}" class="filter-btn {% if current_status == 'reviewed' %}active{% endif %}">Рассмотрены</a>
+            <a href="{{ url_for('moderator_reports', status='dismissed') }}" class="filter-btn {% if current_status == 'dismissed' %}active{% endif %}">Отклонены</a>
+        </div>
+
+        {% if reports.items %}
+            {% for report in reports.items %}
+            <div class="report-card">
+                <div class="report-header">
+                    <div class="report-user">
+                        <div class="avatar">{{ report.reporter.username[0]|upper }}</div>
+                        <span class="username">{{ report.reporter.username }}</span>
+                        <span class="arrow"><i class="fas fa-arrow-right"></i></span>
+                        {% if report.reported_user %}
+                            <div class="avatar" style="background: var(--danger);">{{ report.reported_user.username[0]|upper }}</div>
+                            <span class="username">{{ report.reported_user.username }}</span>
+                        {% elif report.post_id %}
+                            <span style="color: var(--text-dim);"><i class="fas fa-file-alt"></i> Пост #{{ report.post_id }}</span>
+                        {% elif report.comment_id %}
+                            <span style="color: var(--text-dim);"><i class="fas fa-comment"></i> Комментарий</span>
+                        {% endif %}
+                    </div>
+                    <span class="badge badge-{{ report.status }}">{{ report.status }}</span>
+                </div>
+
+                <div class="report-reason"><i class="fas fa-tag"></i> {{ report.reason }}</div>
+
+                {% if report.description %}
+                <div class="report-description">{{ report.description }}</div>
+                {% endif %}
+
+                <div class="report-meta">
+                    <i class="far fa-clock"></i> {{ report.created_at|timeago }}
+                    {% if report.reviewed_at %}
+                        • Рассмотрено: {{ report.reviewed_at|timeago }}
+                    {% endif %}
+                </div>
+
+                <div class="report-actions">
+                    <a href="{{ url_for('moderator_report_detail', report_id=report.id) }}" class="btn btn-primary">
+                        <i class="fas fa-eye"></i> Подробнее
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+
+            <div class="pagination">
+                {% if reports.has_prev %}
+                    <a href="{{ url_for('moderator_reports', page=reports.prev_num, status=current_status) }}">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                {% endif %}
+                {% for page in reports.iter_pages() %}
+                    {% if page %}
+                        <a href="{{ url_for('moderator_reports', page=page, status=current_status) }}" class="{% if page == reports.page %}active{% endif %}">
+                            {{ page }}
+                        </a>
+                    {% else %}
+                        <span style="color: var(--text-dim);">…</span>
+                    {% endif %}
+                {% endfor %}
+                {% if reports.has_next %}
+                    <a href="{{ url_for('moderator_reports', page=reports.next_num, status=current_status) }}">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                {% endif %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-check-circle"></i>
+                <p>Нет жалоб</p>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>

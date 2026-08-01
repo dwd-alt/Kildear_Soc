@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Спам-паттерны — Kildear</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #07070f;
+            --surface: #0f0f1a;
+            --card: rgba(255,255,255,0.04);
+            --border: rgba(255,255,255,0.08);
+            --border-hover: rgba(255,255,255,0.16);
+            --primary: #7c6fff;
+            --primary-glow: rgba(124,111,255,0.25);
+            --secondary: #ff6b9d;
+            --accent: #00d4ff;
+            --text: #e4e4f0;
+            --text-muted: #7070a0;
+            --text-dim: #4a4a70;
+            --danger: #ff4757;
+            --success: #22d3a0;
+            --warning: #fbbf24;
+            --font-head: 'Syne', sans-serif;
+            --font-body: 'DM Sans', sans-serif;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-family: var(--font-head);
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header h1 i {
+            color: var(--danger);
+        }
+
+        .back-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .back-link:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .card-title {
+            font-family: var(--font-head);
+            font-size: 18px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-title i {
+            color: var(--primary);
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .form-control {
+            width: 100%;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 14px;
+            color: var(--text);
+            font-family: var(--font-body);
+            font-size: 14px;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .form-control:focus {
+            border-color: var(--primary);
+            background: rgba(124,111,255,0.07);
+        }
+
+        .form-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-muted);
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .checkbox-label input {
+            accent-color: var(--primary);
+            width: 16px;
+            height: 16px;
+        }
+
+        .btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 10px;
+            font-family: var(--font-body);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: #9b8fff;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: #fff;
+        }
+
+        .btn-danger:hover {
+            background: #ff6b7a;
+        }
+
+        .btn-sm {
+            padding: 4px 12px;
+            font-size: 12px;
+        }
+
+        .pattern-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border);
+            gap: 12px;
+        }
+
+        .pattern-item:last-child {
+            border-bottom: none;
+        }
+
+        .pattern-text {
+            font-size: 14px;
+        }
+
+        .pattern-badge {
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            background: rgba(124,111,255,0.15);
+            color: var(--primary);
+        }
+
+        .pattern-badge.regex {
+            background: rgba(255,107,157,0.15);
+            color: var(--secondary);
+        }
+
+        .pattern-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state i {
+            font-size: 36px;
+            margin-bottom: 12px;
+            opacity: 0.3;
+        }
+
+        .flash-message {
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            font-size: 13.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .flash-success {
+            background: rgba(34,211,160,0.1);
+            border: 1px solid rgba(34,211,160,0.3);
+            color: var(--success);
+        }
+
+        .flash-error {
+            background: rgba(255,71,87,0.1);
+            border: 1px solid rgba(255,71,87,0.3);
+            color: var(--danger);
+        }
+
+        .flash-warning {
+            background: rgba(251,191,36,0.1);
+            border: 1px solid rgba(251,191,36,0.3);
+            color: var(--warning);
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            .form-row {
+                flex-direction: column;
+            }
+            .form-row .form-group {
+                width: 100%;
+            }
+            .pattern-item {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-ban"></i> Спам-паттерны</h1>
+            <a href="{{ url_for('moderator_dashboard') }}" class="back-link">
+                <i class="fas fa-arrow-left"></i> Назад
+            </a>
+        </div>
+
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}">
+                        <i class="fas fa-{% if category == 'success' %}check-circle{% elif category == 'error' %}exclamation-circle{% else %}info-circle{% endif %}"></i>
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Добавление паттерна -->
+        <div class="card">
+            <div class="card-title">
+                <i class="fas fa-plus-circle"></i> Добавить паттерн
+            </div>
+            <form method="POST" action="{{ url_for('moderator_spam_patterns') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="pattern">Слово или фраза</label>
+                        <input type="text" class="form-control" id="pattern" name="pattern"
+                               placeholder="например: купить подписчиков" required>
+                    </div>
+                    <div class="form-group" style="flex: 0 0 auto;">
+                        <label class="form-label" style="visibility: hidden;">.</label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="is_regex" value="1">
+                            <i class="fas fa-code"></i> Regex
+                        </label>
+                    </div>
+                    <div class="form-group" style="flex: 0 0 auto;">
+                        <label class="form-label" style="visibility: hidden;">.</label>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Добавить
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Список паттернов -->
+        <div class="card">
+            <div class="card-title">
+                <i class="fas fa-list"></i> Все паттерны ({{ patterns|length }})
+            </div>
+            {% if patterns %}
+                {% for pattern in patterns %}
+                <div class="pattern-item">
+                    <div>
+                        <span class="pattern-text">{{ pattern.pattern }}</span>
+                        {% if pattern.is_regex %}
+                            <span class="pattern-badge regex">Regex</span>
+                        {% else %}
+                            <span class="pattern-badge">Текст</span>
+                        {% endif %}
+                    </div>
+                    <div class="pattern-actions">
+                        <form method="POST" action="{{ url_for('moderator_delete_spam_pattern', pattern_id=pattern.id) }}"
+                              onsubmit="return confirm('Удалить паттерн «{{ pattern.pattern }}»?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-danger btn-sm">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-shield-alt"></i>
+                    <p>Нет спам-паттернов</p>
+                    <p style="font-size: 13px; color: var(--text-dim);">Добавьте первый паттерн выше</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Подсказка -->
+        <div style="background: rgba(124,111,255,0.05); border: 1px solid var(--border); border-radius: 12px; padding: 16px;">
+            <p style="font-size: 13px; color: var(--text-muted);">
+                <i class="fas fa-info-circle" style="color: var(--primary);"></i>
+                <strong>Подсказка:</strong> Паттерны проверяются в порядке добавления.
+                <strong>Regex</strong> позволяет использовать регулярные выражения
+                (например, <code>купить.*подписчиков</code>).
+                Будьте осторожны с regex — они могут замедлить работу!
+            </p>
+        </div>
+    </div>
+</body>
+</html>

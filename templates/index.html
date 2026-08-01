@@ -142,14 +142,49 @@
           <span id="comment-count-{{ post.id }}">{{ post.comment_count }}</span>
         </a>
 
-        <button class="post-action" onclick="sharePost({{ post.id }})">
+        <!-- ================================================================ -->
+        <!-- НАЧАЛО_ДОБАВЛЕНО_ШАРИНГ_КНОПКА -->
+        <!-- ================================================================ -->
+        <button class="post-action" onclick="showShareMenu({{ post.id }})">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
             <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
           </svg>
           Поделиться
         </button>
+        <!-- ================================================================ -->
+        <!-- КОНЕЦ_ДОБАВЛЕНО_ШАРИНГ_КНОПКА -->
+        <!-- ================================================================ -->
       </div>
+
+      <!-- ================================================================ -->
+      <!-- НАЧАЛО_ДОБАВЛЕНО_ШАРИНГ_МЕНЮ -->
+      <!-- ================================================================ -->
+      <div id="share-menu-{{ post.id }}" class="share-menu" style="display:none; margin-top: 12px; padding: 12px; background: var(--surface2); border-radius: var(--radius-sm); border: 1px solid var(--border);">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="btn-share" data-post-id="{{ post.id }}" data-platform="telegram" style="background: #0088cc; color: white; border: none; padding: 6px 14px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px;">
+            <i class="fab fa-telegram-plane"></i> Telegram
+          </button>
+          <button class="btn-share" data-post-id="{{ post.id }}" data-platform="vkontakte" style="background: #0077ff; color: white; border: none; padding: 6px 14px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px;">
+            <i class="fab fa-vk"></i> VK
+          </button>
+          <button class="btn-share" data-post-id="{{ post.id }}" data-platform="twitter" style="background: #000; color: white; border: none; padding: 6px 14px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px;">
+            <i class="fab fa-twitter"></i> X
+          </button>
+          <button class="btn-share" data-post-id="{{ post.id }}" data-platform="facebook" style="background: #1877f2; color: white; border: none; padding: 6px 14px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px;">
+            <i class="fab fa-facebook-f"></i> FB
+          </button>
+          <button class="btn-share" data-post-id="{{ post.id }}" data-platform="whatsapp" style="background: #25d366; color: white; border: none; padding: 6px 14px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px;">
+            <i class="fab fa-whatsapp"></i> WhatsApp
+          </button>
+          <button class="btn-share" data-post-id="{{ post.id }}" data-platform="reddit" style="background: #ff4500; color: white; border: none; padding: 6px 14px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px;">
+            <i class="fab fa-reddit-alien"></i> Reddit
+          </button>
+        </div>
+      </div>
+      <!-- ================================================================ -->
+      <!-- КОНЕЦ_ДОБАВЛЕНО_ШАРИНГ_МЕНЮ -->
+      <!-- ================================================================ -->
 
       <!-- inline comment box -->
       <div class="inline-comment">
@@ -286,6 +321,19 @@
 .dropdown-item:hover{background:rgba(255,255,255,.06)}
 .dropdown-item.danger{color:#ff6b6b}
 
+/* Share menu */
+.share-menu {
+  animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.btn-share:hover {
+  transform: scale(1.05);
+  filter: brightness(1.1);
+}
+
 /* Inline comment */
 .inline-comment{display:flex;align-items:center;gap:.6rem;margin-top:.75rem}
 .inline-comment-form{flex:1;display:flex;gap:.4rem}
@@ -357,6 +405,51 @@ function toggleMenu(btn){
 document.addEventListener('click', e=>{
   if(!e.target.closest('.post-menu')) document.querySelectorAll('.dropdown-menu.open').forEach(m=>m.classList.remove('open'));
 });
+
+// ================================================================
+// НАЧАЛО_ДОБАВЛЕНО_ШАРИНГ_ФУНКЦИИ
+// ================================================================
+function showShareMenu(postId) {
+  const menu = document.getElementById(`share-menu-${postId}`);
+  if (menu) {
+    const isVisible = menu.style.display === 'block';
+    // Скрываем все меню
+    document.querySelectorAll('.share-menu').forEach(m => m.style.display = 'none');
+    // Показываем/скрываем текущее
+    menu.style.display = isVisible ? 'none' : 'block';
+  }
+}
+
+document.addEventListener('click', function(e) {
+  // Закрываем меню при клике вне его
+  if (!e.target.closest('.share-menu') && !e.target.closest('.post-action')) {
+    document.querySelectorAll('.share-menu').forEach(m => m.style.display = 'none');
+  }
+});
+
+document.querySelectorAll('.btn-share').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    const postId = this.dataset.postId;
+    const platform = this.dataset.platform;
+
+    fetch(`/share/${postId}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data[platform]) {
+          window.open(data[platform], '_blank', 'width=600,height=500');
+        } else {
+          toast('Ссылка на этот пост недоступна', 'error');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        toast('Ошибка при получении ссылки для шаринга', 'error');
+      });
+  });
+});
+// ================================================================
+// КОНЕЦ_ДОБАВЛЕНО_ШАРИНГ_ФУНКЦИИ
+// ================================================================
 
 async function submitInlineComment(e, postId){
   e.preventDefault();
@@ -441,15 +534,6 @@ async function followUser(username, btn){
     toast(data.following ? `Вы подписались на ${username}!` : `Вы отписались от ${username}`, 'success');
   } catch(e) {
     toast('Не удалось изменить статус подписки.', 'error');
-  }
-}
-
-function sharePost(postId){
-  const url = `${window.location.origin}/post/${postId}`;
-  if(navigator.share){
-    navigator.share({ url, title: 'Посмотрите этот пост в Kildear' }).catch(()=>{});
-  } else {
-    navigator.clipboard.writeText(url).then(() => toast('Ссылка скопирована в буфер обмена!', 'success'));
   }
 }
 

@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Посты на модерацию — Kildear</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #07070f;
+            --surface: #0f0f1a;
+            --card: rgba(255,255,255,0.04);
+            --border: rgba(255,255,255,0.08);
+            --border-hover: rgba(255,255,255,0.16);
+            --primary: #7c6fff;
+            --primary-glow: rgba(124,111,255,0.25);
+            --secondary: #ff6b9d;
+            --accent: #00d4ff;
+            --text: #e4e4f0;
+            --text-muted: #7070a0;
+            --text-dim: #4a4a70;
+            --danger: #ff4757;
+            --success: #22d3a0;
+            --warning: #fbbf24;
+            --font-head: 'Syne', sans-serif;
+            --font-body: 'DM Sans', sans-serif;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-family: var(--font-head);
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header h1 i {
+            color: var(--warning);
+        }
+
+        .back-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .back-link:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .post-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            transition: all 0.2s;
+        }
+
+        .post-card:hover {
+            border-color: var(--border-hover);
+        }
+
+        .post-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .post-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .post-author {
+            font-weight: 600;
+        }
+
+        .post-author a {
+            color: var(--text);
+            text-decoration: none;
+        }
+
+        .post-author a:hover {
+            color: var(--primary);
+        }
+
+        .post-meta {
+            font-size: 12px;
+            color: var(--text-dim);
+            margin-left: auto;
+        }
+
+        .badge {
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-pending {
+            background: rgba(251, 191, 36, 0.2);
+            color: var(--warning);
+        }
+
+        .badge-approved {
+            background: rgba(34, 211, 160, 0.2);
+            color: var(--success);
+        }
+
+        .badge-rejected {
+            background: rgba(255, 71, 87, 0.2);
+            color: var(--danger);
+        }
+
+        .post-content {
+            margin: 12px 0;
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .post-media {
+            margin: 8px 0;
+        }
+
+        .post-media img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+        }
+
+        .post-media video {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+        }
+
+        .post-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 6px 16px;
+            border: none;
+            border-radius: 8px;
+            font-family: var(--font-body);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: #fff;
+        }
+
+        .btn-success:hover {
+            background: #34d9a8;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: #fff;
+        }
+
+        .btn-danger:hover {
+            background: #ff6b7a;
+        }
+
+        .btn-secondary {
+            background: var(--border);
+            color: var(--text-muted);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-hover);
+            color: var(--text);
+        }
+
+        .comment-input {
+            margin-top: 12px;
+        }
+
+        .comment-input textarea {
+            width: 100%;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 12px;
+            color: var(--text);
+            font-family: var(--font-body);
+            font-size: 13px;
+            resize: vertical;
+            min-height: 60px;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .comment-input textarea:focus {
+            border-color: var(--primary);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 24px;
+        }
+
+        .pagination a {
+            padding: 6px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .pagination a:hover {
+            border-color: var(--primary);
+            color: var(--text);
+        }
+
+        .pagination a.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #fff;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            .post-header {
+                flex-wrap: wrap;
+            }
+            .post-meta {
+                margin-left: 0;
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-file-alt"></i> Посты на модерацию</h1>
+            <a href="{{ url_for('moderator_dashboard') }}" class="back-link">
+                <i class="fas fa-arrow-left"></i> Назад
+            </a>
+        </div>
+
+        {% if posts.items %}
+            {% for post in posts.items %}
+            <div class="post-card">
+                <div class="post-header">
+                    <div class="post-avatar">{{ post.user.username[0]|upper }}</div>
+                    <div class="post-author">
+                        <a href="{{ url_for('profile', username=post.user.username) }}">
+                            {{ post.user.username }}
+                        </a>
+                    </div>
+                    <span class="badge badge-pending">На проверке</span>
+                    <span class="post-meta">
+                        <i class="far fa-clock"></i> {{ post.created_at|timeago }}
+                    </span>
+                </div>
+
+                {% if post.content %}
+                <div class="post-content">{{ post.content }}</div>
+                {% endif %}
+
+                {% if post.media_url %}
+                <div class="post-media">
+                    {% if post.media_type == 'image' %}
+                        <img src="{{ post.media_url }}" alt="Post media">
+                    {% elif post.media_type == 'video' %}
+                        <video controls>
+                            <source src="{{ post.media_url }}">
+                        </video>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <form method="POST" action="{{ url_for('moderator_review_pending_post', post_id=post.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <div class="comment-input">
+                        <textarea name="comment" placeholder="Комментарий модератора (опционально)..."></textarea>
+                    </div>
+
+                    <div class="post-actions">
+                        <button type="submit" name="action" value="approve" class="btn btn-success">
+                            <i class="fas fa-check"></i> Одобрить
+                        </button>
+                        <button type="submit" name="action" value="reject" class="btn btn-danger">
+                            <i class="fas fa-times"></i> Отклонить
+                        </button>
+                    </div>
+                </form>
+            </div>
+            {% endfor %}
+
+            <div class="pagination">
+                {% if posts.has_prev %}
+                    <a href="{{ url_for('moderator_pending_posts', page=posts.prev_num) }}">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                {% endif %}
+                {% for page in posts.iter_pages() %}
+                    {% if page %}
+                        <a href="{{ url_for('moderator_pending_posts', page=page) }}" class="{% if page == posts.page %}active{% endif %}">
+                            {{ page }}
+                        </a>
+                    {% else %}
+                        <span style="color: var(--text-dim);">…</span>
+                    {% endif %}
+                {% endfor %}
+                {% if posts.has_next %}
+                    <a href="{{ url_for('moderator_pending_posts', page=posts.next_num) }}">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                {% endif %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-check-circle"></i>
+                <p>Нет постов на модерации</p>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>
