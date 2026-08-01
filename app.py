@@ -461,6 +461,7 @@ def is_new_user(user) -> bool:
     days_since_join = (datetime.utcnow() - user.created_at).days
     return days_since_join < 7 or user.post_count < 10
 
+
 def is_spam(content: str) -> bool:
     """Проверяет текст на спам по сохранённым паттернам"""
     if not content:
@@ -476,15 +477,16 @@ def is_spam(content: str) -> bool:
                 return True
     return False
 
+
 def extract_mentions(text: str) -> List[str]:
     """Извлекает все упоминания @username из текста"""
     if not text:
         return []
     import re
-    # Находит слова, начинающиеся с @, за которым буквы/цифры/подчёркивание
     return re.findall(r'@([A-Za-z0-9_]{3,40})', text)
 
-def notify_mentions(text: str, author: User, post_id: int = None, comment_id: int = None, type: str = 'mention'):
+
+def notify_mentions(text: str, author, post_id: int = None, comment_id: int = None, type: str = 'mention'):
     """Отправляет уведомления всем упомянутым пользователям"""
     if not text:
         return
@@ -510,6 +512,7 @@ def notify_mentions(text: str, author: User, post_id: int = None, comment_id: in
             })
     db.session.commit()
 
+
 def check_ip_block(ip: str) -> bool:
     """Проверяет, заблокирован ли IP-адрес"""
     if not ip:
@@ -523,6 +526,7 @@ def check_ip_block(ip: str) -> bool:
             return False
         return True
     return False
+
 
 def block_ip(ip: str, reason: str = "", duration_hours: int = 24):
     """Блокирует IP-адрес на указанное время"""
