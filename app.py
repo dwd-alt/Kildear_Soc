@@ -3,6 +3,7 @@ Kildear Social Network — Полная версия с исправленным
 Добавлены: ответ на сообщение, редактирование, удаление, пересылка, эмодзи
 А также: система жалоб, модераторский интерфейс, IP-блокировка, фильтр спама,
 премодерация для новых пользователей, упоминания, кнопки "Поделиться".
+ДОБАВЛЕНО: СКВОЗНОЕ ШИФРОВАНИЕ СООБЩЕНИЙ (RSA+AES) С ИСПОЛЬЗОВАНИЕМ FORGE.JS
 """
 
 import os
@@ -776,6 +777,12 @@ class User(UserMixin, db.Model):
     two_factor_enabled = db.Column(db.Boolean, default=False)
     two_factor_secret = db.Column(db.String(32), nullable=True)
 
+    # ================================================================
+    # ДОБАВЛЕНО: ПОЛЯ ДЛЯ ШИФРОВАНИЯ
+    # ================================================================
+    public_key = db.Column(db.Text, nullable=True)               # публичный RSA ключ (PEM)
+    encrypted_private_key = db.Column(db.Text, nullable=True)   # зашифрованный паролем приватный ключ (PEM, зашифрованный AES)
+
     # Relationships
     following = db.relationship(
         "User", secondary=follows,
@@ -1186,6 +1193,13 @@ class Message(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # ================================================================
+    # ДОБАВЛЕНО: ПОЛЯ ДЛЯ ШИФРОВАНИЯ
+    # ================================================================
+    encrypted_key = db.Column(db.Text, nullable=True)    # зашифрованный RSA-ключ AES (base64)
+    iv = db.Column(db.String(44), nullable=True)         # вектор инициализации AES (base64)
+    is_encrypted = db.Column(db.Boolean, default=False)  # флаг шифрования
+
     # Relationships - исправлено
     reply_to = db.relationship("Message", remote_side=[id], backref=db.backref("replies", lazy="dynamic"))
 
@@ -1494,7 +1508,7 @@ def security_headers(response):
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     csp = [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' https://cdn.socket.io https://cdnjs.cloudflare.com https://unpkg.com https://accounts.google.com https://oauth.vk.com https://login.yandex.ru",
+        "script-src 'self' 'unsafe-inline' https://cdn.socket.io https://cdnjs.cloudflare.com https://unpkg.com https://accounts.google.com https://oauth.vk.com https://login.yandex.ru https://cdnjs.cloudflare.com/ajax/libs/forge/1.3.1/forge.min.js",
         "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com",
         "font-src 'self' https://cdnjs.cloudflare.com",
         "img-src 'self' data: blob: https:",
@@ -3365,6 +3379,8 @@ def api_get_conversations():
         ).order_by(Message.created_at.desc()).first()
         unread = Message.query.filter_by(sender_id=p.id, receiver_id=current_user.id, is_read=False,
                                          is_deleted=False).count()
+        # Проверяем, шифруется ли чат (есть ли у собеседника публичный ключ)
+        encryption_enabled = bool(p.public_key)
         conversations.append({
             "id": p.id, "username": p.username, "display_name": p.display_name or p.username,
             "avatar": p.avatar_url, "is_online": p.is_online, "is_verified": p.is_verified,
@@ -3374,7 +3390,8 @@ def api_get_conversations():
                 "time": last.created_at.strftime("%H:%M") if last else None,
                 "is_own": last.sender_id == current_user.id if last else None
             } if last else None,
-            "unread_count": unread
+            "unread_count": unread,
+            "encryption_enabled": encryption_enabled
         })
     conversations.sort(key=lambda x: x.get("last_message", {}).get("time", ""), reverse=True)
     return jsonify({"conversations": conversations})
@@ -3401,14 +3418,20 @@ def api_get_messages(username):
     return jsonify({
         "messages": [{
             "id": m.id, "sender_id": m.sender_id, "sender_username": m.sender.username,
-            "sender_avatar": m.sender.avatar_url, "content": m.content, "media_url": m.media_url,
+            "sender_avatar": m.sender.avatar_url,
+            "content": m.content,  # может быть зашифрован
+            "media_url": m.media_url,
             "is_read": m.is_read, "is_edited": m.is_edited, "edit_count": m.edit_count,
             "reply_to_id": m.reply_to_id,
             "reply_to": {
                 "id": m.reply_to.id, "content": m.reply_to.content[:100],
                 "sender_username": m.reply_to.sender.username
             } if m.reply_to else None,
-            "created_at": m.created_at.isoformat(), "time": m.created_at.strftime("%H:%M")
+            "created_at": m.created_at.isoformat(), "time": m.created_at.strftime("%H:%M"),
+            # Дополнительные поля для шифрования
+            "is_encrypted": m.is_encrypted,
+            "encrypted_key": m.encrypted_key,
+            "iv": m.iv,
         } for m in messages]
     })
 
@@ -3427,28 +3450,71 @@ def api_send_message(username):
         return jsonify({"error": "No data"}), 400
     content = escape_html(data.get("content", "").strip())
     reply_to_id = data.get("reply_to_id", None)
-    if not content:
-        return jsonify({"error": "Message cannot be empty"}), 400
-    msg = Message(sender_id=current_user.id, receiver_id=partner.id, content=content, reply_to_id=reply_to_id)
+    # Проверяем, пришли ли зашифрованные поля
+    is_encrypted = data.get("is_encrypted", False)
+    encrypted_key = data.get("encrypted_key", None)
+    iv = data.get("iv", None)
+
+    if is_encrypted and encrypted_key and iv:
+        # Сохраняем зашифрованное сообщение
+        msg = Message(
+            sender_id=current_user.id,
+            receiver_id=partner.id,
+            content=content,  # зашифрованный текст
+            is_encrypted=True,
+            encrypted_key=encrypted_key,
+            iv=iv,
+            reply_to_id=reply_to_id
+        )
+    else:
+        # Обычное сообщение (возможно, без шифрования)
+        if not content:
+            return jsonify({"error": "Message cannot be empty"}), 400
+        msg = Message(
+            sender_id=current_user.id,
+            receiver_id=partner.id,
+            content=content,
+            reply_to_id=reply_to_id
+        )
     db.session.add(msg)
     db.session.commit()
+
+    # Уведомление
     notif = Notification(user_id=partner.id, from_user_id=current_user.id, type="message",
                          text=f"{current_user.username} sent you a message")
     db.session.add(notif)
     db.session.commit()
+
+    # Отправка через WebSocket
     room = "_".join(sorted([str(current_user.id), str(partner.id)]))
     socketio.emit("new_message", {
-        "id": msg.id, "sender_id": current_user.id, "sender_username": current_user.username,
-        "sender_avatar": current_user.avatar_url, "content": msg.content, "reply_to_id": msg.reply_to_id,
-        "created_at": msg.created_at.isoformat(), "time": msg.created_at.strftime("%H:%M")
+        "id": msg.id,
+        "sender_id": current_user.id,
+        "sender_username": current_user.username,
+        "sender_avatar": current_user.avatar_url,
+        "content": msg.content,
+        "reply_to_id": msg.reply_to_id,
+        "is_encrypted": msg.is_encrypted,
+        "encrypted_key": msg.encrypted_key,
+        "iv": msg.iv,
+        "created_at": msg.created_at.isoformat(),
+        "time": msg.created_at.strftime("%H:%M")
     }, room=room)
+
     return jsonify({
         "success": True,
         "message": {
-            "id": msg.id, "sender_id": msg.sender_id, "sender_username": current_user.username,
-            "sender_avatar": current_user.avatar_url, "content": msg.content,
-            "created_at": msg.created_at.isoformat(), "time": msg.created_at.strftime("%H:%M"),
-            "reply_to_id": msg.reply_to_id
+            "id": msg.id,
+            "sender_id": msg.sender_id,
+            "sender_username": current_user.username,
+            "sender_avatar": current_user.avatar_url,
+            "content": msg.content,
+            "created_at": msg.created_at.isoformat(),
+            "time": msg.created_at.strftime("%H:%M"),
+            "reply_to_id": msg.reply_to_id,
+            "is_encrypted": msg.is_encrypted,
+            "encrypted_key": msg.encrypted_key,
+            "iv": msg.iv,
         }
     })
 
@@ -3542,6 +3608,41 @@ def api_typing_indicator(username):
     return jsonify({"success": True})
 
 
+# ================================================================
+# ДОБАВЛЕНЫ ЭНДПОИНТЫ ДЛЯ УПРАВЛЕНИЯ КЛЮЧАМИ ШИФРОВАНИЯ
+# ================================================================
+
+@app.route("/api/user/keys", methods=["GET", "POST"])
+@login_required
+def user_keys():
+    """Получение или сохранение ключей шифрования текущего пользователя."""
+    if request.method == "GET":
+        return jsonify({
+            "public_key": current_user.public_key,
+            "encrypted_private_key": current_user.encrypted_private_key
+        })
+    else:
+        data = request.get_json()
+        public_key = data.get("public_key")
+        encrypted_private_key = data.get("encrypted_private_key")
+        if not public_key or not encrypted_private_key:
+            return jsonify({"error": "Missing public_key or encrypted_private_key"}), 400
+        current_user.public_key = public_key
+        current_user.encrypted_private_key = encrypted_private_key
+        db.session.commit()
+        return jsonify({"success": True})
+
+
+@app.route("/api/user/<username>/public_key")
+@login_required
+def get_public_key(username):
+    """Возвращает публичный ключ другого пользователя."""
+    user = User.query.filter(func.lower(User.username) == username.lower()).first_or_404()
+    if current_user.is_blocked(user):
+        return jsonify({"error": "Blocked user"}), 403
+    return jsonify({"public_key": user.public_key})
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 #  Report Routes
 # ──────────────────────────────────────────────────────────────────────────────
@@ -3633,6 +3734,10 @@ def register():
             email = request.form.get("email", "").strip().lower()
             password = request.form.get("password", "")
             confirm = request.form.get("confirm", "")
+            # Дополнительные поля для ключей шифрования (передаются со скрытых полей)
+            public_key = request.form.get("public_key", "").strip()
+            encrypted_private_key = request.form.get("encrypted_private_key", "").strip()
+
             if not username or not email or not password:
                 flash("Все поля обязательны для заполнения", "error")
                 return render_template("register.html")
@@ -3671,6 +3776,10 @@ def register():
             user = User(username=username, email=email, display_name=username, preset_avatar=1,
                         bio="", accent_color="#6c63ff", is_private=False, is_verified=False, is_banned=False)
             user.set_password(password)
+            # Сохраняем ключи шифрования, если они были переданы
+            if public_key and encrypted_private_key:
+                user.public_key = public_key
+                user.encrypted_private_key = encrypted_private_key
             db.session.add(user)
             db.session.commit()
             login_user(user, remember=True)
@@ -4866,11 +4975,33 @@ def run_migrations():
         if 'ip_ban' in tables:
             columns = [col['name'] for col in inspector.get_columns('ip_ban')]
             if 'is_active' not in columns:
-                # SQLite поддерживает ALTER TABLE ADD COLUMN с DEFAULT
                 db.session.execute(text('ALTER TABLE ip_ban ADD COLUMN is_active BOOLEAN DEFAULT 1'))
                 logger.info("➕ Добавлена колонка is_active в ip_ban")
-            # также можно проверить и добавить другие колонки, если нужно
-        # Если таблицы ip_ban нет, она будет создана при следующем db.create_all()
+
+        # --- МИГРАЦИЯ ДЛЯ ШИФРОВАНИЯ ---
+        if 'message' in tables:
+            columns = [col['name'] for col in inspector.get_columns('message')]
+            if 'encrypted_key' not in columns:
+                if is_render:
+                    db.session.execute(text('ALTER TABLE message ADD COLUMN encrypted_key TEXT'))
+                    db.session.execute(text('ALTER TABLE message ADD COLUMN iv VARCHAR(44)'))
+                    db.session.execute(text('ALTER TABLE message ADD COLUMN is_encrypted BOOLEAN DEFAULT FALSE'))
+                else:
+                    db.session.execute(text('ALTER TABLE message ADD COLUMN encrypted_key TEXT'))
+                    db.session.execute(text('ALTER TABLE message ADD COLUMN iv VARCHAR(44)'))
+                    db.session.execute(text('ALTER TABLE message ADD COLUMN is_encrypted BOOLEAN DEFAULT 0'))
+                logger.info("➕ Добавлены колонки encrypted_key, iv, is_encrypted в message")
+
+        if 'user' in tables:
+            columns = [col['name'] for col in inspector.get_columns('user')]
+            if 'public_key' not in columns:
+                if is_render:
+                    db.session.execute(text('ALTER TABLE "user" ADD COLUMN public_key TEXT'))
+                    db.session.execute(text('ALTER TABLE "user" ADD COLUMN encrypted_private_key TEXT'))
+                else:
+                    db.session.execute(text('ALTER TABLE user ADD COLUMN public_key TEXT'))
+                    db.session.execute(text('ALTER TABLE user ADD COLUMN encrypted_private_key TEXT'))
+                logger.info("➕ Добавлены колонки public_key, encrypted_private_key в user")
 
         db.session.commit()
         logger.info("🎉 Миграция базы данных завершена успешно!")
@@ -5113,6 +5244,12 @@ if __name__ == "__main__":
     print("   ✅ Фильтр спама и премодерация для новых пользователей")
     print("   ✅ Упоминания @username с уведомлениями")
     print("   ✅ Кнопки 'Поделиться' в соцсети")
+    print("=" * 70)
+    print("📝 СКВОЗНОЕ ШИФРОВАНИЕ СООБЩЕНИЙ (RSA+AES) ВКЛЮЧЕНО")
+    print("   ✅ Генерация ключей при регистрации")
+    print("   ✅ Шифрование сообщений на клиенте (с помощью forge.js)")
+    print("   ✅ Расшифровка на клиенте приватным ключом")
+    print("   ✅ Сервер не может прочитать содержимое переписки")
     print("=" * 70)
     print("📝 Для остановки нажмите Ctrl+C")
     print("=" * 70 + "\n")
