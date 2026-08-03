@@ -117,6 +117,7 @@
     display: flex;
     flex-direction: column;
     background: var(--bg);
+    position: relative;
   }
 
   .chat-header {
@@ -193,6 +194,8 @@
     display: flex;
     gap: 10px;
     animation: fadeIn 0.3s ease;
+    position: relative;
+    padding: 4px 0;
   }
 
   .message.own {
@@ -451,11 +454,11 @@
     cursor: not-allowed;
   }
 
-  /* Emoji picker */
+  /* Emoji picker - теперь справа */
   .emoji-picker {
     position: absolute;
     bottom: 80px;
-    left: 20px;
+    right: 20px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 12px;
@@ -483,6 +486,83 @@
 
   .emoji-btn:hover {
     background: rgba(255,255,255,0.1);
+  }
+
+  /* Sticker picker - справа */
+  .sticker-picker {
+    position: absolute;
+    bottom: 80px;
+    right: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 15px;
+    display: none;
+    z-index: 100;
+    max-width: 350px;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .sticker-picker.show {
+    display: block;
+  }
+
+  .sticker-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+
+  .sticker-item {
+    width: 70px;
+    height: 70px;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: transform 0.2s, background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.05);
+  }
+
+  .sticker-item:hover {
+    transform: scale(1.1);
+    background: rgba(255,255,255,0.1);
+  }
+
+  .sticker-item img {
+    width: 60px;
+    height: 60px;
+    object-fit: contain;
+  }
+
+  .sticker-categories {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .sticker-category-btn {
+    padding: 5px 12px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 15px;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+  }
+
+  .sticker-category-btn:hover {
+    background: rgba(255,255,255,0.1);
+  }
+
+  .sticker-category-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
   }
 
   /* Pending message */
@@ -611,6 +691,126 @@
     background: rgba(255,255,255,0.05);
   }
 
+  /* ============================================================
+     CONTEXT MENU STYLES - ИСПРАВЛЕННАЯ ВЕРСИЯ
+     ============================================================ */
+  .context-menu {
+    position: fixed;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px 0;
+    min-width: 220px;
+    max-width: 280px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+    z-index: 10000;
+    display: none;
+    animation: fadeIn 0.15s ease;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+
+  .context-menu.show {
+    display: block;
+  }
+
+  .context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    color: var(--text);
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.15s;
+  }
+
+  .context-menu-item:hover {
+    background: rgba(255,255,255,0.05);
+  }
+
+  .context-menu-item i {
+    width: 20px;
+    color: var(--text-muted);
+  }
+
+  .context-menu-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 12px;
+  }
+
+  .context-menu-reactions {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+    padding: 12px;
+  }
+
+  .context-menu-reaction-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    padding: 6px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform 0.15s, background 0.15s;
+  }
+
+  .context-menu-reaction-btn:hover {
+    transform: scale(1.3);
+    background: rgba(255,255,255,0.05);
+  }
+
+  /* Message Reactions */
+  .message-reactions {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+  }
+
+  .message-reaction {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2px 10px 2px 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+  }
+
+  .message-reaction:hover {
+    background: rgba(255,255,255,0.1);
+    transform: scale(1.05);
+  }
+
+  .message-reaction .reaction-emoji {
+    font-size: 1rem;
+  }
+
+  .message-reaction .reaction-count {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+  }
+
+  .message-reaction.active {
+    background: rgba(124,111,255,0.15);
+    border-color: var(--primary);
+  }
+
+  .message-reaction.active .reaction-count {
+    color: var(--primary);
+  }
+
   @keyframes fadeIn {
     from {
       opacity: 0;
@@ -688,6 +888,9 @@
         <button class="chat-action-btn" onclick="toggleEmojiPicker()" title="Emoji">
           <i class="fa-regular fa-face-smile"></i>
         </button>
+        <button class="chat-action-btn" onclick="toggleStickerPicker()" title="Stickers">
+          <i class="fa-regular fa-face-laugh"></i>
+        </button>
       </div>
     </div>
 
@@ -729,14 +932,14 @@
                   placeholder="Message @{{ partner.username }}..."
                   rows="1"
                   onkeydown="handleKeyPress(event)"
-                  oninput="autoResize(this); sendTyping()"></textarea>
+                  oninput="handleInputChange()"></textarea>
         <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>
           <i class="fa-regular fa-paper-plane"></i>
         </button>
       </div>
     </div>
 
-    <!-- Emoji Picker -->
+    <!-- Emoji Picker - справа -->
     <div class="emoji-picker" id="emojiPicker">
       <button class="emoji-btn" onclick="addEmoji('😀')">😀</button>
       <button class="emoji-btn" onclick="addEmoji('😊')">😊</button>
@@ -755,7 +958,46 @@
       <button class="emoji-btn" onclick="addEmoji('👀')">👀</button>
       <button class="emoji-btn" onclick="addEmoji('✨')">✨</button>
     </div>
+
+    <!-- Sticker Picker - справа -->
+    <div class="sticker-picker" id="stickerPicker">
+      <div class="sticker-categories">
+        <button class="sticker-category-btn active" onclick="switchStickerCategory('all')">All</button>
+        <button class="sticker-category-btn" onclick="switchStickerCategory('happy')">😊</button>
+        <button class="sticker-category-btn" onclick="switchStickerCategory('sad')">😢</button>
+        <button class="sticker-category-btn" onclick="switchStickerCategory('angry')">😡</button>
+        <button class="sticker-category-btn" onclick="switchStickerCategory('love')">❤️</button>
+      </div>
+      <div class="sticker-grid" id="stickerGrid">
+        <!-- Stickers will be loaded here -->
+      </div>
+    </div>
   </div>
+</div>
+
+<!-- Context Menu -->
+<div class="context-menu" id="contextMenu">
+  <div id="contextMenuReactions" class="context-menu-reactions">
+    <button class="context-menu-reaction-btn" onclick="addReaction('👍')">👍</button>
+    <button class="context-menu-reaction-btn" onclick="addReaction('❤️')">❤️</button>
+    <button class="context-menu-reaction-btn" onclick="addReaction('😂')">😂</button>
+    <button class="context-menu-reaction-btn" onclick="addReaction('😮')">😮</button>
+    <button class="context-menu-reaction-btn" onclick="addReaction('😢')">😢</button>
+    <button class="context-menu-reaction-btn" onclick="addReaction('🔥')">🔥</button>
+  </div>
+  <div class="context-menu-divider"></div>
+  <button class="context-menu-item" onclick="contextMenuReply()">
+    <i class="fa-regular fa-reply"></i> Reply
+  </button>
+  <button class="context-menu-item" onclick="contextMenuForward()">
+    <i class="fa-regular fa-share-from-square"></i> Forward
+  </button>
+  <button class="context-menu-item" id="contextMenuEdit" onclick="contextMenuEdit()" style="display: none;">
+    <i class="fa-regular fa-pen-to-square"></i> Edit
+  </button>
+  <button class="context-menu-item" id="contextMenuDelete" onclick="contextMenuDelete()" style="display: none;">
+    <i class="fa-regular fa-trash-can" style="color: var(--danger);"></i> Delete
+  </button>
 </div>
 
 <!-- Edit Message Modal -->
@@ -821,6 +1063,36 @@ let isInitialLoad = true;
 let lastSentTime = 0;
 let lastSentContent = '';
 
+// Context menu variables
+let contextMessageId = null;
+let contextMessageContent = '';
+let contextMessageSender = '';
+let contextIsOwn = false;
+
+// Stickers data
+const stickers = {
+  all: [
+    { id: 1, emoji: '😊', category: 'happy' },
+    { id: 2, emoji: '😂', category: 'happy' },
+    { id: 3, emoji: '🥳', category: 'happy' },
+    { id: 4, emoji: '🤩', category: 'happy' },
+    { id: 5, emoji: '😢', category: 'sad' },
+    { id: 6, emoji: '😭', category: 'sad' },
+    { id: 7, emoji: '🥺', category: 'sad' },
+    { id: 8, emoji: '😤', category: 'angry' },
+    { id: 9, emoji: '😡', category: 'angry' },
+    { id: 10, emoji: '🤬', category: 'angry' },
+    { id: 11, emoji: '❤️', category: 'love' },
+    { id: 12, emoji: '💕', category: 'love' },
+    { id: 13, emoji: '🥰', category: 'love' },
+    { id: 14, emoji: '😘', category: 'love' },
+    { id: 15, emoji: '👍', category: 'happy' },
+    { id: 16, emoji: '👎', category: 'angry' }
+  ]
+};
+
+let currentStickerCategory = 'all';
+
 // Join chat room
 socket.emit('join_chat', { room: room });
 
@@ -829,12 +1101,62 @@ document.addEventListener('DOMContentLoaded', function() {
   loadConversations();
   loadMessages();
   startPolling();
+  loadStickers();
 
   const input = document.getElementById('messageInput');
   if (input && document.getElementById('isBlocked').value !== 'true') {
     input.focus();
   }
 });
+
+// ============================================================
+// LOAD STICKERS
+// ============================================================
+
+function loadStickers() {
+  renderStickers('all');
+}
+
+function renderStickers(category) {
+  const grid = document.getElementById('stickerGrid');
+  let stickerList = stickers.all;
+
+  if (category !== 'all') {
+    stickerList = stickers.all.filter(s => s.category === category);
+  }
+
+  grid.innerHTML = stickerList.map(sticker => `
+    <div class="sticker-item" onclick="sendSticker('${sticker.emoji}')">
+      <span style="font-size: 2.5rem;">${sticker.emoji}</span>
+    </div>
+  `).join('');
+}
+
+function switchStickerCategory(category) {
+  currentStickerCategory = category;
+  document.querySelectorAll('.sticker-category-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  document.querySelector(`.sticker-category-btn[onclick*="${category}"]`)?.classList.add('active');
+  renderStickers(category);
+}
+
+function toggleStickerPicker() {
+  const picker = document.getElementById('stickerPicker');
+  const emojiPicker = document.getElementById('emojiPicker');
+  emojiPicker.classList.remove('show');
+  picker.classList.toggle('show');
+}
+
+function sendSticker(emoji) {
+  const input = document.getElementById('messageInput');
+  input.value += emoji;
+  updateSendButton();
+  autoResize(input);
+  sendTyping();
+  document.getElementById('stickerPicker').classList.remove('show');
+  input.focus();
+}
 
 // ============================================================
 // LOAD CONVERSATIONS (Sidebar)
@@ -926,6 +1248,10 @@ async function loadMessages() {
   }
 }
 
+// ============================================================
+// RENDER MESSAGE WITH REACTIONS
+// ============================================================
+
 function renderMessage(msg) {
   const isOwn = msg.sender_id === currentUserId;
 
@@ -944,8 +1270,23 @@ function renderMessage(msg) {
     editedHtml = `<div class="message-edited"><i class="fa-regular fa-pen-to-square"></i> edited</div>`;
   }
 
+  // Reactions
+  let reactionsHtml = '';
+  if (msg.reactions && Object.keys(msg.reactions).length > 0) {
+    reactionsHtml = '<div class="message-reactions">';
+    for (const [emoji, data] of Object.entries(msg.reactions)) {
+      reactionsHtml += `
+        <span class="message-reaction ${data.user_reacted ? 'active' : ''}" onclick="event.stopPropagation(); toggleReaction(${msg.id}, '${emoji}')">
+          <span class="reaction-emoji">${emoji}</span>
+          <span class="reaction-count">${data.count}</span>
+        </span>
+      `;
+    }
+    reactionsHtml += '</div>';
+  }
+
   return `
-    <div class="message ${isOwn ? 'own' : ''}" id="msg-${msg.id}" data-message-id="${msg.id}">
+    <div class="message ${isOwn ? 'own' : ''}" id="msg-${msg.id}" data-message-id="${msg.id}" data-owner="${isOwn ? 'own' : 'other'}">
       <div class="message-actions">
         <button class="message-action-btn" onclick="replyToMessage(${msg.id}, '${escapeJs(msg.content || '')}', '${escapeJs(msg.sender_username || '')}')" title="Reply">
           <i class="fa-regular fa-reply"></i>
@@ -971,6 +1312,7 @@ function renderMessage(msg) {
         ${replyHtml}
         <div>${escapeHtml(msg.content || '')}</div>
         ${editedHtml}
+        ${reactionsHtml}
         <div class="message-time">
           ${msg.time || new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           ${isOwn && msg.is_read ? '<i class="fa-regular fa-circle-check" style="margin-left: 5px; color: #4ade80;"></i>' : ''}
@@ -981,7 +1323,7 @@ function renderMessage(msg) {
 }
 
 // ============================================================
-// SEND MESSAGE (with duplicate protection)
+// SEND MESSAGE
 // ============================================================
 
 async function sendMessage() {
@@ -1022,7 +1364,7 @@ async function sendMessage() {
       input.value = '';
       input.style.height = 'auto';
       cancelReply();
-      checkInput();
+      updateSendButton();
 
       // Show temporary message while waiting for confirmation
       showTempMessage(content);
@@ -1044,13 +1386,20 @@ function showTempMessage(content) {
   const container = document.getElementById('messagesArea');
   const tempId = 'temp_' + Date.now();
 
-  // Check if we need date separator
-  const lastMsg = container.lastElementChild;
   const now = new Date();
   const todayStr = formatDate(now.toISOString());
 
-  if (!lastMsg || !lastMsg.classList.contains('date-separator') ||
-      (lastMsg.classList.contains('date-separator') && !lastMsg.innerHTML.includes(todayStr))) {
+  // Check if we need date separator
+  let lastDateSeparator = null;
+  for (let i = container.children.length - 1; i >= 0; i--) {
+    const child = container.children[i];
+    if (child.classList && child.classList.contains('date-separator')) {
+      lastDateSeparator = child;
+      break;
+    }
+  }
+
+  if (!lastDateSeparator || !lastDateSeparator.innerHTML.includes(todayStr)) {
     const separator = document.createElement('div');
     separator.className = 'date-separator';
     separator.innerHTML = `<span>${todayStr}</span>`;
@@ -1081,6 +1430,201 @@ function showTempMessage(content) {
       tempDiv.remove();
     }
   }, 5000);
+}
+
+// ============================================================
+// CONTEXT MENU - ИСПРАВЛЕННАЯ ВЕРСИЯ
+// ============================================================
+
+document.addEventListener('contextmenu', function(e) {
+  // Check if click was on a message
+  const messageDiv = e.target.closest('.message');
+  if (!messageDiv) {
+    hideContextMenu();
+    return;
+  }
+
+  e.preventDefault();
+
+  // Get message ID
+  const messageId = messageDiv.dataset.messageId;
+  if (!messageId) return;
+
+  // Save message data
+  contextMessageId = parseInt(messageId);
+  contextIsOwn = messageDiv.dataset.owner === 'own';
+
+  // Find message content
+  const bubbleDiv = messageDiv.querySelector('.message-bubble');
+  const contentDiv = bubbleDiv.querySelector('div:not(.message-reply):not(.message-time):not(.message-edited):not(.message-reactions)');
+  if (contentDiv) {
+    contextMessageContent = contentDiv.textContent || '';
+  }
+
+  // Determine sender
+  contextMessageSender = contextIsOwn ? '{{ current_user.username }}' : partnerUsername;
+
+  // Show/hide edit/delete buttons based on ownership
+  document.getElementById('contextMenuEdit').style.display = contextIsOwn ? 'flex' : 'none';
+  document.getElementById('contextMenuDelete').style.display = contextIsOwn ? 'flex' : 'none';
+
+  // Show menu
+  const menu = document.getElementById('contextMenu');
+
+  // Сначала показываем меню, чтобы измерить его размеры
+  menu.classList.add('show');
+  menu.style.left = '0px';
+  menu.style.top = '0px';
+
+  // Получаем размеры меню после отображения
+  const menuWidth = menu.offsetWidth;
+  const menuHeight = menu.offsetHeight;
+
+  // Вычисляем позицию
+  let left = e.pageX + 10;
+  let top = e.pageY;
+
+  // Проверяем правую границу - если меню выходит за правый край, сдвигаем влево
+  if (left + menuWidth > window.innerWidth - 10) {
+    left = e.pageX - menuWidth - 10;
+  }
+
+  // Проверяем левую границу
+  if (left < 10) {
+    left = 10;
+  }
+
+  // Проверяем нижнюю границу
+  if (top + menuHeight > window.innerHeight - 10) {
+    top = window.innerHeight - menuHeight - 10;
+  }
+
+  // Проверяем верхнюю границу
+  if (top < 10) {
+    top = 10;
+  }
+
+  menu.style.left = left + 'px';
+  menu.style.top = top + 'px';
+});
+
+// Hide context menu on click outside
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.context-menu')) {
+    hideContextMenu();
+  }
+});
+
+function hideContextMenu() {
+  document.getElementById('contextMenu').classList.remove('show');
+  contextMessageId = null;
+}
+
+// ============================================================
+// CONTEXT MENU ACTIONS
+// ============================================================
+
+function contextMenuReply() {
+  if (contextMessageId) {
+    replyToMessage(contextMessageId, contextMessageContent, contextMessageSender);
+    hideContextMenu();
+  }
+}
+
+function contextMenuForward() {
+  if (contextMessageId) {
+    openForwardModal(contextMessageId);
+    hideContextMenu();
+  }
+}
+
+function contextMenuEdit() {
+  if (contextMessageId) {
+    openEditModal(contextMessageId, contextMessageContent);
+    hideContextMenu();
+  }
+}
+
+function contextMenuDelete() {
+  if (contextMessageId) {
+    deleteMessage(contextMessageId);
+    hideContextMenu();
+  }
+}
+
+// ============================================================
+// REACTIONS
+// ============================================================
+
+async function addReaction(emoji) {
+  if (!contextMessageId) {
+    hideContextMenu();
+    return;
+  }
+
+  await toggleReaction(contextMessageId, emoji);
+  hideContextMenu();
+}
+
+async function toggleReaction(messageId, emoji) {
+  try {
+    const response = await fetch(`/api/messages/${messageId}/react`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': document.getElementById('csrfToken').value
+      },
+      body: JSON.stringify({ emoji: emoji })
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      updateReactionDisplay(messageId, data.reactions);
+    }
+  } catch (error) {
+    console.error('Error toggling reaction:', error);
+    toast('Error adding reaction', 'error');
+  }
+}
+
+function updateReactionDisplay(messageId, reactions) {
+  const messageDiv = document.getElementById(`msg-${messageId}`);
+  if (!messageDiv) return;
+
+  // Remove old reactions
+  const oldReactions = messageDiv.querySelector('.message-reactions');
+  if (oldReactions) oldReactions.remove();
+
+  if (!reactions || Object.keys(reactions).length === 0) return;
+
+  const reactionsDiv = document.createElement('div');
+  reactionsDiv.className = 'message-reactions';
+
+  for (const [emoji, data] of Object.entries(reactions)) {
+    const reactionSpan = document.createElement('span');
+    reactionSpan.className = `message-reaction ${data.user_reacted ? 'active' : ''}`;
+    reactionSpan.innerHTML = `
+      <span class="reaction-emoji">${emoji}</span>
+      <span class="reaction-count">${data.count}</span>
+    `;
+
+    reactionSpan.onclick = function(e) {
+      e.stopPropagation();
+      toggleReaction(messageId, emoji);
+    };
+
+    reactionsDiv.appendChild(reactionSpan);
+  }
+
+  // Insert reactions before the time
+  const bubble = messageDiv.querySelector('.message-bubble');
+  const timeDiv = bubble.querySelector('.message-time');
+  if (timeDiv) {
+    bubble.insertBefore(reactionsDiv, timeDiv);
+  } else {
+    bubble.appendChild(reactionsDiv);
+  }
 }
 
 // ============================================================
@@ -1137,7 +1681,7 @@ function updateMessageContent(messageId, newContent) {
   const messageDiv = document.getElementById(`msg-${messageId}`);
   if (messageDiv) {
     const bubbleDiv = messageDiv.querySelector('.message-bubble');
-    const contentDiv = bubbleDiv.querySelector('div:not(.message-reply):not(.message-time):not(.message-edited)');
+    const contentDiv = bubbleDiv.querySelector('div:not(.message-reply):not(.message-time):not(.message-edited):not(.message-reactions)');
     if (contentDiv) contentDiv.innerHTML = escapeHtml(newContent);
 
     let editedDiv = bubbleDiv.querySelector('.message-edited');
@@ -1278,6 +1822,19 @@ function cancelReply() {
   document.getElementById('replyIndicator').classList.remove('show');
 }
 
+function scrollToMessage(messageId) {
+  const messageDiv = document.getElementById(`msg-${messageId}`);
+  if (messageDiv) {
+    messageDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Highlight the message
+    messageDiv.style.transition = 'background 0.5s';
+    messageDiv.style.background = 'rgba(124,111,255,0.15)';
+    setTimeout(() => {
+      messageDiv.style.background = 'transparent';
+    }, 2000);
+  }
+}
+
 // ============================================================
 // TYPING INDICATOR
 // ============================================================
@@ -1395,6 +1952,12 @@ socket.on('message_deleted', function(data) {
   if (messageDiv) messageDiv.remove();
 });
 
+socket.on('message_reacted', function(data) {
+  if (data.message_id) {
+    updateReactionDisplay(data.message_id, data.reactions);
+  }
+});
+
 // ============================================================
 // APPEND MESSAGE
 // ============================================================
@@ -1428,59 +1991,15 @@ function appendMessage(msg) {
     container.appendChild(separator);
   }
 
-  let replyHtml = '';
-  if (msg.reply_to) {
-    replyHtml = `
-      <div class="message-reply" onclick="scrollToMessage(${msg.reply_to.id})">
-        <div class="reply-sender">${escapeHtml(msg.reply_to.sender_username || '')}</div>
-        <div class="reply-content">${escapeHtml((msg.reply_to.content || '').substring(0, 80))}</div>
-      </div>
-    `;
+  // Create message using render function
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = renderMessage(msg);
+  const messageElement = tempDiv.firstElementChild;
+
+  if (messageElement) {
+    container.appendChild(messageElement);
+    scrollToBottom();
   }
-
-  let editedHtml = '';
-  if (msg.is_edited) {
-    editedHtml = `<div class="message-edited"><i class="fa-regular fa-pen-to-square"></i> edited</div>`;
-  }
-
-  const messageDiv = document.createElement('div');
-  messageDiv.className = `message ${isOwn ? 'own' : ''}`;
-  messageDiv.id = `msg-${msg.id}`;
-  messageDiv.innerHTML = `
-    <div class="message-actions">
-      <button class="message-action-btn" onclick="replyToMessage(${msg.id}, '${escapeJs(msg.content || '')}', '${escapeJs(msg.sender_username || '')}')">
-        <i class="fa-regular fa-reply"></i>
-      </button>
-      <button class="message-action-btn" onclick="openForwardModal(${msg.id})">
-        <i class="fa-regular fa-share-from-square"></i>
-      </button>
-      ${isOwn ? `
-        <button class="message-action-btn" onclick="openEditModal(${msg.id}, '${escapeJs(msg.content || '')}')">
-          <i class="fa-regular fa-pen-to-square"></i>
-        </button>
-        <button class="message-action-btn delete" onclick="deleteMessage(${msg.id})">
-          <i class="fa-regular fa-trash-can"></i>
-        </button>
-      ` : ''}
-    </div>
-    ${!isOwn ? `
-    <div class="message-avatar">
-      <img src="${msg.sender_avatar || '/static/default_avatar.png'}" onerror="this.src='/static/default_avatar.png'">
-    </div>
-    ` : ''}
-    <div class="message-bubble">
-      ${replyHtml}
-      <div>${escapeHtml(msg.content || '')}</div>
-      ${editedHtml}
-      <div class="message-time">
-        ${msg.time || new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        ${isOwn && msg.is_read ? '<i class="fa-regular fa-circle-check" style="margin-left: 5px; color: #4ade80;"></i>' : ''}
-      </div>
-    </div>
-  `;
-
-  container.appendChild(messageDiv);
-  scrollToBottom();
 }
 
 // ============================================================
@@ -1633,29 +2152,32 @@ function filterConversations() {
 
 function toggleEmojiPicker() {
   const picker = document.getElementById('emojiPicker');
+  const stickerPicker = document.getElementById('stickerPicker');
+  stickerPicker.classList.remove('show');
   picker.classList.toggle('show');
 }
 
 function addEmoji(emoji) {
   const input = document.getElementById('messageInput');
-  input.value += emoji;
+  const start = input.selectionStart;
+  const end = input.selectionEnd;
+  const value = input.value;
+
+  input.value = value.substring(0, start) + emoji + value.substring(end);
+
+  const newCursorPos = start + emoji.length;
+  input.selectionStart = newCursorPos;
+  input.selectionEnd = newCursorPos;
+
   input.focus();
   document.getElementById('emojiPicker').classList.remove('show');
-  checkInput();
+
+  updateSendButton();
+  autoResize(input);
+  sendTyping();
 }
 
-function scrollToMessage(messageId) {
-  const messageDiv = document.getElementById(`msg-${messageId}`);
-  if (messageDiv) {
-    messageDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    messageDiv.style.backgroundColor = 'rgba(124,111,255,0.1)';
-    setTimeout(() => {
-      messageDiv.style.backgroundColor = '';
-    }, 2000);
-  }
-}
-
-function checkInput() {
+function updateSendButton() {
   const input = document.getElementById('messageInput');
   const sendBtn = document.getElementById('sendBtn');
   sendBtn.disabled = !input.value.trim();
@@ -1664,7 +2186,13 @@ function checkInput() {
 function autoResize(textarea) {
   textarea.style.height = 'auto';
   textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
-  checkInput();
+}
+
+function handleInputChange() {
+  const input = document.getElementById('messageInput');
+  updateSendButton();
+  autoResize(input);
+  sendTyping();
 }
 
 function handleKeyPress(event) {
@@ -1776,6 +2304,16 @@ document.addEventListener('keydown', function(e) {
     closeEditModal();
     closeForwardModal();
     document.getElementById('emojiPicker').classList.remove('show');
+    document.getElementById('stickerPicker').classList.remove('show');
+    hideContextMenu();
+  }
+});
+
+// Click on emoji/sticker picker outside to close
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('#emojiPicker') && !e.target.closest('.chat-action-btn') && !e.target.closest('.sticker-picker')) {
+    document.getElementById('emojiPicker').classList.remove('show');
+    document.getElementById('stickerPicker').classList.remove('show');
   }
 });
 </script>
